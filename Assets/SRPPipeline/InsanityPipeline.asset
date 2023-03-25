@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d72a3831e2ca99e4c8b40d19d42278a6, type: 3}
+  m_Name: InsanityPipeline
+  m_EditorClassIdentifier: 
+  m_ShadowDistance: 50
+  m_ShadowCascades: 1
+  m_Cascade2Split: 0.25
+  m_Cascade4Split: {x: 0.067, y: 0.2, z: 0.467}
+  m_ShadowDepthBias: 0.57
+  m_ShadowNormalBias: 0.75
+  m_SoftShadowsSupported: 0
+  m_AdaptiveShadowBias: 0
+  m_EnableCSMBlend: 1
+  m_CSMBlendDistance: 0.43
+  m_ShadowType: 3
+  m_ShadowPCFFilter: 0
+  m_PCSSSoftness: 1
+  m_PCSSSoftnessFalloff: 3
+  m_ShadowPrefitlerGaussianRadius: 1
+  m_EVSMExponents: {x: 5, y: 5}
+  m_LightBleedingReduction: 0.255
