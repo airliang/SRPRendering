@@ -120,8 +120,8 @@ real ChebyshevEquation(float t, float mean, float variance)
 real SampleVarianceShadowmap(Texture2D shadowMap, SamplerState samp, float4 shadowCoord)
 {
     float2 uv = shadowCoord.xy;
-    //float4 shadow = SAMPLE_TEXTURE2D_LOD(shadowMap, samp, uv, 0);
-    float4 shadow = SAMPLE_TEXTURE2D(shadowMap, samp, uv);
+    float4 shadow = SAMPLE_TEXTURE2D_LOD(shadowMap, samp, uv, 0);
+    //float4 shadow = SAMPLE_TEXTURE2D(shadowMap, samp, uv);
     float mean = shadow.r;
     float z = shadowCoord.z;
 #if defined(UNITY_REVERSED_Z)

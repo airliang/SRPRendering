@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 286b9683d697eba41a7e7b83235e08b4, type: 3}
+  m_Name: InsanityPipelineResources
+  m_EditorClassIdentifier: 
+  shaders:
+    Blit: {fileID: 4800000, guid: 7c0b0718aa2f5834ea739d5009bbbc0d, type: 3}
+    HDRISky: {fileID: 4800000, guid: 06c01dc3845ea1245802e318cacb5273, type: 3}
+    ParallelScan: {fileID: 7200000, guid: 8a4fde720a0fdb34b99ff02187040f19, type: 3}
+  materials:
+    Blit: {fileID: 0}
+    Skybox: {fileID: 2100000, guid: 67452d3878198b14b84d18147ea1dab2, type: 2}

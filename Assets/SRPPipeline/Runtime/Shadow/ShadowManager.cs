@@ -116,6 +116,7 @@ namespace Insanity
         ShadowSettings m_shadowSetting;
         IShadowCaster m_shadowCaster;
         PrefilterShadowPass m_prefilterPass;
+        
 
         private static class MainLightShadowConstantBuffer
         {
@@ -423,7 +424,11 @@ namespace Insanity
             Bounds bounds;
             bool doShadow = m_MainLight.shadows != LightShadows.None && cullResults.GetShadowCasterBounds(m_mainLightShadowIndex, out bounds);
             if (!doShadow)
+            {
+                Shader.DisableKeyword("_MAIN_LIGHT_SHADOWS");
+                Shader.DisableKeyword("_SHADOWS_SOFT");
                 return null;
+            }
 
             using (var builder = renderGraph.AddRenderPass<ShadowPassData>("Render Shadow Maps", out var passData, new ProfilingSampler("ShadowPass Profiler")))
             {

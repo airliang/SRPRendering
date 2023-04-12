@@ -38,6 +38,10 @@ namespace UnityEditor.Insanity
             public static string[] shadowTypeOptions = { "PCF", "PCSS", "VSM", "EVSM", "MSM" };
             public static string[] shadowPCFFilterOptions = { "Hard", "Low", "Medium", "High" };
             public static string[] gaussianFilterRadiusOptions = { "3x3", "5x5", "9x9", "13x13" };
+
+            public static GUIContent resourcesSettingsText = EditorGUIUtility.TrTextContent("Resources");
+            public static GUIContent pipelineResourcesText = EditorGUIUtility.TrTextContent("Pipeline Resources", 
+                    "The pipeline resources asset that contains all the shaders and other resources used by the pipeline.");
         }
 
 
@@ -63,11 +67,15 @@ namespace UnityEditor.Insanity
         SerializedProperty m_ShadowPrefilterGaussians;
         SerializedProperty m_ExponentialConstants;
         SerializedProperty m_LightBleedingReduction;
+
+        SavedBool m_ResourcesSettingsFoldout;
+        SerializedProperty m_PipelineResources;
              
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
 
+            DrawPipelineResources();
             DrawShadowSettings();
 
 
@@ -95,6 +103,9 @@ namespace UnityEditor.Insanity
             m_ShadowPrefilterGaussians = serializedObject.FindProperty("m_ShadowPrefitlerGaussianRadius");
             m_ExponentialConstants = serializedObject.FindProperty("m_EVSMExponents");
             m_LightBleedingReduction = serializedObject.FindProperty("m_LightBleedingReduction");
+            m_PipelineResources = serializedObject.FindProperty("m_PipelineResources");
+
+            m_ResourcesSettingsFoldout = new SavedBool($"{target.GetType()}.ResourcesSettingsFoldout", false);
         }
 
         void DrawShadowSettings()
@@ -156,6 +167,22 @@ namespace UnityEditor.Insanity
                 EditorGUILayout.Space();
                 EditorGUILayout.Space();
             }
+            EditorGUILayout.EndFoldoutHeaderGroup();
+        }
+
+        void DrawPipelineResources()
+        {
+            m_ResourcesSettingsFoldout.value = EditorGUILayout.BeginFoldoutHeaderGroup(m_ResourcesSettingsFoldout.value, Styles.resourcesSettingsText);
+            if (m_ResourcesSettingsFoldout.value)
+            {
+                EditorGUI.indentLevel++;
+                m_PipelineResources.objectReferenceValue = EditorGUILayout.ObjectField(Styles.pipelineResourcesText,
+                m_PipelineResources.objectReferenceValue, typeof(InsanityPipelineResources), false);
+
+                EditorGUI.indentLevel--;
+                EditorGUILayout.Space();
+            }
+
             EditorGUILayout.EndFoldoutHeaderGroup();
         }
     }

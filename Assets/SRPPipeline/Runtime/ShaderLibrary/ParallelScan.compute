@@ -1,0 +1,159 @@
+// Each #kernel tells which function to compile; you can have many kernels
+//presum array kernel
+#pragma kernel PreSum
+
+//presum group array kernel
+#pragma kernel PreSumGroup
+
+//add group sum kernel
+#pragma kernel AddGroupSum
+
+
+#define THREAD_NUM_X 8
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+Texture2D<float4>   InputTexture;
+RWTexture2D<float4>   OutputTexture;
+Texture2D<float4>   GroupSumTexture;
+//each thread will caculate 2 elements, so the thread num should be double of the element num.
+groupshared float4 TempTexture[THREAD_NUM_X * 2];
+uint2 InputTextureSize;
+uint2 GroupSumTextureSize;
+
+
+void PreSumArray(int thid)
+{
+    int offset = 1;
+    //up pass
+    for (int d = THREAD_NUM_X; d > 0; d >>= 1)
+    {
+        GroupMemoryBarrierWithGroupSync();
+        if (thid < d)
+        {
+            int ai = offset * (2 * thid + 1) - 1;
+            int bi = offset * (2 * thid + 2) - 1;
+            TempTexture[bi] += TempTexture[ai];
+        }
+        offset <<= 1;
+    }
+
+    //down pass
+    //because the fisrt loop should at the sum and the last element, the sum has been already caculate,
+    //so the last element should be zero.
+    if (thid == 0)
+    {
+        TempTexture[THREAD_NUM_X * 2 - 1] = float4(0, 0, 0, 0);
+    }
+
+    for (int d = 1; d <= THREAD_NUM_X; d *= 2)
+    {
+        offset >>= 1;
+        GroupMemoryBarrierWithGroupSync();
+        if (thid < d)
+        {
+            int ai = offset * (2 * thid + 1) - 1;
+            int bi = offset * (2 * thid + 2) - 1;
+            float4 t = TempTexture[ai];
+            TempTexture[ai] = TempTexture[bi];
+            TempTexture[bi] += t;
+        }
+    }
+}
+
+
+[numthreads(THREAD_NUM_X, 1, 1)]
+void PreSum (uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+{
+    // TODO: insert actual code here!
+    uint thid = GTid.x;
+    uint2 textureAddr = DTid.xy;//uint2(groupId.x * THREAD_NUM_X + thid, groupId.y);
+    TempTexture[2 * thid] = textureAddr.x < InputTextureSize.x ? InputTexture[textureAddr] : 0;
+    TempTexture[2 * thid + 1] = (textureAddr.x + 1) < InputTextureSize.x ? InputTexture[uint2(textureAddr.x + 1, textureAddr.y)] : 0;
+    
+    /*
+    int offset = 1;
+    //up pass
+    for (int d = THREAD_NUM_X; d > 0; d >>= 1)
+    {
+    	GroupMemoryBarrierWithGroupSync();
+    	if (thid < d)
+    	{
+    		int ai = offset * (2 * thid + 1) - 1;
+    		int bi = offset * (2 * thid + 2) - 1;
+    		TempTexture[bi] += TempTexture[ai];
+    	}
+    	offset <<= 1;
+    }
+    
+    //down pass
+    //because the fisrt loop should at the sum and the last element, the sum has been already caculate,
+    //so the last element should be zero.
+    if (thid == 0)
+    {
+    	TempTexture[THREAD_NUM_X * 2 - 1] = float4(0, 0, 0, 0);
+    }
+
+    for (int d = 1; d <= THREAD_NUM_X; d *= 2)
+    {
+        offset >>= 1;
+    	GroupMemoryBarrierWithGroupSync();
+        if (thid < d)
+        {
+    		int ai = offset * (2 * thid + 1) - 1;
+    		int bi = offset * (2 * thid + 2) - 1;
+    		float4 t = TempTexture[ai];
+    		TempTexture[ai] = TempTexture[bi];
+    		TempTexture[bi] += t;
+    	}
+    }
+    */
+    PreSumArray(thid);
+
+    GroupMemoryBarrierWithGroupSync();
+    uint2 outputTextureAddr = uint2(groupId.x * THREAD_NUM_X + thid * 2, DTid.y);
+    uint2 outputTextureAddr1 = uint2(groupId.x * THREAD_NUM_X + thid * 2 + 1, DTid.y);
+    if ((2 * thid) < THREAD_NUM_X)
+    {
+        OutputTexture[outputTextureAddr] = TempTexture[2 * thid + 1];
+    }
+    if ((2 * thid + 1) < THREAD_NUM_X)
+    {
+        OutputTexture[outputTextureAddr1] = TempTexture[2 * thid + 2];
+    }
+    //if (GTid.x < InputTextureSize.x)
+    //    OutputTexture[GTid.xy] = TempTexture[GTid.x];
+}
+
+[numthreads(THREAD_NUM_X, 1, 1)]
+void PreSumGroup(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+{
+    // TODO: insert actual code here!
+    uint thid = DTid.x;
+    uint2 textureAddr = uint2((thid + 1) * THREAD_NUM_X - 1, groupId.y);
+    uint2 textureAddr1 = uint2((thid + 2) * THREAD_NUM_X - 1, groupId.y);
+    TempTexture[2 * thid] = textureAddr.x < InputTextureSize.x ? InputTexture[textureAddr] : 0;
+    TempTexture[2 * thid + 1] = textureAddr1.x < InputTextureSize.x ? InputTexture[textureAddr1] : 0;
+
+    PreSumArray(thid);
+
+    GroupMemoryBarrierWithGroupSync();
+    if ((2 * thid) < THREAD_NUM_X)
+    {
+        OutputTexture[uint2(2 * thid, groupId.y)] = TempTexture[2 * thid];
+    }
+    if ((2 * thid + 1) < THREAD_NUM_X)
+    {
+        OutputTexture[uint2(2 * thid + 1, groupId.y)] = TempTexture[2 * thid + 1];
+    }
+}
+
+[numthreads(THREAD_NUM_X, 1, 1)]
+void AddGroupSum(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+{
+    float4 groupSum = GroupSumTexture[groupId.xy];
+    if (DTid.x < GroupSumTextureSize.x && DTid.y < GroupSumTextureSize.y)
+    {
+        float4 sum = OutputTexture[DTid.xy];
+        OutputTexture[DTid.xy] = sum + groupSum;
+    }
+}

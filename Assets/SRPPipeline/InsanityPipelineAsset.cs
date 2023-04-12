@@ -1,6 +1,8 @@
 using Insanity;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Scripting.APIUpdating;
@@ -59,6 +61,15 @@ namespace Insanity
             var instance = ScriptableObject.CreateInstance<InsanityPipelineAsset>();
             UnityEditor.AssetDatabase.CreateAsset(instance, "Assets/SRPPipeline/InsanityPipeline.asset");
         }
+
+        [UnityEditor.MenuItem("Assets/Create/Render Pipeline/InsanityPipelineResource", priority = 1)]
+        static void CreateInsanityPipelineResources()
+        {
+            var newAsset = CreateInstance<InsanityPipelineResources>();
+            string pathName = AssetDatabase.GetAssetPath(Selection.activeObject) + "/InsanityPipelineResources.asset";
+            newAsset.name = Path.GetFileName(pathName);
+            UnityEditor.AssetDatabase.CreateAsset(newAsset, pathName);
+        }
 #endif
 
         protected override RenderPipeline CreatePipeline()
@@ -85,6 +96,7 @@ namespace Insanity
         [SerializeField] eGaussianRadius m_ShadowPrefitlerGaussianRadius = eGaussianRadius.eGausian3x3;
         [SerializeField] Vector2 m_EVSMExponents = new Vector2(10, 10);
         [SerializeField] float m_LightBleedingReduction = 0.5f;
+        [SerializeField] InsanityPipelineResources m_PipelineResources;
 
         public float shadowDistance
         {
@@ -190,6 +202,12 @@ namespace Insanity
         {
             get { return m_LightBleedingReduction; }
             set { m_LightBleedingReduction = value; }
+        }
+
+        public InsanityPipelineResources InsanityPipelineResources
+        {
+            get { return m_PipelineResources; }
+            set { m_PipelineResources = value; }
         }
     }
 }

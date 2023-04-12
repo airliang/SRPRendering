@@ -32,7 +32,7 @@ namespace Insanity
 
         RenderGraph m_RenderGraph = new RenderGraph("Insanity");
         ShaderVariablesGlobal m_ShaderVariablesGlobalCB = new ShaderVariablesGlobal();
-        
+        SATRenderer m_satRenderer = new SATRenderer();
 
         void CleanupRenderGraph()
         {
@@ -91,23 +91,33 @@ namespace Insanity
                     if (m_shadowSettings.supportsMainLightShadows)
                     {
                         shadowPassData = RenderShadow(cameraData, m_RenderGraph, cull);
-                        shadowmap = shadowPassData.m_Shadowmap;
-                        if (m_ShadowMananger.NeedPrefilterShadowmap(shadowPassData))
+
+                        if (shadowPassData != null)
                         {
-                            PrefilterShadowPassData prefilterPassData = m_ShadowMananger.PrefilterShadowPass(
-                                m_RenderGraph, shadowPassData);
-                            //shadowPassData.m_Shadowmap = prefilterPassData.m_BlurShadowmap;
-                            if (prefilterPassData.m_filterRadius != eGaussianRadius.eGausian3x3)
-                                shadowmap = prefilterPassData.m_Shadowmap;
-                            else
-                                shadowmap = prefilterPassData.m_BlurShadowmap;
+                            shadowmap = shadowPassData.m_Shadowmap;
+                            if (m_ShadowMananger.NeedPrefilterShadowmap(shadowPassData))
+                            {
+                                PrefilterShadowPassData prefilterPassData = m_ShadowMananger.PrefilterShadowPass(
+                                    m_RenderGraph, shadowPassData);
+                                //shadowPassData.m_Shadowmap = prefilterPassData.m_BlurShadowmap;
+                                if (prefilterPassData.m_filterRadius != eGaussianRadius.eGausian3x3)
+                                    shadowmap = prefilterPassData.m_Shadowmap;
+                                else
+                                    shadowmap = prefilterPassData.m_BlurShadowmap;
+                            }
                         }
+                        
                         //if (shadowPassData != null)
                         //    RenderScreenSpaceShadow(cameraData, m_RenderGraph, shadowPassData, depthPassData);
                     }
 
                     ForwardPassData forwardPassData = Render_OpaqueFowardPass(cameraData, m_RenderGraph, cull, depthPassData, shadowmap);
-                    Render_SkyPass(cameraData, m_RenderGraph, depthPassData);
+                    Render_SkyPass(cameraData, m_RenderGraph, depthPassData, asset.InsanityPipelineResources.materials.Skybox);
+                    SATPassData satData = m_satRenderer.TestParallelScan(m_RenderGraph, asset.InsanityPipelineResources.shaders.ParallelScan);
+                    if (satData != null)
+                    {
+                        //forwardPassData.m_Albedo = satData.m_OutputTexture;
+                    }
                     FinalBlitPass(cameraData, m_RenderGraph, forwardPassData);
                 }
 

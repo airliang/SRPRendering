@@ -13,6 +13,7 @@ namespace Insanity
         public TextureHandle m_Source;
         //public TextureHandle m_Color;
         public bool flip;
+        public Material m_finalBlitMaterial;
     }
 
     public partial class InsanityPipeline
@@ -28,6 +29,7 @@ namespace Insanity
             {
                 passData.flip = cameraData.isMainGameView;                
                 passData.m_Source = builder.ReadTexture(forwardPassData.m_Albedo);
+                passData.m_finalBlitMaterial = m_finalBlitMaterial;
                 //TextureHandle dest = builder.WriteTexture(TextureHandle.nullHandle);
                 builder.SetRenderFunc((FinalBlitPassData data, RenderGraphContext context) =>
                 {
@@ -44,7 +46,7 @@ namespace Insanity
                     //cmd.SetGlobalMatrix("_ViewMatrix", Matrix4x4.identity);
                     //cmd.SetGlobalMatrix("_ViewProjMatrix", Matrix4x4.identity);
                     context.cmd.SetViewport(cameraData.camera.pixelRect);
-                    CoreUtils.DrawFullScreen(context.cmd, m_finalBlitMaterial);
+                    CoreUtils.DrawFullScreen(context.cmd, data.m_finalBlitMaterial);
                     //cmd.DrawMesh(screenTriangle, Matrix4x4.identity, m_finalBlitMaterial);
                     //cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
                 });

@@ -70,7 +70,12 @@ half4 ShadowPassFragment(Varyings input) : SV_TARGET
     float neg = -exp(-_ShadowExponents.y * depth);
     return half4(pos, pos * pos, neg, neg * neg);
 #else
-    return half4(depth, depth * depth, 0, 0);
+    float dx = ddx(depth);
+    float dy = ddy(depth);
+
+    //float firstMoment = depth; // redundant
+    float secondMoment = depth * depth + 0.25 * (dx * dx + dy * dy);
+    return half4(depth, secondMoment, 0, 0);
 #endif
 #else
     return 0;

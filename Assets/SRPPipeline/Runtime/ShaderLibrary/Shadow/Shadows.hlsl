@@ -284,16 +284,16 @@ half MainLightRealtimeShadow(ShadowSampleCoords sampleData)
     half s1 = SampleShadowmap(TEXTURE2D_ARGS(_ShadowMap, sampler_ShadowMap), sampleData.shadow_coord, sampleData.positionSS, 
         sampleData.cascadeIndex, shadowSamplingData, shadowParams, false);
 #if defined(_MAIN_LIGHT_SHADOWS_CASCADE)
-    if (shadowParams.z > 0.01)
+    if (shadowParams.z > 0.01 )
     {
-        half s2 = SampleShadowmap(TEXTURE2D_ARGS(_ShadowMap, sampler_ShadowMap), sampleData.shadow_coord1, 
-            sampleData.positionSS, sampleData.cascadeIndex + 1.0, shadowSamplingData, shadowParams, false);
+        half s2 = sampleData.cascadeIndex < shadowParams.w - 1 ? SampleShadowmap(TEXTURE2D_ARGS(_ShadowMap, sampler_ShadowMap), sampleData.shadow_coord1,
+            sampleData.positionSS, sampleData.cascadeIndex + 1.0, shadowSamplingData, shadowParams, false) : s1;
         s1 = lerp(s1, s2, sampleData.blend);
     }
 #endif
-    float blendDistance = max(length(sampleData.positionWS) / 5.0, 1.0);  //one meter for blend shadowmap
-    float t = saturate(max(_ShadowDistance - length(sampleData.positionWS), 0) / blendDistance);
-    s1 = LerpWhiteTo(s1, t);
+    //float blendDistance = max(length(sampleData.positionWS) / 5.0, 1.0);  //one meter for blend shadowmap
+    //float t = saturate(max(_ShadowDistance - length(sampleData.positionWS), 0) / blendDistance);
+    //s1 = LerpWhiteTo(s1, t);
     return s1;
 }
 
