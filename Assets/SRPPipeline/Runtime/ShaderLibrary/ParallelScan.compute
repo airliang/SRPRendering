@@ -88,7 +88,9 @@ void PreSum (uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, ui
     //    OutputTexture[GTid.xy] = TempTexture[GTid.x];
 }
 
-[numthreads(THREAD_NUM_X, 1, 1)]
+#define PRESUMGROUP_TREADNUM_X 128
+int arrayLengthPerThreadGroup;
+[numthreads(PRESUMGROUP_TREADNUM_X, 1, 1)]
 void PreSumGroup(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
 {
     // TODO: insert actual code here!
@@ -101,12 +103,12 @@ void PreSumGroup(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID
     PreSumArray(thid);
 
     GroupMemoryBarrierWithGroupSync();
-    if ((2 * thid) < THREAD_NUM_X)
+    if ((2 * thid) < arrayLengthPerThreadGroup)
     {
         uint2 outputAddress = uint2(2 * thid, groupId.y);
         OutputTexture[outputAddress] = TempTexture[2 * thid];
     }
-    if ((2 * thid + 1) < THREAD_NUM_X)
+    if ((2 * thid + 1) < arrayLengthPerThreadGroup)
     {
         uint2 outputAddress = uint2(2 * thid + 1, groupId.y);
         OutputTexture[outputAddress] = TempTexture[2 * thid + 1];
@@ -119,7 +121,7 @@ void AddGroupSum(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID
     float4 groupSum = GroupSumTexture[groupId.xy];
     if (DTid.x < GroupSumTextureSize.x && DTid.y < GroupSumTextureSize.y)
     {
-        float4 sum = InputTexture[DTid.xy];
+        float4 sum = IsTranposeOutput ? InputTexture[DTid.xy] : OutputTexture[DTid.xy];
         uint2 outputAddress = IsTranposeOutput ? DTid.yx : DTid.xy;
         OutputTexture[outputAddress] = sum + groupSum;
     }

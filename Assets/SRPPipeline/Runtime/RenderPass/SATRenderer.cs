@@ -181,6 +181,7 @@ namespace Insanity
 
                     if (groupsX > 1)
                     {
+                        context.cmd.SetComputeIntParam(data.m_SATCompute, "arrayLengthPerThreadGroup", groupsX);
                         context.cmd.SetComputeVectorParam(data.m_SATCompute, "GroupSumTextureSize", new Vector2(groupsX, groupsY));
                         context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSumGroup, "InputTexture", data.m_OutputTexture);
                         context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSumGroup, "OutputTexture", data.m_OutputGroupSumTexture);
