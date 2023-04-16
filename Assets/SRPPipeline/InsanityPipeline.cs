@@ -116,7 +116,7 @@ namespace Insanity
                     SATPassData satData = m_satRenderer.TestParallelScan(m_RenderGraph, asset.InsanityPipelineResources.shaders.ParallelScan);
                     if (satData != null)
                     {
-                        //forwardPassData.m_Albedo = satData.m_OutputTexture;
+                        forwardPassData.m_Albedo = satData.m_OutputTexture;
                     }
                     FinalBlitPass(cameraData, m_RenderGraph, forwardPassData);
                 }

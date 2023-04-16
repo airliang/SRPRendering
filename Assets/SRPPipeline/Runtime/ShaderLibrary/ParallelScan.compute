@@ -9,7 +9,7 @@
 #pragma kernel AddGroupSum
 
 
-#define THREAD_NUM_X 8
+#define THREAD_NUM_X 128
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 Texture2D<float4>   InputTexture;
