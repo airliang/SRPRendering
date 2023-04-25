@@ -93,6 +93,7 @@ namespace Insanity
         [SerializeField] ShadowPCFFilter m_ShadowPCFFilter = ShadowPCFFilter.PCF_None;
         [SerializeField] float m_PCSSSoftness = 1.0f;
         [SerializeField] float m_PCSSSoftnessFalloff = 2.0f;
+        [SerializeField] bool m_PCSSSatEnable = false;
         [SerializeField] eGaussianRadius m_ShadowPrefitlerGaussianRadius = eGaussianRadius.eGausian3x3;
         [SerializeField] Vector2 m_EVSMExponents = new Vector2(10, 10);
         [SerializeField] float m_LightBleedingReduction = 0.5f;
@@ -184,6 +185,12 @@ namespace Insanity
         {
             get { return m_PCSSSoftnessFalloff; }
             set { m_PCSSSoftnessFalloff = value; }
+        }
+
+        public bool PCSSSATEnable
+        {
+            get { return m_PCSSSatEnable; }
+            set { m_PCSSSatEnable = value; }
         }
 
         public eGaussianRadius ShadowPrefilterGaussian

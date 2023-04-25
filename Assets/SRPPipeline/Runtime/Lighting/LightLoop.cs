@@ -128,6 +128,7 @@ namespace Insanity
             m_shadowSettings.csmBlendEnable = asset.enableCSMBlend;
             m_shadowSettings.pcssSoftness = asset.PCSSSoftness;
             m_shadowSettings.pcssSoftnessFalloff = asset.PCSSSoftnessFalloff;
+            m_shadowSettings.pcssSatEnable = asset.PCSSSATEnable;
             m_shadowSettings.mainLightResolution = GetLightShadowResolution(m_sunLight);
             m_shadowSettings.prefilterGaussianRadius = asset.ShadowPrefilterGaussian;
             m_shadowSettings.exponentialConstants = asset.EVSMExponentConstants;

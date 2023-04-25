@@ -27,6 +27,7 @@ namespace Insanity
         public float csmBlendDistance = 0;
         public float pcssSoftness = 1.0f;
         public float pcssSoftnessFalloff = 2.0f;
+        public bool pcssSatEnable = false;
         public Vector2 exponentialConstants = new Vector2(10.0f, 10.0f);
         public float lightBleedingReduction = 0.5f;
         public eGaussianRadius prefilterGaussianRadius = eGaussianRadius.eGausian3x3;

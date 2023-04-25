@@ -31,6 +31,7 @@ namespace UnityEditor.Insanity
             public static GUIContent shadowPCFFilter = EditorGUIUtility.TrTextContent("Shadow PCF Filter", "Shadow Mapping PCF Filter options.");
             public static GUIContent pcssSoftness = EditorGUIUtility.TrTextContent("PCSS Softness", "Simulate the direction light size in PCSS algorithrm");
             public static GUIContent pcssSoftnessFalloff = EditorGUIUtility.TrTextContent("PCSS Softness Falloff", "Softness falloff parameter use by a pow formular.");
+            public static GUIContent pcssSATEnable = EditorGUIUtility.TrTextContent("PCSS SAT Enable", "Enable the SAT algorithm to calculate the PCSS.");
             public static GUIContent gaussianFilterRadius = EditorGUIUtility.TrTextContent("Gaussian Prefilter Radius", "The gaussian kernel size to filtering.");
             public static GUIContent exponentialConstants = EditorGUIUtility.TrTextContent("Exponential Variance Shadow Constants", "Setting the exponential constants of EVSM");
             public static GUIContent lightBleedingReduction = EditorGUIUtility.TrTextContent("LightBleeding Reduction Value", "Clamp the [pMax, 1] to the [lightBleeding, 1]");
@@ -64,6 +65,7 @@ namespace UnityEditor.Insanity
 
         SerializedProperty m_PCSSSoftnessProp;
         SerializedProperty m_PCSSSoftnessFalloff;
+        SerializedProperty m_PCSSSATEnable;
         SerializedProperty m_ShadowPrefilterGaussians;
         SerializedProperty m_ExponentialConstants;
         SerializedProperty m_LightBleedingReduction;
@@ -100,6 +102,7 @@ namespace UnityEditor.Insanity
             m_ShadowPCFFilter = serializedObject.FindProperty("m_ShadowPCFFilter");
             m_PCSSSoftnessProp = serializedObject.FindProperty("m_PCSSSoftness");
             m_PCSSSoftnessFalloff = serializedObject.FindProperty("m_PCSSSoftnessFalloff");
+            m_PCSSSATEnable = serializedObject.FindProperty("m_PCSSSATEnable");
             m_ShadowPrefilterGaussians = serializedObject.FindProperty("m_ShadowPrefitlerGaussianRadius");
             m_ExponentialConstants = serializedObject.FindProperty("m_EVSMExponents");
             m_LightBleedingReduction = serializedObject.FindProperty("m_LightBleedingReduction");
@@ -147,6 +150,7 @@ namespace UnityEditor.Insanity
                 {
                     m_PCSSSoftnessProp.floatValue = EditorGUILayout.Slider(Styles.pcssSoftness, m_PCSSSoftnessProp.floatValue, 0.01f, 2.0f);
                     m_PCSSSoftnessFalloff.floatValue = EditorGUILayout.Slider(Styles.pcssSoftnessFalloff, m_PCSSSoftnessFalloff.floatValue, 0.0f, 8.0f);
+                    m_PCSSSATEnable.boolValue = EditorGUILayout.Toggle(Styles.pcssSATEnable, m_PCSSSATEnable.boolValue);
                 }
                 else if (shadowType == ShadowType.VSM || shadowType == ShadowType.EVSM)
                 {

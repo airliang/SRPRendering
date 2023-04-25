@@ -14,6 +14,7 @@ namespace Insanity
     public class ShadowPassData
     {
         public TextureHandle m_Shadowmap;
+        public TextureHandle m_ShadowmapSAT;
         public ShadowDrawingSettings shadowDrawSettings;
         public int cascadeCount;
         public Matrix4x4[] m_MainLightWorldToShadowMatrices;
@@ -116,6 +117,7 @@ namespace Insanity
         ShadowSettings m_shadowSetting;
         IShadowCaster m_shadowCaster;
         PrefilterShadowPass m_prefilterPass;
+        SATRenderer m_SATRenderer;
         
 
         private static class MainLightShadowConstantBuffer
@@ -636,6 +638,39 @@ namespace Insanity
             // moved outside, this is needed for expotional shadow maps
             cmd.SetGlobalVector(MainLightShadowConstantBuffer._ShadowmapSize, data.m_ShadowmapSize);
             cmd.SetGlobalTexture("_ShadowMap", data.m_Shadowmap);
+        }
+
+        private TextureHandle GetShadowmapSATTexture(RenderGraph renderGraph, int _width, int _height, int _slices)
+        {
+            TextureDesc textureDesc = new TextureDesc()
+            {
+                filterMode = FilterMode.Point,
+                depthBufferBits = m_DepthBufferBits,
+                isShadowMap = true,
+                name = m_Name + "SAT",
+                wrapMode = TextureWrapMode.Clamp,
+                slices = _slices,
+                width = _width,
+                height = _height
+            };
+
+            return renderGraph.CreateTexture(textureDesc);
+        }
+
+        public SATPassData GenerateShadowmapSAT(RenderGraph renderGraph, ShadowPassData shadowPassData)
+        {
+            if (m_SATRenderer == null)
+            {
+                m_SATRenderer = new SATRenderer();
+            }
+
+            
+
+            for (int i = 0; i < m_shadowSetting.mainLightShadowCascadesCount; ++i)
+            {
+
+            }
+            return null;
         }
     }
 }
