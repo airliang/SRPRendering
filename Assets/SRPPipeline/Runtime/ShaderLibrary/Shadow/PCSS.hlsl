@@ -3,6 +3,10 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
+//shadowmap SAT
+Texture2D _ShadowMapSAT;
+float2 _ShadowMapSATSize;
+
 #define DISK_SAMPLE_COUNT 64
 // Fibonacci Spiral Disk Sampling Pattern
 // https://people.irisa.fr/Ricardo.Marques/articles/2013/SF_CGF.pdf
@@ -336,6 +340,15 @@ float CaculatePCFKernelFilterRadius(float depth_blocker, float depth_receiver, f
     float Penumbra = (depth_receiver - depth_blocker) * lightSize / depth_blocker;
 }
 
+float SampleShadowSAT(SamplerState samp, float2 center, float2 radius)
+{
+    float r = SAMPLE_TEXTURE2D(_ShadowMapSAT, samp, center + radius);
+    float topleft = SAMPLE_TEXTURE2D(_ShadowMapSAT, samp, float2(center.x - radius.x, center.y + radius.y));
+    float bottomRight = SAMPLE_TEXTURE2D(_ShadowMapSAT, samp, float2(center.x + radius.x, center.y - radius.y));
+    float bottomLeft = SAMPLE_TEXTURE2D(_ShadowMapSAT, samp, center - radius);
+    return (r - bottomRight - topleft + bottomLeft) / (radius.x * radius.y);
+}
+
 float PCSS(float4 coords, float2 receiverPlaneDepthBias, float random, float cascadeScale,
     Texture2D shadowMap, SamplerComparisonState compSampler, SamplerState samp)
 {
@@ -379,7 +392,11 @@ float PCSS(float4 coords, float2 receiverPlaneDepthBias, float random, float cas
     //filterRadiusUV *= filterRadiusUV;
 
     // STEP 3: filtering
+#if defined(_PCSS_SAT_FILTER)
+    float shadow = SampleShadowSAT(samp, uv, filterRadiusUV);
+#else
     float shadow = PCSS_PCF_Filter(uv, depth, filterRadiusUV, receiverPlaneDepthBias, penumbra, rotationTrig, shadowMap, compSampler);
+#endif
     return shadow;
 }
 

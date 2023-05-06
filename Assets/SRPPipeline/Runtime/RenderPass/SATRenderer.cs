@@ -25,8 +25,9 @@ namespace Insanity
         public TextureHandle m_inputTexture;
         public int m_inputTextureWidth;
         public int m_inputTextureHeight;
-        public int m_inputOffsetX = 0;
-        public int m_inputOffsetY = 0;
+        //public int m_inputOffsetX = 0;
+        //public int m_inputOffsetY = 0;
+        public Vector4 m_inputST; //x,y:scale, z,w:offset
         public Vector4 m_validRect;
         public bool m_firstPassTransposeOutput = false;
         public bool m_transposeOutput;
@@ -46,31 +47,81 @@ namespace Insanity
         public Material m_blitMaterial;
     }
 
+
+    
+    public struct SATTexture
+    {
+        public TextureHandle m_texture;
+        public int m_width;
+        public int m_height;
+        public TextureFormat m_format;
+        public Vector4 m_ST;
+        
+        public SATTexture(TextureHandle texture, int width, int height, TextureFormat textureFormat, Vector4 st)
+        {
+            m_texture = texture;
+            m_width = width;
+            m_height = height;
+            m_format = textureFormat;
+            m_ST = st;
+        }
+    }
+
     public class SATRenderer
     {
-        private const int MaxGroupThreadsNum = 128;
-        public SATPassData RenderSAT(RenderGraph graph, TextureHandle inputTexture, ComputeShader scanCS)
+        public static Vector4 defaultST = new Vector4(1, 1, 0, 0);
+        private static class SATConstantBuffer
         {
-            using (var builder = graph.AddRenderPass<SATPassData>("SAT Pass", out var passData, 
-                               new ProfilingSampler("SAT Pass Profiler")))
+            public static int _InputTexture;
+            public static int _GroupSumTexture;
+            public static int _OutputTexture;
+            public static int _InputTextureSize;
+            public static int _GroupSumTextureSize;
+            public static int _ValidRect;
+            public static int _IsTranposeOutput;
+            public static int _ArrayLengthPerThreadGroup;
+            public static int _InputTextureST;
+            public static int _OutputTextureST;
+        }
+
+        public SATRenderer()
+        {
+            SATConstantBuffer._InputTexture = Shader.PropertyToID("InputTexture");
+            SATConstantBuffer._GroupSumTexture = Shader.PropertyToID("GroupSumTexture");
+            SATConstantBuffer._OutputTexture = Shader.PropertyToID("OutputTexture");
+            SATConstantBuffer._InputTextureSize = Shader.PropertyToID("InputTextureSize");
+            SATConstantBuffer._GroupSumTextureSize = Shader.PropertyToID("GroupSumTextureSize");
+            SATConstantBuffer._ValidRect = Shader.PropertyToID("ValidRect");
+            SATConstantBuffer._IsTranposeOutput = Shader.PropertyToID("IsTranposeOutput");
+            SATConstantBuffer._ArrayLengthPerThreadGroup = Shader.PropertyToID("ArrayLengthPerThreadGroup");
+            SATConstantBuffer._InputTextureST = Shader.PropertyToID("InputTextureST");
+            SATConstantBuffer._OutputTextureST = Shader.PropertyToID("OutputTextureST");
+        }
+
+
+        private const int MaxGroupThreadsNum = 128;
+        public SATPassData RenderSAT(RenderGraph graph, ComputeShader scanCS, ref SATTexture inputTexture, ref SATTexture outputTexture, Vector4 validRect)
+        {
+            SATPassData passDataRow = ParallelScan(graph, scanCS, ref inputTexture, false, validRect);
+            SATPassData passData = null;
+            if (inputTexture.m_height > 1)
             {
-                //passData.m_InputTexture = builder.ReadTexture(inputTexture);
-                passData.m_OutputTexture = builder.UseColorBuffer(inputTexture, 0);
-                builder.SetRenderFunc((SATPassData data, RenderGraphContext context) =>
-                {
-                    //context.cmd.SetGlobalTexture("_InputTexture", data.m_InputTexture);
-                    //context.cmd.SetGlobalTexture("_OutputTexture", data.m_OutputTexture);
-                    //context.cmd.SetGlobalTexture("_ShadowMap", data.m_ShadowMap);
-                    //CoreUtils.DrawRendererList(context.renderContext, context.cmd, data.m_renderList_opaque);
-                });
-                return passData;
+                //testTexture = new Texture2D(passData.m_transposeSumTexture);
+                int inputTextureWidth = inputTexture.m_height;
+                int inputTextureHeight = inputTexture.m_width;
+                inputTexture = new SATTexture(passDataRow.GetFinalOutputTexture(), inputTextureWidth, inputTextureHeight, 
+                    outputTexture.m_format, defaultST);
+                passData = ParallelScan(graph, scanCS, ref inputTexture, true, validRect);
             }
+            else
+                passData = passDataRow;
+            return passData;
         }
 
         //test codes
         private Texture2D m_testInputTexture;
-        const int k_TestInputTextureWidth = 256;
-        const int k_TestInputTextureHeight = 256;
+        const int k_TestInputTextureWidth = 1024;
+        const int k_TestInputTextureHeight = 1024;
 
         Texture2D GetTestInputTexture()
         {
@@ -82,14 +133,16 @@ namespace Insanity
                 {
                     for (int col = 0; col < k_TestInputTextureWidth; col++)
                     {
-                        float pixelValue = 0.005f * col;
+                        float pixelValue = 0;
+                        if (col >= 785 && col <= 787 && row == 192)
+                        {
+                            pixelValue = 0.99998f;
+                            
+                        }
                         colors[row * k_TestInputTextureWidth + col] = new Color(pixelValue, pixelValue, pixelValue, pixelValue);//Color.white.linear;
                     }
                 }
-                //for (int i = k_TestInputTextureWidth; i < k_TestInputTextureWidth * k_TestInputTextureHeight; ++i)
-                //{
-                //    colors[i] = Color.red;
-                //}
+
                 m_testInputTexture.SetPixels(colors);
                 m_testInputTexture.Apply(false, true);
             }
@@ -125,30 +178,29 @@ namespace Insanity
             return graph.CreateTexture(textureDesc); 
         }
 
-        public SATPassData ParallelScan(RenderGraph graph, ComputeShader scanCS, TextureHandle inputTexture, 
-            int inputWidth, int inputHeight, int inputOffsetX, int inputOffsetY, TextureFormat inputFormat, bool verticalScan, Vector4 validRect)
+        public SATPassData ParallelScan(RenderGraph graph, ComputeShader scanCS, ref SATTexture inputTexture, bool verticalScan, Vector4 validRect)
         {
             string passName = verticalScan ? "Vertical Parallen Scan Pass" : "Horizontal Parallen Scan Pass";
             using (var builder = graph.AddRenderPass<SATPassData>(passName, out var passData,
                                new ProfilingSampler("SAT Pass Profiler")))
             {
-                passData.m_inputTexture = builder.ReadTexture(inputTexture);
+                passData.m_inputTexture = builder.ReadTexture(inputTexture.m_texture);
                 passData.m_SATCompute = scanCS;
-                GraphicsFormat satFormat = GetSATTextureFormat(inputFormat);
-                int outputTextureWidth = verticalScan ? inputHeight : inputWidth;
-                int outputTextureHeight = verticalScan ? inputWidth : inputHeight;
+                GraphicsFormat satFormat = GetSATTextureFormat(inputTexture.m_format);
+                int outputTextureWidth = verticalScan ? inputTexture.m_height : inputTexture.m_width;
+                int outputTextureHeight = verticalScan ? inputTexture.m_width : inputTexture.m_height;
                 passData.m_OutputTexture = builder.ReadWriteTexture(GetOutputTexture(graph, outputTextureWidth,
                     outputTextureHeight, satFormat));
                 if (passData.kernelPreSum == -1)
                 {
                     passData.kernelPreSum = scanCS.FindKernel("PreSum");
                 }
-                int groupThreadsX = inputWidth < MaxGroupThreadsNum ? 1 : Mathf.CeilToInt((float)inputWidth / MaxGroupThreadsNum);
+                int groupThreadsX = inputTexture.m_width < MaxGroupThreadsNum ? 1 : Mathf.CeilToInt((float)inputTexture.m_width / MaxGroupThreadsNum);
                 if (groupThreadsX > 1)
                 {
                     int groupSumTextureWidth = groupThreadsX;
                     passData.m_OutputGroupSumTexture = builder.ReadWriteTexture(GetOutputTexture(graph, groupSumTextureWidth, 
-                        inputHeight, satFormat));
+                        inputTexture.m_height, satFormat));
                     if (passData.kernelPreSumGroup == -1)
                         passData.kernelPreSumGroup = scanCS.FindKernel("PreSumGroup");
                     if (passData.kernelPostSum == -1)
@@ -156,15 +208,14 @@ namespace Insanity
                 }
                 else
                     passData.m_OutputGroupSumTexture = TextureHandle.nullHandle;
-                passData.m_inputOffsetX = inputOffsetX;
-                passData.m_inputOffsetY = inputOffsetY;
+                passData.m_inputST = inputTexture.m_ST;
 
                 if (!verticalScan)
                 {
-                    if (inputHeight > 1)
+                    if (inputTexture.m_height > 1)
                     {
                         passData.m_transposeSumTexture = builder.ReadWriteTexture(GetOutputTexture(graph,
-                            inputHeight, inputWidth, satFormat));
+                            inputTexture.m_height, inputTexture.m_width, satFormat));
                         passData.m_transposeOutput = true;
                     }
                     else
@@ -176,26 +227,26 @@ namespace Insanity
                 else
                 {
                     passData.m_transposeSumTexture = builder.ReadWriteTexture(GetOutputTexture(graph,
-                        inputHeight, inputWidth, satFormat));
+                        inputTexture.m_height, inputTexture.m_width, satFormat));
                     passData.m_transposeOutput = true;
                 }
-                passData.m_inputTextureWidth = inputWidth;
-                passData.m_inputTextureHeight = inputHeight;
+                passData.m_inputTextureWidth = inputTexture.m_width;
+                passData.m_inputTextureHeight = inputTexture.m_height;
                 passData.m_validRect = validRect;
                 //if verticalScan is true, the input texture height must be greater than 1.
                 //so in the verticalScan it do not need transpose output in the first pass.
-                passData.m_firstPassTransposeOutput = verticalScan ? false : (inputHeight > 1 && groupThreadsX == 1);
+                passData.m_firstPassTransposeOutput = verticalScan ? false : (inputTexture.m_height > 1 && groupThreadsX == 1);
                 passData.m_groupNumX = groupThreadsX;
 
                 builder.SetRenderFunc((SATPassData data, RenderGraphContext context) =>
                 {
-                    context.cmd.SetComputeIntParam(data.m_SATCompute, "IsTranposeOutput", data.m_firstPassTransposeOutput ? 1 : 0);
-                    context.cmd.SetComputeVectorParam(data.m_SATCompute, "ValidRect", data.m_validRect);
+                    context.cmd.SetComputeIntParam(data.m_SATCompute, SATConstantBuffer._IsTranposeOutput, data.m_firstPassTransposeOutput ? 1 : 0);
+                    context.cmd.SetComputeVectorParam(data.m_SATCompute, SATConstantBuffer._ValidRect, data.m_validRect);
                     Vector4 inputSize = new Vector4(data.m_inputTextureWidth, data.m_inputTextureHeight, 0, 0);
-                    context.cmd.SetComputeVectorParam(data.m_SATCompute, "InputTextureSize", inputSize);
-                    context.cmd.SetComputeVectorParam(data.m_SATCompute, "InputImageOffset", new Vector2(data.m_inputOffsetX, data.m_inputOffsetY));
-                    context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSum, "InputTexture", data.m_inputTexture);
-                    context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSum, "OutputTexture", data.m_OutputTexture);
+                    context.cmd.SetComputeVectorParam(data.m_SATCompute, SATConstantBuffer._InputTextureSize, inputSize);
+                    context.cmd.SetComputeVectorParam(data.m_SATCompute, SATConstantBuffer._InputTextureST, data.m_inputST);
+                    context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSum, SATConstantBuffer._InputTexture, data.m_inputTexture);
+                    context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSum, SATConstantBuffer._OutputTexture, data.m_OutputTexture);
 
                     int groupsX = data.m_inputTextureWidth < MaxGroupThreadsNum ? 1 : Mathf.CeilToInt((float)data.m_inputTextureWidth / MaxGroupThreadsNum);
                     int groupsY = data.m_inputTextureHeight;
@@ -203,18 +254,18 @@ namespace Insanity
 
                     if (groupsX > 1)
                     {
-                        context.cmd.SetComputeIntParam(data.m_SATCompute, "arrayLengthPerThreadGroup", groupsX);
-                        context.cmd.SetComputeVectorParam(data.m_SATCompute, "GroupSumTextureSize", new Vector2(groupsX, groupsY));
+                        context.cmd.SetComputeIntParam(data.m_SATCompute, SATConstantBuffer._ArrayLengthPerThreadGroup, groupsX);
+                        context.cmd.SetComputeVectorParam(data.m_SATCompute, SATConstantBuffer._GroupSumTextureSize, new Vector2(groupsX, groupsY));
 
-                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSumGroup, "InputTexture", data.m_OutputTexture);
-                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSumGroup, "OutputTexture", data.m_OutputGroupSumTexture);
+                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSumGroup, SATConstantBuffer._InputTexture, data.m_OutputTexture);
+                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPreSumGroup, SATConstantBuffer._OutputTexture, data.m_OutputGroupSumTexture);
                         context.cmd.DispatchCompute(data.m_SATCompute, data.kernelPreSumGroup, 1, groupsY, 1);
 
-                        context.cmd.SetComputeIntParam(data.m_SATCompute, "IsTranposeOutput", data.m_transposeOutput ? 1 : 0);
-                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPostSum, "InputTexture", data.m_OutputTexture);
-                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPostSum, "OutputTexture",
+                        context.cmd.SetComputeIntParam(data.m_SATCompute, SATConstantBuffer._IsTranposeOutput, data.m_transposeOutput ? 1 : 0);
+                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPostSum, SATConstantBuffer._InputTexture, data.m_OutputTexture);
+                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPostSum, SATConstantBuffer._OutputTexture,
                             data.m_transposeOutput ? data.m_transposeSumTexture : data.m_OutputTexture);
-                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPostSum, "GroupSumTexture", data.m_OutputGroupSumTexture);
+                        context.cmd.SetComputeTextureParam(data.m_SATCompute, data.kernelPostSum, SATConstantBuffer._GroupSumTexture, data.m_OutputGroupSumTexture);
                         context.cmd.DispatchCompute(data.m_SATCompute, data.kernelPostSum, groupsX, groupsY, 1);
                     }
                 });
@@ -224,22 +275,24 @@ namespace Insanity
 
         public SATPassData TestParallelScan(RenderGraph graph, ComputeShader scanCS)
         {
-            //Texture2D testTexture = GetTestInputTexture();
             GenerateTestTexturePassData generateTestTexturePassData = GenerateTestTexture(graph);
+            int inValidWidth = 4;
+            SATTexture inputTexture = new SATTexture(generateTestTexturePassData.m_testTexture, generateTestTexturePassData.m_inputTexture.width,
+                generateTestTexturePassData.m_inputTexture.height, generateTestTexturePassData.m_inputTexture.format, defaultST);
 
-            SATPassData passDataRow = ParallelScan(graph, scanCS, generateTestTexturePassData.m_testTexture,
-                generateTestTexturePassData.m_inputTexture.width, generateTestTexturePassData.m_inputTexture.height, 0, 0,
-                generateTestTexturePassData.m_inputTexture.format, false, new Vector4(4, 4, generateTestTexturePassData.m_inputTexture.width - 1 - 4,
-                generateTestTexturePassData.m_inputTexture.height - 1 - 4));
+            SATPassData passDataRow = ParallelScan(graph, scanCS, ref inputTexture, false, new Vector4(inValidWidth, inValidWidth, 
+                generateTestTexturePassData.m_inputTexture.width - 1 - inValidWidth,
+                generateTestTexturePassData.m_inputTexture.height - 1 - inValidWidth));
             SATPassData passData = null;
             if (generateTestTexturePassData.m_inputTexture.height > 1)
             {
-                //testTexture = new Texture2D(passData.m_transposeSumTexture);
+                
                 int inputTextureWidth = generateTestTexturePassData.m_inputTexture.height;
                 int inputTextureHeight = generateTestTexturePassData.m_inputTexture.width;
-                TextureHandle inputTexture = passDataRow.GetFinalOutputTexture();//passDataRow.m_groupNumX == 1 ? passDataRow.m_OutputTexture : passDataRow.m_transposeSumTexture;
-                passData = ParallelScan(graph, scanCS, inputTexture, inputTextureWidth, inputTextureHeight, 0, 0,
-                    generateTestTexturePassData.m_inputTexture.format, true, new Vector4(4, 4, inputTextureWidth - 1 - 4, inputTextureHeight - 1 - 4));
+                TextureHandle inputTextureHandle = passDataRow.GetFinalOutputTexture();
+                inputTexture = new SATTexture(inputTextureHandle, inputTextureWidth, inputTextureHeight, generateTestTexturePassData.m_inputTexture.format, defaultST);
+                passData = ParallelScan(graph, scanCS, ref inputTexture, true, new Vector4(inValidWidth, inValidWidth, 
+                    inputTextureWidth - 1 - inValidWidth, inputTextureHeight - 1 - inValidWidth));
             }
             else
                 passData = passDataRow;

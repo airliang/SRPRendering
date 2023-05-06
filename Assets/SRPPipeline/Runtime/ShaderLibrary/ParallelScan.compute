@@ -22,7 +22,14 @@ uint4 InputTextureSize;
 uint2 GroupSumTextureSize;
 uint2 InputImageOffset;
 float4 ValidRect;
+float4 InputTextureST;  //xy scale, zw offset
+float4 OutputTextureST; //xy scale, zw offset
 bool IsTranposeOutput;
+
+float2 TransformTexUV(float4 st, float2 uv)
+{
+    return uv * st.xy + st.zw;
+}
 
 
 void PreSumArray(int thid)
@@ -81,10 +88,11 @@ void PreSum (uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, ui
     // TODO: insert actual code here!
     uint thid = GTid.x;
     uint2 textureAddr = uint2(2 * thid + groupId.x * THREAD_NUM_X, DTid.y);//uint2(groupId.x * THREAD_NUM_X + thid, groupId.y);
+    textureAddr = TransformTexUV(InputTextureST, textureAddr);
     //uint2 thidToInputAddr = GroupThreadToInputAddr(uint2(2 * thid, DTid.y), groupId.xy);
     TempTexture[2 * thid] = IsInValidRect(textureAddr) ? InputTexture[textureAddr] : 0;//textureAddr.x < InputTextureSize.x ? InputTexture[textureAddr] : 0;
     //thidToInputAddr = GroupThreadToInputAddr(uint2(2 * thid + 1, DTid.y), groupId.xy);
-    uint2 textureAddrNext = uint2(2 * thid + groupId.x * THREAD_NUM_X + 1, DTid.y);
+    uint2 textureAddrNext = uint2(textureAddr.x + 1, DTid.y);
     TempTexture[2 * thid + 1] = IsInValidRect(textureAddrNext) ? InputTexture[textureAddrNext] : 0;//(textureAddr.x + 1) < InputTextureSize.x ? InputTexture[uint2(textureAddr.x + 1, textureAddr.y)] : 0;
     PreSumArray(thid);
 
@@ -105,27 +113,27 @@ void PreSum (uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, ui
     //    OutputTexture[GTid.xy] = TempTexture[GTid.x];
 }
 
-#define PRESUMGROUP_TREADNUM_X 128
-int arrayLengthPerThreadGroup;
-[numthreads(PRESUMGROUP_TREADNUM_X, 1, 1)]
+//#define PRESUMGROUP_TREADNUM_X 128
+int ArrayLengthPerThreadGroup;
+[numthreads(THREAD_NUM_X, 1, 1)]
 void PreSumGroup(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
 {
     // TODO: insert actual code here!
     uint thid = DTid.x;
-    uint2 textureAddr = uint2((thid + 1) * THREAD_NUM_X - 1, groupId.y);
-    uint2 textureAddr1 = uint2((thid + 2) * THREAD_NUM_X - 1, groupId.y);
+    uint2 textureAddr = uint2((2 * thid + 1) * THREAD_NUM_X - 1, groupId.y);
+    uint2 textureAddr1 = uint2((2 * thid + 2) * THREAD_NUM_X - 1, groupId.y);
     TempTexture[2 * thid] = textureAddr.x < InputTextureSize.x ? InputTexture[textureAddr] : 0;
     TempTexture[2 * thid + 1] = textureAddr1.x < InputTextureSize.x ? InputTexture[textureAddr1] : 0;
 
     PreSumArray(thid);
 
     GroupMemoryBarrierWithGroupSync();
-    if ((2 * thid) < arrayLengthPerThreadGroup)
+    if ((2 * thid) < ArrayLengthPerThreadGroup)
     {
         uint2 outputAddress = uint2(2 * thid, groupId.y);
         OutputTexture[outputAddress] = TempTexture[2 * thid];
     }
-    if ((2 * thid + 1) < arrayLengthPerThreadGroup)
+    if ((2 * thid + 1) < ArrayLengthPerThreadGroup)
     {
         uint2 outputAddress = uint2(2 * thid + 1, groupId.y);
         OutputTexture[outputAddress] = TempTexture[2 * thid + 1];

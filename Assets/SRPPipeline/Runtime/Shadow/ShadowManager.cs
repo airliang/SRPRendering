@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Xml.Linq;
 using UnityEditor;
+using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
@@ -106,6 +107,7 @@ namespace Insanity
         string m_Name = "Shadow Atlas Map";
         protected TextureHandle m_ShadowMap;
         protected TextureHandle m_SSShadowMap;    //screen space shadowmap
+        protected TextureHandle m_ShadowMapSAT = TextureHandle.nullHandle;
         //MainLightShadowVariablesGlobal m_MainLightShadowVariablesGlobal = new MainLightShadowVariablesGlobal();
         Light m_MainLight;
         Matrix4x4[] m_MainLightWorldToShadowMatrices;
@@ -640,37 +642,41 @@ namespace Insanity
             cmd.SetGlobalTexture("_ShadowMap", data.m_Shadowmap);
         }
 
-        private TextureHandle GetShadowmapSATTexture(RenderGraph renderGraph, int _width, int _height, int _slices)
-        {
-            TextureDesc textureDesc = new TextureDesc()
-            {
-                filterMode = FilterMode.Point,
-                depthBufferBits = m_DepthBufferBits,
-                isShadowMap = true,
-                name = m_Name + "SAT",
-                wrapMode = TextureWrapMode.Clamp,
-                slices = _slices,
-                width = _width,
-                height = _height
-            };
-
-            return renderGraph.CreateTexture(textureDesc);
-        }
-
-        public SATPassData GenerateShadowmapSAT(RenderGraph renderGraph, ShadowPassData shadowPassData)
+        public SATPassData GenerateShadowmapSAT(RenderGraph renderGraph, ShadowPassData shadowPassData, ComputeShader scanCS)
         {
             if (m_SATRenderer == null)
             {
                 m_SATRenderer = new SATRenderer();
             }
-
-            
-
+            SATPassData satPassData = null;
+            SATTexture inputTexture = new SATTexture(shadowPassData.m_Shadowmap, 
+                shadowPassData.m_ShadowmapWidth, shadowPassData.m_ShadowmapHeight, TextureFormat.RFloat, SATRenderer.defaultST);
+            TextureDesc outputDesc = new TextureDesc(shadowPassData.m_ShadowmapWidth, shadowPassData.m_ShadowmapHeight)
+            {
+                filterMode = FilterMode.Point,
+                depthBufferBits = DepthBits.None,
+                //isShadowMap = false,
+                name = m_Name,
+                wrapMode = TextureWrapMode.Clamp,
+                colorFormat = GraphicsFormat.R32_SFloat,
+                clearColor = Color.black,
+                autoGenerateMips = false,
+                useMipMap = false,
+                clearBuffer = true
+            };
+            renderGraph.CreateTextureIfInvalid(outputDesc, ref m_ShadowMapSAT);
+            SATTexture outputTexture = new SATTexture(m_ShadowMapSAT, shadowPassData.m_ShadowmapWidth, shadowPassData.m_ShadowmapHeight, TextureFormat.RFloat, new Vector4(1,1,0,0));
             for (int i = 0; i < m_shadowSetting.mainLightShadowCascadesCount; ++i)
             {
-
+                ShadowRequest shadowRequest = m_ShadowRequests[i];
+                int shadowResolution = GetShadowResolution();
+                Vector4 validRect = new Vector4(shadowRequest.atlasViewport.x, shadowRequest.atlasViewport.y,
+                    shadowRequest.atlasViewport.width + shadowRequest.atlasViewport.x, shadowRequest.atlasViewport.height + shadowRequest.atlasViewport.y);
+                //validRect = new Vector4(0, 0, shadowResolution, shadowResolution);
+                outputTexture.m_ST = new Vector4(1, 1, shadowRequest.atlasViewport.x, shadowRequest.atlasViewport.y);
+                satPassData = m_SATRenderer.RenderSAT(renderGraph, scanCS, ref inputTexture, ref outputTexture, validRect);
             }
-            return null;
+            return satPassData;
         }
     }
 }

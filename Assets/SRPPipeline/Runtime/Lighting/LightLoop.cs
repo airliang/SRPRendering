@@ -188,9 +188,20 @@ namespace Insanity
             m_ShadowMananger.ExecuteShadowInitPass(graph);
         }
 
-        ShadowPassData RenderShadow(CameraData cameraData, RenderGraph graph, CullingResults cull)
+        ShadowPassData RenderShadow(CameraData cameraData, RenderGraph graph, CullingResults cull, ComputeShader scanCS)
         {
             ShadowPassData shadowPassData = m_ShadowMananger.RenderShadowMap(graph, cull, m_ShaderVariablesGlobalCB);
+            if (shadowPassData.m_ShadowType == ShadowType.PCSS)
+            {
+                if (m_shadowSettings.pcssSatEnable)
+                {
+                    SATPassData satData = m_ShadowMananger.GenerateShadowmapSAT(graph, shadowPassData, scanCS);
+                    if (satData != null)
+                    {
+                        shadowPassData.m_ShadowmapSAT = satData.GetFinalOutputTexture();
+                    }
+                }
+            }
             PushGlobalCameraParams(graph, cameraData);
             return shadowPassData;
         }
