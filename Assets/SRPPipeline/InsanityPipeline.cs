@@ -4,8 +4,6 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using static Insanity.InsanityPipeline;
-using Unity.Collections;
 //using UnityEngine.Experimental.GlobalIllumination;
 
 namespace Insanity
@@ -90,7 +88,7 @@ namespace Insanity
                     TextureHandle shadowmap = TextureHandle.nullHandle;
                     if (m_shadowSettings.supportsMainLightShadows)
                     {
-                        shadowPassData = RenderShadow(cameraData, m_RenderGraph, cull);
+                        shadowPassData = RenderShadow(cameraData, m_RenderGraph, cull, asset.InsanityPipelineResources.shaders.ParallelScan);
 
                         if (shadowPassData != null)
                         {
@@ -112,12 +110,21 @@ namespace Insanity
                     }
 
                     ForwardPassData forwardPassData = Render_OpaqueFowardPass(cameraData, m_RenderGraph, cull, depthPassData, shadowmap);
-                    Render_SkyPass(cameraData, m_RenderGraph, depthPassData, asset.InsanityPipelineResources.materials.Skybox);
-                    SATPassData satData = m_satRenderer.TestParallelScan(m_RenderGraph, asset.InsanityPipelineResources.shaders.ParallelScan);
-                    if (satData != null)
+                    if (asset.PhysicalBasedSky)
                     {
-                        forwardPassData.m_Albedo = satData.GetFinalOutputTexture();
+                        Render_PhysicalBaseSky(cameraData, m_RenderGraph, depthPassData, asset);
                     }
+                    else
+                        Render_SkyPass(cameraData, m_RenderGraph, depthPassData, asset.InsanityPipelineResources.materials.Skybox);
+                    //SATPassData satData = m_satRenderer.TestParallelScan(m_RenderGraph, asset.InsanityPipelineResources.shaders.ParallelScan);
+                    //if (satData != null)
+                    //{
+                    //    forwardPassData.m_Albedo = satData.GetFinalOutputTexture();
+                    //}
+                    //if (asset.PCSSSATEnable && shadowPassData != null)
+                    //{
+                    //    forwardPassData.m_Albedo = shadowPassData.m_ShadowmapSAT;
+                    //}
                     FinalBlitPass(cameraData, m_RenderGraph, forwardPassData);
                 }
 

@@ -1,0 +1,51 @@
+
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel PrecomputeScattering
+#pragma enable_d3d11_debug_symbols
+#include "AtmosphereScattering.hlsl"
+
+RWTexture3D<float4> _SkyboxLUT;
+
+
+[numthreads(1,1,1)]
+void PrecomputeScattering(uint3 id : SV_DispatchThreadID)
+{
+    float w, h, d;
+    _SkyboxLUT.GetDimensions(w, h, d);
+
+    float3 texCoords = float3(id.x / w, id.y / h, id.z / d);
+
+    float height = texCoords.x * texCoords.x * _AtmosphereHeight;
+    float cosViewZenith = texCoords.y * 2.0 - 1.0;
+    float cosSunZenith = texCoords.z * 2.0 - 1.0;
+    float cv = cosViewZenith;
+    float ch = -sqrt(height * (2 * _EarthRadius + height)) / (_EarthRadius + height);
+    
+    if (texCoords.y > 0.5)
+    {
+        cv = ch + pow(cosViewZenith, 5) * (1 - ch);
+    }
+    else
+    {
+        cv = ch - pow(cosViewZenith + 1, 5) * (1 + ch);
+    }
+
+    float cs = tan((cosSunZenith + 0.26) * 0.75) / tan(1.26 * 0.75);
+
+    float3 rayStart = float3(0, height, 0);
+
+
+    float3 rayDir = normalize(float3(sqrt(saturate(1 - cv * cv)), cv, 0));
+
+    float3 sunDir = -normalize(float3(sqrt(saturate(1 - cs * cs)), cs, 0));
+    float3 earthCenter = float3(0, -_EarthRadius, 0);
+    float intersection = RaySphereIntersection(rayStart, rayDir, earthCenter, _EarthRadius + _AtmosphereHeight);
+    float rayLength = intersection;
+    //intersection = RaySphereIntersection(rayStart, rayDir, earthCenter, _EarthRadius);
+    //if (intersection.x > 0)
+    //    rayLength = min(rayLength, intersection.x);
+    float3 rayEnd = rayStart + rayDir * rayLength;
+    float4 scattering = IntegrateInScattering(rayStart, rayEnd, sunDir, earthCenter);
+    _SkyboxLUT[id] = scattering;
+}

@@ -26,9 +26,13 @@ MonoBehaviour:
   m_ShadowPCFFilter: 0
   m_PCSSSoftness: 1
   m_PCSSSoftnessFalloff: 3
-  m_PCSSSATEnable: 1
+  m_VSMSATEnable: 0
   m_ShadowPrefitlerGaussianRadius: 1
   m_EVSMExponents: {x: 5, y: 5}
   m_LightBleedingReduction: 0.255
+  m_ScatteringScaleR: 1
+  m_ScatteringScaleM: 1
+  m_MieG: 0.76
+  m_physicalBasedSky: 1
   m_PipelineResources: {fileID: 11400000, guid: e267fa520b4e57140aaa0481ee785b42,
     type: 2}

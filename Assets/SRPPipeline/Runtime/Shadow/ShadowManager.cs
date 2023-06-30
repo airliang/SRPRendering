@@ -40,11 +40,18 @@ namespace Insanity
         public eGaussianRadius m_ShadowPrefilterGaussianRadius = eGaussianRadius.eGausian3x3;
         public Vector2 m_ShadowExponents = new Vector2(10, 10);
         public float m_LightBleedingReduction = 0.5f;
+        public bool m_VSMSATEnable = false;
     }
 
     public class ShadowInitPassData
     {
         public bool m_supportMainLightShadow = false;
+    }
+
+    public class PushShadowSATData
+    {
+        public TextureHandle m_ShadowSAT;
+        public Vector2 m_ShadowSATSize;
     }
 
     public class ScreenSpaceShadowPassData
@@ -139,6 +146,8 @@ namespace Insanity
             public static int _ShadowmapSize;
             public static int _ShadowBias;
             public static int _ShadowDistance;
+            public static int _Shadowmap;
+            
         }
 
         private static class PCSSConstantBuffer
@@ -146,6 +155,8 @@ namespace Insanity
             public static int _PCSSSoftness;
             public static int _PCF_Samples;
             public static int _SoftnessFalloff;
+            public static int _ShadowmapSAT;
+            public static int _ShadowmapSATSize;
         }
 
         private static class VSMConstantBuffer
@@ -182,9 +193,12 @@ namespace Insanity
             MainLightShadowConstantBuffer._ShadowmapSize = Shader.PropertyToID("_MainLightShadowmapSize");
             MainLightShadowConstantBuffer._ShadowBias = Shader.PropertyToID("_ShadowBias");
             MainLightShadowConstantBuffer._ShadowDistance = Shader.PropertyToID("_ShadowDistance");
+            MainLightShadowConstantBuffer._Shadowmap = Shader.PropertyToID("_ShadowMap");
             PCSSConstantBuffer._PCSSSoftness = Shader.PropertyToID("_Softness");
             PCSSConstantBuffer._PCF_Samples = Shader.PropertyToID("_PCF_Samples");
             PCSSConstantBuffer._SoftnessFalloff = Shader.PropertyToID("_SoftnessFalloff");
+            PCSSConstantBuffer._ShadowmapSAT = Shader.PropertyToID("_ShadowMapSAT");
+            PCSSConstantBuffer._ShadowmapSATSize = Shader.PropertyToID("_ShadowMapSATSize");
             VSMConstantBuffer._ExponentConstants = Shader.PropertyToID("_ShadowExponents");
             VSMConstantBuffer._LightBleedingReduction = Shader.PropertyToID("_LightBleedingReduction");
         }
@@ -412,6 +426,7 @@ namespace Insanity
             CoreUtils.SetKeyword(cmd, "_SHADOWS_SOFT", passData.m_SoftShadows);
             CoreUtils.SetKeyword(cmd, "_MAIN_LIGHT_SHADOWS_CASCADE", passData.cascadeCount > 1);
             CoreUtils.SetKeyword(cmd, "_SHADOW_PCSS", passData.m_ShadowType == ShadowType.PCSS);
+            CoreUtils.SetKeyword(cmd, "_VSM_SAT_FILTER", passData.m_ShadowType == ShadowType.PCSS && passData.m_VSMSATEnable);
             CoreUtils.SetKeyword(cmd, "_SHADOW_VSM", passData.m_ShadowType == ShadowType.VSM);
             CoreUtils.SetKeyword(cmd, "_SHADOW_EVSM", passData.m_ShadowType == ShadowType.EVSM);
         }
@@ -489,6 +504,7 @@ namespace Insanity
                 passData.m_ShadowPrefilterGaussianRadius = m_shadowSetting.prefilterGaussianRadius;
                 passData.m_ShadowExponents = m_shadowSetting.exponentialConstants;
                 passData.m_LightBleedingReduction = m_shadowSetting.lightBleedingReduction;
+                passData.m_VSMSATEnable = m_shadowSetting.vsmSatEnable;
 
                 builder.SetRenderFunc(
                     (ShadowPassData data, RenderGraphContext ctx) =>
@@ -639,10 +655,12 @@ namespace Insanity
 
             // moved outside, this is needed for expotional shadow maps
             cmd.SetGlobalVector(MainLightShadowConstantBuffer._ShadowmapSize, data.m_ShadowmapSize);
-            cmd.SetGlobalTexture("_ShadowMap", data.m_Shadowmap);
+            cmd.SetGlobalTexture(MainLightShadowConstantBuffer._Shadowmap, data.m_Shadowmap);
+
+            
         }
 
-        public SATPassData GenerateShadowmapSAT(RenderGraph renderGraph, ShadowPassData shadowPassData, ComputeShader scanCS)
+        public SATPassData GenerateVSMSAT(RenderGraph renderGraph, ShadowPassData shadowPassData, ComputeShader scanCS)
         {
             if (m_SATRenderer == null)
             {
@@ -662,7 +680,8 @@ namespace Insanity
                 clearColor = Color.black,
                 autoGenerateMips = false,
                 useMipMap = false,
-                clearBuffer = true
+                clearBuffer = true,
+                enableRandomWrite = true,
             };
             renderGraph.CreateTextureIfInvalid(outputDesc, ref m_ShadowMapSAT);
             SATTexture outputTexture = new SATTexture(m_ShadowMapSAT, shadowPassData.m_ShadowmapWidth, shadowPassData.m_ShadowmapHeight, TextureFormat.RFloat, new Vector4(1,1,0,0));
@@ -675,6 +694,22 @@ namespace Insanity
                 //validRect = new Vector4(0, 0, shadowResolution, shadowResolution);
                 outputTexture.m_ST = new Vector4(1, 1, shadowRequest.atlasViewport.x, shadowRequest.atlasViewport.y);
                 satPassData = m_SATRenderer.RenderSAT(renderGraph, scanCS, ref inputTexture, ref outputTexture, validRect);
+            }
+            if (shadowPassData.m_VSMSATEnable)
+            {
+                using (var builder = renderGraph.AddRenderPass<PushShadowSATData>("Push ShadowSAT Parameters", out var passData))
+                {
+                    passData.m_ShadowSAT = builder.ReadTexture(satPassData.GetFinalOutputTexture());
+                    passData.m_ShadowSATSize = new Vector2(m_ShadowmapWidth, m_ShadowmapHeight);
+
+                    builder.SetRenderFunc(
+                        (PushShadowSATData data, RenderGraphContext context) =>
+                        {
+                            context.cmd.SetGlobalTexture(PCSSConstantBuffer._ShadowmapSAT, data.m_ShadowSAT);
+                            context.cmd.SetGlobalVector(PCSSConstantBuffer._ShadowmapSATSize, data.m_ShadowSATSize);
+                        });
+                }
+                
             }
             return satPassData;
         }

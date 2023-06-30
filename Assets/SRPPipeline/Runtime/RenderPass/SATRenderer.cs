@@ -102,7 +102,7 @@ namespace Insanity
         private const int MaxGroupThreadsNum = 128;
         public SATPassData RenderSAT(RenderGraph graph, ComputeShader scanCS, ref SATTexture inputTexture, ref SATTexture outputTexture, Vector4 validRect)
         {
-            SATPassData passDataRow = ParallelScan(graph, scanCS, ref inputTexture, false, validRect);
+            SATPassData passDataRow = ParallelScan(graph, scanCS, ref inputTexture, ref outputTexture, false, validRect);
             SATPassData passData = null;
             if (inputTexture.m_height > 1)
             {
@@ -111,7 +111,7 @@ namespace Insanity
                 int inputTextureHeight = inputTexture.m_width;
                 inputTexture = new SATTexture(passDataRow.GetFinalOutputTexture(), inputTextureWidth, inputTextureHeight, 
                     outputTexture.m_format, defaultST);
-                passData = ParallelScan(graph, scanCS, ref inputTexture, true, validRect);
+                passData = ParallelScan(graph, scanCS, ref inputTexture, ref outputTexture, true, validRect);
             }
             else
                 passData = passDataRow;
@@ -178,7 +178,8 @@ namespace Insanity
             return graph.CreateTexture(textureDesc); 
         }
 
-        public SATPassData ParallelScan(RenderGraph graph, ComputeShader scanCS, ref SATTexture inputTexture, bool verticalScan, Vector4 validRect)
+        public SATPassData ParallelScan(RenderGraph graph, ComputeShader scanCS, ref SATTexture inputTexture, ref SATTexture outputTexture,
+            bool verticalScan, Vector4 validRect)
         {
             string passName = verticalScan ? "Vertical Parallen Scan Pass" : "Horizontal Parallen Scan Pass";
             using (var builder = graph.AddRenderPass<SATPassData>(passName, out var passData,
@@ -191,6 +192,8 @@ namespace Insanity
                 int outputTextureHeight = verticalScan ? inputTexture.m_width : inputTexture.m_height;
                 passData.m_OutputTexture = builder.ReadWriteTexture(GetOutputTexture(graph, outputTextureWidth,
                     outputTextureHeight, satFormat));
+                bool equalRatio = inputTexture.m_width == inputTexture.m_height;
+                passData.m_OutputTexture = builder.ReadWriteTexture(outputTexture.m_texture);
                 if (passData.kernelPreSum == -1)
                 {
                     passData.kernelPreSum = scanCS.FindKernel("PreSum");
@@ -214,7 +217,7 @@ namespace Insanity
                 {
                     if (inputTexture.m_height > 1)
                     {
-                        passData.m_transposeSumTexture = builder.ReadWriteTexture(GetOutputTexture(graph,
+                        passData.m_transposeSumTexture = /*equalRatio ? passData.m_OutputTexture : */builder.ReadWriteTexture(GetOutputTexture(graph,
                             inputTexture.m_height, inputTexture.m_width, satFormat));
                         passData.m_transposeOutput = true;
                     }
@@ -226,7 +229,7 @@ namespace Insanity
                 }
                 else
                 {
-                    passData.m_transposeSumTexture = builder.ReadWriteTexture(GetOutputTexture(graph,
+                    passData.m_transposeSumTexture = /*equalRatio ? passData.m_OutputTexture : */builder.ReadWriteTexture(GetOutputTexture(graph,
                         inputTexture.m_height, inputTexture.m_width, satFormat));
                     passData.m_transposeOutput = true;
                 }
@@ -279,19 +282,26 @@ namespace Insanity
             int inValidWidth = 4;
             SATTexture inputTexture = new SATTexture(generateTestTexturePassData.m_testTexture, generateTestTexturePassData.m_inputTexture.width,
                 generateTestTexturePassData.m_inputTexture.height, generateTestTexturePassData.m_inputTexture.format, defaultST);
+            GraphicsFormat graphicsFormat = generateTestTexturePassData.m_inputTexture.graphicsFormat;
+            int outputTextureWidth = generateTestTexturePassData.m_inputTexture.width;
+            int outputTextureHeight = generateTestTexturePassData.m_inputTexture.height;
+            TextureHandle outputTextureHandle =
+                GetOutputTestTexture(graph, outputTextureWidth,
+                outputTextureHeight, graphicsFormat, "SATTestOutputTexture", true);
+            SATTexture outputTexture = new SATTexture(outputTextureHandle, outputTextureWidth,
+                               outputTextureHeight, generateTestTexturePassData.m_inputTexture.format, defaultST);
 
-            SATPassData passDataRow = ParallelScan(graph, scanCS, ref inputTexture, false, new Vector4(inValidWidth, inValidWidth, 
+            SATPassData passDataRow = ParallelScan(graph, scanCS, ref inputTexture, ref outputTexture, false, new Vector4(inValidWidth, inValidWidth, 
                 generateTestTexturePassData.m_inputTexture.width - 1 - inValidWidth,
                 generateTestTexturePassData.m_inputTexture.height - 1 - inValidWidth));
             SATPassData passData = null;
             if (generateTestTexturePassData.m_inputTexture.height > 1)
             {
-                
                 int inputTextureWidth = generateTestTexturePassData.m_inputTexture.height;
                 int inputTextureHeight = generateTestTexturePassData.m_inputTexture.width;
                 TextureHandle inputTextureHandle = passDataRow.GetFinalOutputTexture();
                 inputTexture = new SATTexture(inputTextureHandle, inputTextureWidth, inputTextureHeight, generateTestTexturePassData.m_inputTexture.format, defaultST);
-                passData = ParallelScan(graph, scanCS, ref inputTexture, true, new Vector4(inValidWidth, inValidWidth, 
+                passData = ParallelScan(graph, scanCS, ref inputTexture, ref outputTexture, true, new Vector4(inValidWidth, inValidWidth,
                     inputTextureWidth - 1 - inValidWidth, inputTextureHeight - 1 - inValidWidth));
             }
             else
@@ -299,30 +309,31 @@ namespace Insanity
             return passData;
         }
 
+        TextureHandle GetOutputTestTexture(RenderGraph graph, int width, int height, GraphicsFormat graphicsFormat, string textureName, bool writable)
+        {
+            TextureDesc textureDesc = new TextureDesc(width, height)
+            {
+                colorFormat = graphicsFormat,
+                filterMode = FilterMode.Point,
+                depthBufferBits = DepthBits.None,
+                autoGenerateMips = false,
+                useMipMap = false,
+                name = textureName,
+                enableRandomWrite = writable
+            };
+
+            return graph.CreateTexture(textureDesc);
+        }
+
         GenerateTestTexturePassData GenerateTestTexture(RenderGraph graph)
         {
-            TextureHandle GetOutputTestTexture(RenderGraph graph, int width, int height, GraphicsFormat graphicsFormat)
-            {
-                TextureDesc textureDesc = new TextureDesc(width, height)
-                {
-                    colorFormat = graphicsFormat,
-                    filterMode = FilterMode.Point,
-                    depthBufferBits = DepthBits.None,
-                    autoGenerateMips = false,
-                    useMipMap = false,
-                    name = "TestSATInputTexture"
-                };
-
-                return graph.CreateTexture(textureDesc);
-            }
-
             using (var builder = graph.AddRenderPass<GenerateTestTexturePassData>("Generate Test Texture", out var passData,
                                new ProfilingSampler("Generate Test Texture Pass Profiler")))
             {
                 Texture2D texture = GetTestInputTexture();
                 GraphicsFormat graphicsFormat = texture.graphicsFormat;
                 passData.m_inputTexture = texture;
-                passData.m_testTexture = builder.WriteTexture(GetOutputTestTexture(graph, texture.width, texture.height, graphicsFormat));
+                passData.m_testTexture = builder.WriteTexture(GetOutputTestTexture(graph, texture.width, texture.height, graphicsFormat, "TestSATInputTexture", false));
 
                 builder.SetRenderFunc((GenerateTestTexturePassData data, RenderGraphContext context) =>
                 {

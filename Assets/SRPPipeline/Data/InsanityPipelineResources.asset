@@ -16,6 +16,9 @@ MonoBehaviour:
     Blit: {fileID: 4800000, guid: 7c0b0718aa2f5834ea739d5009bbbc0d, type: 3}
     HDRISky: {fileID: 4800000, guid: 06c01dc3845ea1245802e318cacb5273, type: 3}
     ParallelScan: {fileID: 7200000, guid: 8a4fde720a0fdb34b99ff02187040f19, type: 3}
+    PrecomputeScattering: {fileID: 7200000, guid: f29ed63cf0dc4584e905a83c826a0b6e,
+      type: 3}
   materials:
     Blit: {fileID: 0}
     Skybox: {fileID: 2100000, guid: 67452d3878198b14b84d18147ea1dab2, type: 2}
+    PhysicalBaseSky: {fileID: 2100000, guid: 5a36ff6ec0205ac45a2fde5da7c0ac1d, type: 2}

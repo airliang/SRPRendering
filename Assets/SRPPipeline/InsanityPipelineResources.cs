@@ -17,6 +17,8 @@ namespace Insanity
             public Shader HDRISky;
             [Reload("Runtime/ShaderLibrary/ParallelScan.compute")]
             public ComputeShader ParallelScan;
+
+            public ComputeShader PrecomputeScattering;
         }
 
         [Serializable, ReloadGroup]
@@ -26,6 +28,8 @@ namespace Insanity
             public Material Blit;
             [Reload("Runtime/Materials/Skybox.mat")]
             public Material Skybox;
+
+            public Material PhysicalBaseSky;
         }
 
         public ShaderResources shaders;

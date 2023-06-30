@@ -257,7 +257,8 @@ inline float2 Rotate(float2 pos, float2 rotationTrig)
     return float2(pos.x * rotationTrig.x - pos.y * rotationTrig.y, pos.y * rotationTrig.x + pos.x * rotationTrig.y);
 }
 
-
+//find the blocker information for a shading point, given a finding range defined as searchUV.
+//return value is a float2, where x is the average blocker depth, and y is the number of blockers
 float2 FindBlocker(float2 uv, float depth, float searchUV, float2 receiverPlaneDepthBias, float2 rotationTrig, 
     Texture2D shadowMap, SamplerState pointSampler)
 {
@@ -277,10 +278,6 @@ float2 FindBlocker(float2 uv, float depth, float searchUV, float2 receiverPlaneD
 
         float biasedDepth = depth;
 
-#if defined(USE_BLOCKER_BIAS)
-        biasedDepth += dot(offset, receiverPlaneDepthBias) * Blocker_GradientBias;
-#endif
-
 #if defined(UNITY_REVERSED_Z)
         if (shadowMapDepth > biasedDepth)
 #else
@@ -299,6 +296,21 @@ float2 FindBlocker(float2 uv, float depth, float searchUV, float2 receiverPlaneD
 #endif
 
     return float2(avgBlockerDepth, numBlockers);
+}
+
+float2 FindBlockerBySAT(float2 uv, float depth, float searchUV,
+    Texture2D shadowMapSAT, SamplerState pointSampler)
+{
+    float2 radius = searchUV;
+    float r = SAMPLE_TEXTURE2D(shadowMapSAT, pointSampler, uv + radius);
+    float topleft = SAMPLE_TEXTURE2D(shadowMapSAT, pointSampler, float2(uv.x - radius.x, uv.y + radius.y));
+    float bottomRight = SAMPLE_TEXTURE2D(shadowMapSAT, pointSampler, float2(uv.x + radius.x, uv.y - radius.y));
+    float bottomLeft = SAMPLE_TEXTURE2D(shadowMapSAT, pointSampler, uv - radius);
+    float avgBlockerDepth = (r - bottomRight - topleft + bottomLeft) / (radius.x * radius.y);
+#if defined(UNITY_REVERSED_Z)
+    avgBlockerDepth = 1.0 - avgBlockerDepth;
+#endif
+    return float2(avgBlockerDepth, 1);
 }
 
 float PCSS_PCF_Filter(float2 uv, float depth, float filterRadiusUV, float2 receiverPlaneDepthBias, float penumbra, float2 rotationTrig,
@@ -359,19 +371,16 @@ float PCSS(float4 coords, float2 receiverPlaneDepthBias, float random, float cas
 
 #if defined(UNITY_REVERSED_Z)
     depthReceiver = 1.0 - depth;
-#endif
-
-    //float rotationAngle = random * 6.283185307179586476925286766559;
-    float rotationAngle = random * 3.1415926;
-    float2 rotationTrig = float2(cos(rotationAngle), sin(rotationAngle));
-
-#if defined(UNITY_REVERSED_Z)
     receiverPlaneDepthBias *= -1.0;
 #endif
+
 
     // STEP 1: blocker search
     //float searchSize = Softness * (depth - _LightShadowData.w) / depth;
     float searchSize = cascadeScale * _Softness * saturate(depthReceiver - .02) / depthReceiver;
+
+    float rotationAngle = random * 3.1415926;
+    float2 rotationTrig = float2(cos(rotationAngle), sin(rotationAngle));
     float2 blockerInfo = FindBlocker(uv, depth, searchSize, receiverPlaneDepthBias, rotationTrig, shadowMap, samp);
    
     if (blockerInfo.y < 1)
@@ -379,7 +388,9 @@ float PCSS(float4 coords, float2 receiverPlaneDepthBias, float random, float cas
         //There are no occluders so early out (this saves filtering)
         return 1.0;
     }
-
+#if defined(_VSM_SAT_FILTER)
+    float shadow = SampleShadowSAT(samp, uv, searchSize);
+#else
     // STEP 2: penumbra size
     //float penumbra = zAwareDepth * zAwareDepth - blockerInfo.x * blockerInfo.x;
     float dBlocker = blockerInfo.x;
@@ -392,9 +403,7 @@ float PCSS(float4 coords, float2 receiverPlaneDepthBias, float random, float cas
     //filterRadiusUV *= filterRadiusUV;
 
     // STEP 3: filtering
-#if defined(_PCSS_SAT_FILTER)
-    float shadow = SampleShadowSAT(samp, uv, filterRadiusUV);
-#else
+
     float shadow = PCSS_PCF_Filter(uv, depth, filterRadiusUV, receiverPlaneDepthBias, penumbra, rotationTrig, shadowMap, compSampler);
 #endif
     return shadow;

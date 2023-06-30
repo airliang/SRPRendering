@@ -128,7 +128,7 @@ namespace Insanity
             m_shadowSettings.csmBlendEnable = asset.enableCSMBlend;
             m_shadowSettings.pcssSoftness = asset.PCSSSoftness;
             m_shadowSettings.pcssSoftnessFalloff = asset.PCSSSoftnessFalloff;
-            m_shadowSettings.pcssSatEnable = asset.PCSSSATEnable;
+            m_shadowSettings.vsmSatEnable = asset.VSMSATEnable;
             m_shadowSettings.mainLightResolution = GetLightShadowResolution(m_sunLight);
             m_shadowSettings.prefilterGaussianRadius = asset.ShadowPrefilterGaussian;
             m_shadowSettings.exponentialConstants = asset.EVSMExponentConstants;
@@ -191,11 +191,11 @@ namespace Insanity
         ShadowPassData RenderShadow(CameraData cameraData, RenderGraph graph, CullingResults cull, ComputeShader scanCS)
         {
             ShadowPassData shadowPassData = m_ShadowMananger.RenderShadowMap(graph, cull, m_ShaderVariablesGlobalCB);
-            if (shadowPassData.m_ShadowType == ShadowType.PCSS)
+            if (shadowPassData != null && shadowPassData.m_ShadowType == ShadowType.VSM)
             {
-                if (m_shadowSettings.pcssSatEnable)
+                if (m_shadowSettings.vsmSatEnable)
                 {
-                    SATPassData satData = m_ShadowMananger.GenerateShadowmapSAT(graph, shadowPassData, scanCS);
+                    SATPassData satData = m_ShadowMananger.GenerateVSMSAT(graph, shadowPassData, scanCS);
                     if (satData != null)
                     {
                         shadowPassData.m_ShadowmapSAT = satData.GetFinalOutputTexture();

@@ -31,7 +31,7 @@ namespace UnityEditor.Insanity
             public static GUIContent shadowPCFFilter = EditorGUIUtility.TrTextContent("Shadow PCF Filter", "Shadow Mapping PCF Filter options.");
             public static GUIContent pcssSoftness = EditorGUIUtility.TrTextContent("PCSS Softness", "Simulate the direction light size in PCSS algorithrm");
             public static GUIContent pcssSoftnessFalloff = EditorGUIUtility.TrTextContent("PCSS Softness Falloff", "Softness falloff parameter use by a pow formular.");
-            public static GUIContent pcssSATEnable = EditorGUIUtility.TrTextContent("PCSS SAT Enable", "Enable the SAT algorithm to calculate the PCSS.");
+            public static GUIContent vsmSATEnable = EditorGUIUtility.TrTextContent("VSM SAT Enable", "Enable the SAT algorithm to calculate the vsm filter.");
             public static GUIContent gaussianFilterRadius = EditorGUIUtility.TrTextContent("Gaussian Prefilter Radius", "The gaussian kernel size to filtering.");
             public static GUIContent exponentialConstants = EditorGUIUtility.TrTextContent("Exponential Variance Shadow Constants", "Setting the exponential constants of EVSM");
             public static GUIContent lightBleedingReduction = EditorGUIUtility.TrTextContent("LightBleeding Reduction Value", "Clamp the [pMax, 1] to the [lightBleeding, 1]");
@@ -39,6 +39,13 @@ namespace UnityEditor.Insanity
             public static string[] shadowTypeOptions = { "PCF", "PCSS", "VSM", "EVSM", "MSM" };
             public static string[] shadowPCFFilterOptions = { "Hard", "Low", "Medium", "High" };
             public static string[] gaussianFilterRadiusOptions = { "3x3", "5x5", "9x9", "13x13" };
+
+            public static GUIContent atmosphereSettingsText = EditorGUIUtility.TrTextContent("Atmosphere");
+            public static GUIContent physicalBasedSkyEnable = EditorGUIUtility.TrTextContent("Physical based sky Enable", "Enable Atmosphere scattering rendering in sky.");
+            public static GUIContent scatteringScaleRayleigh = EditorGUIUtility.TrTextContent("Scattering Scale Rayleigh", "The Rayleigh scattering scale.");
+            public static GUIContent scatteringScaleMie = EditorGUIUtility.TrTextContent("Scattering Scale Mie", "The Mie scattering scale.");
+            public static GUIContent mieG = EditorGUIUtility.TrTextContent("Mie G", "The Mie G value.");
+            public static GUIContent sunLightColor = EditorGUIUtility.TrTextContent("Sun Light Color", "The sun light color.");
 
             public static GUIContent resourcesSettingsText = EditorGUIUtility.TrTextContent("Resources");
             public static GUIContent pipelineResourcesText = EditorGUIUtility.TrTextContent("Pipeline Resources", 
@@ -65,13 +72,20 @@ namespace UnityEditor.Insanity
 
         SerializedProperty m_PCSSSoftnessProp;
         SerializedProperty m_PCSSSoftnessFalloff;
-        SerializedProperty m_PCSSSATEnable;
+        SerializedProperty m_VSMSATEnable;
         SerializedProperty m_ShadowPrefilterGaussians;
         SerializedProperty m_ExponentialConstants;
         SerializedProperty m_LightBleedingReduction;
 
         SavedBool m_ResourcesSettingsFoldout;
         SerializedProperty m_PipelineResources;
+
+        SavedBool m_AtmosphereSettingsFoldout;
+        SerializedProperty m_PhysicalBaseSky;
+        SerializedProperty m_ScatteringScaleRayleigh;
+        SerializedProperty m_ScatteringScaleMie;
+        SerializedProperty m_MieG;
+        SerializedProperty m_SunLightColor;
              
         public override void OnInspectorGUI()
         {
@@ -79,7 +93,7 @@ namespace UnityEditor.Insanity
 
             DrawPipelineResources();
             DrawShadowSettings();
-
+            DrawAtmosphereScatteringSettings();
 
             serializedObject.ApplyModifiedProperties();
         }
@@ -102,11 +116,18 @@ namespace UnityEditor.Insanity
             m_ShadowPCFFilter = serializedObject.FindProperty("m_ShadowPCFFilter");
             m_PCSSSoftnessProp = serializedObject.FindProperty("m_PCSSSoftness");
             m_PCSSSoftnessFalloff = serializedObject.FindProperty("m_PCSSSoftnessFalloff");
-            m_PCSSSATEnable = serializedObject.FindProperty("m_PCSSSATEnable");
+            m_VSMSATEnable = serializedObject.FindProperty("m_VSMSATEnable");
             m_ShadowPrefilterGaussians = serializedObject.FindProperty("m_ShadowPrefitlerGaussianRadius");
             m_ExponentialConstants = serializedObject.FindProperty("m_EVSMExponents");
             m_LightBleedingReduction = serializedObject.FindProperty("m_LightBleedingReduction");
             m_PipelineResources = serializedObject.FindProperty("m_PipelineResources");
+
+            m_AtmosphereSettingsFoldout = new SavedBool($"{target.GetType()}.AtmosphereSettingsFoldout", false);
+            m_PhysicalBaseSky = serializedObject.FindProperty("m_physicalBasedSky");
+            m_ScatteringScaleRayleigh = serializedObject.FindProperty("m_ScatteringScaleR");
+            m_ScatteringScaleMie = serializedObject.FindProperty("m_ScatteringScaleM");
+            m_MieG = serializedObject.FindProperty("m_MieG");
+            m_SunLightColor = serializedObject.FindProperty("m_SunLightColor");
 
             m_ResourcesSettingsFoldout = new SavedBool($"{target.GetType()}.ResourcesSettingsFoldout", false);
         }
@@ -150,7 +171,7 @@ namespace UnityEditor.Insanity
                 {
                     m_PCSSSoftnessProp.floatValue = EditorGUILayout.Slider(Styles.pcssSoftness, m_PCSSSoftnessProp.floatValue, 0.01f, 2.0f);
                     m_PCSSSoftnessFalloff.floatValue = EditorGUILayout.Slider(Styles.pcssSoftnessFalloff, m_PCSSSoftnessFalloff.floatValue, 0.0f, 8.0f);
-                    m_PCSSSATEnable.boolValue = EditorGUILayout.Toggle(Styles.pcssSATEnable, m_PCSSSATEnable.boolValue);
+                    
                 }
                 else if (shadowType == ShadowType.VSM || shadowType == ShadowType.EVSM)
                 {
@@ -158,6 +179,10 @@ namespace UnityEditor.Insanity
                     if (shadowType == ShadowType.EVSM)
                     {
                         EditorGUILayout.PropertyField(m_ExponentialConstants, Styles.exponentialConstants);
+                    }
+                    else
+                    {
+                        m_VSMSATEnable.boolValue = EditorGUILayout.Toggle(Styles.vsmSATEnable, m_VSMSATEnable.boolValue);
                     }
                     m_LightBleedingReduction.floatValue =  EditorGUILayout.Slider(Styles.lightBleedingReduction, 
                         m_LightBleedingReduction.floatValue, 0.0f, 1.0f);
@@ -167,6 +192,28 @@ namespace UnityEditor.Insanity
                 EditorGUILayout.PropertyField(m_AdaptiveShadowBias, Styles.adaptiveShadowBias);
 
 
+                EditorGUI.indentLevel--;
+                EditorGUILayout.Space();
+                EditorGUILayout.Space();
+            }
+            EditorGUILayout.EndFoldoutHeaderGroup();
+        }
+
+        void DrawAtmosphereScatteringSettings()
+        {
+            m_AtmosphereSettingsFoldout.value = EditorGUILayout.BeginFoldoutHeaderGroup(m_AtmosphereSettingsFoldout.value, Styles.atmosphereSettingsText);
+            if (m_AtmosphereSettingsFoldout.value)
+            {
+                EditorGUI.indentLevel++;
+                m_PhysicalBaseSky.boolValue = EditorGUILayout.Toggle(Styles.physicalBasedSkyEnable, m_PhysicalBaseSky.boolValue);
+                if (m_PhysicalBaseSky.boolValue)
+                {
+                    m_ScatteringScaleRayleigh.floatValue = EditorGUILayout.Slider(Styles.scatteringScaleRayleigh, 
+                        m_ScatteringScaleRayleigh.floatValue, 0.0f, 5.0f);
+                    m_ScatteringScaleMie.floatValue = EditorGUILayout.Slider(Styles.scatteringScaleMie, m_ScatteringScaleMie.floatValue, 0.0f, 5.0f);
+                    m_MieG.floatValue = EditorGUILayout.Slider(Styles.mieG, m_MieG.floatValue, 0.0f, 1.0f);
+                    m_SunLightColor.colorValue = EditorGUILayout.ColorField(Styles.sunLightColor, m_SunLightColor.colorValue, true, false, true);
+                }
                 EditorGUI.indentLevel--;
                 EditorGUILayout.Space();
                 EditorGUILayout.Space();

@@ -77,7 +77,7 @@ namespace Insanity
             return new InsanityPipeline();
         }
 
-
+        #region Shadowmap
         // Shadows Settings
         [SerializeField] float m_ShadowDistance = 50.0f;
         [SerializeField] ShadowCascadesOption m_ShadowCascades = ShadowCascadesOption.NoCascades;
@@ -93,11 +93,10 @@ namespace Insanity
         [SerializeField] ShadowPCFFilter m_ShadowPCFFilter = ShadowPCFFilter.PCF_None;
         [SerializeField] float m_PCSSSoftness = 1.0f;
         [SerializeField] float m_PCSSSoftnessFalloff = 2.0f;
-        [SerializeField] bool m_PCSSSATEnable = false;
+        [SerializeField] bool m_VSMSATEnable = false;
         [SerializeField] eGaussianRadius m_ShadowPrefitlerGaussianRadius = eGaussianRadius.eGausian3x3;
         [SerializeField] Vector2 m_EVSMExponents = new Vector2(10, 10);
         [SerializeField] float m_LightBleedingReduction = 0.5f;
-        [SerializeField] InsanityPipelineResources m_PipelineResources;
 
         public float shadowDistance
         {
@@ -187,10 +186,10 @@ namespace Insanity
             set { m_PCSSSoftnessFalloff = value; }
         }
 
-        public bool PCSSSATEnable
+        public bool VSMSATEnable
         {
-            get { return m_PCSSSATEnable; }
-            set { m_PCSSSATEnable = value; }
+            get { return m_VSMSATEnable; }
+            set { m_VSMSATEnable = value; }
         }
 
         public eGaussianRadius ShadowPrefilterGaussian
@@ -210,6 +209,55 @@ namespace Insanity
             get { return m_LightBleedingReduction; }
             set { m_LightBleedingReduction = value; }
         }
+        #endregion
+
+        #region Atmosphere scattring
+        //Atmosphere Settings
+        [SerializeField] float m_ScatteringScaleR = 1.0f;
+        [SerializeField] float m_ScatteringScaleM = 1.0f;
+        [SerializeField] float m_MieG = 0.76f;
+        [SerializeField] Color m_SunLightColor = Color.white;
+        [SerializeField] bool m_physicalBasedSky = false;
+
+        public float ScatteringScaleR
+        {
+            get { return m_ScatteringScaleR; }
+            set { m_ScatteringScaleR = value; }
+        }
+
+        public float ScatteringScaleM
+        {
+            get { return m_ScatteringScaleM; }
+            set { m_ScatteringScaleM = value; }
+        }
+
+        public float MieG
+        {
+            get { return m_MieG; }
+            set { m_MieG = value;}
+        }
+
+        public Color SunLightColor
+        {
+            get { return m_SunLightColor; }
+            set { m_SunLightColor = value; }
+        }
+
+        public bool PhysicalBasedSky
+        {
+            get { return m_physicalBasedSky; }
+            set
+            {
+                m_physicalBasedSky = value;
+            }
+        }
+
+        #endregion
+
+        //Pipeline resources
+        [SerializeField] InsanityPipelineResources m_PipelineResources;
+
+        
 
         public InsanityPipelineResources InsanityPipelineResources
         {
