@@ -26,7 +26,7 @@ namespace Insanity
         public static Vector4 kMieScatteringCoef = new Vector4(2.0f, 2.0f, 2.0f, 0) * 0.00001f;
         protected RenderTexture m_SkyboxLUT;
         protected int kernelSkyboxLUT = -1;
-        Vector3Int _skyboxLUTSize = new Vector3Int(32, 128, 32);
+        Vector3Int _skyboxLUTSize = new Vector3Int(32, 64, 32);
 
         public class AtmosphereShaderParameters
         {

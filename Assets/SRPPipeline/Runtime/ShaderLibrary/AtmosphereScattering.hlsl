@@ -18,7 +18,7 @@ float3 _BetaMie;        //β_M
 float _MieG;
 float3 _SunLightColor;
 
-float RaySphereIntersection(float3 rayOrigin, float3 rayDir, float3 sphereCenter, float sphereRadius)
+float2 RaySphereIntersection(float3 rayOrigin, float3 rayDir, float3 sphereCenter, float sphereRadius)
 {
     rayOrigin -= sphereCenter;
     float a = dot(rayDir, rayDir);
@@ -32,19 +32,11 @@ float RaySphereIntersection(float3 rayOrigin, float3 rayDir, float3 sphereCenter
     else
     {
         d = sqrt(d);
-        float x0 = -0.5 * (b + d) / a;
-        float x1 = -0.5 * (b - d) / a;
+        //because d is always positive, so t0 is always smaller than t1
+        float t0 = 0.5 * (-b - d) / a;
+        float t1 = 0.5 * (-b + d) / a;
 
-        if (x0 < 0)
-        {
-            x0 = x1;
-            if (x0 < 0)
-            {
-                return -1;
-            }
-            return x0;
-        }
-        return x0 > 0 ? min(x0, x1) : x1;
+        return float2(t0, t1);
     }
 }
 
@@ -70,11 +62,11 @@ float GetModifyRayleighPhase(float cosTheta)
 //As g is close to 1, the phase function will be larger when cosTheta is close to 1.
 float3 SunSimulation(float cosTheta)
 {
-    float g = 0.98;
+    float g = 0.99;
     float g2 = g * g;
 
     float sun = pow(1.0 - g, 2.0) / (4.0 * PI * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
-    return sun * 0.002;
+    return sun * 0.003;
 }
 
 //float GetAtmosphereDensityRayleigh(float height)
@@ -104,7 +96,7 @@ float2 Transmittance(float3 rayStart, float3 rayEnd, float3 earthCenter)
     for (float s = 0.5; s < sampleCount; s++)
     {
         float3 samplePoint = rayStart + step * s;
-        float height = abs(length(samplePoint - earthCenter) - _EarthRadius);
+        float height = max(length(samplePoint - earthCenter) - _EarthRadius, 0);
         //tRayleigh += densityR * stepSize;
         //tMie += densityM * stepSize;
         densityIntegral += GetAtmosphereDensity(height) * stepSize;
@@ -137,9 +129,9 @@ float4 IntegrateInScattering(float3 rayStart, float3 rayEnd, float3 sunLight, fl
         float2 densityCP = 0;
 
         
-        float intersection = RaySphereIntersection(samplePoint, -sunLight, earthCenter, _EarthRadius);
+        float2 intersection = RaySphereIntersection(samplePoint, -sunLight, earthCenter, _EarthRadius);
         
-        if (intersection > 0)
+        if (intersection.x > 0)
         {
             // intersection with planet, write high density
             densityCP = 1e+20;
@@ -147,12 +139,11 @@ float4 IntegrateInScattering(float3 rayStart, float3 rayEnd, float3 sunLight, fl
         else
         {
             intersection = RaySphereIntersection(samplePoint, -sunLight, earthCenter, _EarthRadius + _AtmosphereHeight);
-            float3 pc = samplePoint - intersection * sunLight;
+            //because we are in the atmosphere, intersection.x is always negative, so we use intersection.y as the raylength.
+            float3 pc = samplePoint - intersection.y * sunLight;
             densityCP = Transmittance(samplePoint, pc, earthCenter);
         }
-        //float2 intersection = RaySphereIntersection(samplePoint, -sunLight, earthCenter, _EarthRadius + _AtmosphereHeight);
-        //float3 pc = samplePoint - intersection.y * sunLight;
-        //float3 tPC = Transmittance(samplePoint, pc, earthCenter);
+
         float2 densityCPA = densityCP + densityPA;
         float3 tR = densityCPA.x * _BetaRayleigh;
         float3 tM = densityCPA.y * _BetaMie;

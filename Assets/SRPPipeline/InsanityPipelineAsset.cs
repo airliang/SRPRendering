@@ -219,16 +219,24 @@ namespace Insanity
         [SerializeField] Color m_SunLightColor = Color.white;
         [SerializeField] bool m_physicalBasedSky = false;
 
+        private bool m_RecalculateSkyLUT = true;
+
+        public bool RecalculateSkyLUT
+        {
+            get { return m_RecalculateSkyLUT; }
+            set { m_RecalculateSkyLUT = value; }
+        }
+
         public float ScatteringScaleR
         {
             get { return m_ScatteringScaleR; }
-            set { m_ScatteringScaleR = value; }
+            set { m_ScatteringScaleR = value; RecalculateSkyLUT = true; }
         }
 
         public float ScatteringScaleM
         {
             get { return m_ScatteringScaleM; }
-            set { m_ScatteringScaleM = value; }
+            set { m_ScatteringScaleM = value; RecalculateSkyLUT = true; }
         }
 
         public float MieG

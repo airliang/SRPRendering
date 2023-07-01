@@ -40,11 +40,11 @@ void PrecomputeScattering(uint3 id : SV_DispatchThreadID)
 
     float3 sunDir = -normalize(float3(sqrt(saturate(1 - cs * cs)), cs, 0));
     float3 earthCenter = float3(0, -_EarthRadius, 0);
-    float intersection = RaySphereIntersection(rayStart, rayDir, earthCenter, _EarthRadius + _AtmosphereHeight);
-    float rayLength = intersection;
-    //intersection = RaySphereIntersection(rayStart, rayDir, earthCenter, _EarthRadius);
-    //if (intersection.x > 0)
-    //    rayLength = min(rayLength, intersection.x);
+    float2 intersection = RaySphereIntersection(rayStart, rayDir, earthCenter, _EarthRadius + _AtmosphereHeight);
+    float rayLength = intersection.y;
+    intersection = RaySphereIntersection(rayStart, rayDir, earthCenter, _EarthRadius);
+    if (intersection.x > 0)
+        rayLength = min(rayLength, intersection.x);
     float3 rayEnd = rayStart + rayDir * rayLength;
     float4 scattering = IntegrateInScattering(rayStart, rayEnd, sunDir, earthCenter);
     _SkyboxLUT[id] = scattering;

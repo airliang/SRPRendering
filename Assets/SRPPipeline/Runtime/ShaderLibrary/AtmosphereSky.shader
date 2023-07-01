@@ -61,7 +61,7 @@ Shader "Insanity/AtmosphereSky"
                 float3 sunDir = -normalize(_MainLightPosition.xyz);
                 // Reverse it to point into the scene
                 float3 earthCenter = float3(0, -_EarthRadius, 0);
-                float height = length(rayStart - earthCenter) - _EarthRadius;
+                float height = max(length(rayStart - earthCenter) - _EarthRadius, 0);
                 float3 groundNormal = normalize(rayStart - earthCenter);
                 float cosView = dot(groundNormal, viewDirWS);
                 float cosSun = dot(groundNormal, -sunDir);

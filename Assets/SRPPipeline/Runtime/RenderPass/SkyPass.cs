@@ -63,11 +63,12 @@ namespace Insanity
             }
 
             RenderTexture skyboxLUT;
-            if (!m_atmosphere.IsSkyboxLUTValid())
+            if (!m_atmosphere.IsSkyboxLUTValid() || pipelineAsset.RecalculateSkyLUT)
             {
                 skyboxLUTPassData = m_atmosphere.GenerateSkyboxLUT(graph, asset, asset.InsanityPipelineResources.shaders.PrecomputeScattering);
                 skyboxLUT = skyboxLUTPassData.skyboxLUT;
                 hasPrecomputedSkyLut = false;
+                pipelineAsset.RecalculateSkyLUT = false;
             }
             else
                 skyboxLUT = m_atmosphere.SkyboxLUT;
@@ -82,14 +83,16 @@ namespace Insanity
                 builder.UseDepthBuffer(depthData.m_Depth, DepthAccess.Read);
                 passData.m_SkyboxLUT = skyboxLUT;
                 passData.mieG = pipelineAsset.MieG;
+                passData.scatteringScaleR = pipelineAsset.ScatteringScaleR;
+                passData.scatteringScaleM = pipelineAsset.ScatteringScaleM;
                 passData.sunLightColor = asset.SunLightColor;
 
                 builder.SetRenderFunc((PhysicalBaseSkyPassData data, RenderGraphContext context) =>
                 {
                     context.cmd.SetGlobalFloat(AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
                     context.cmd.SetGlobalFloat(AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
-                    context.cmd.SetGlobalVector(AtmosphereShaderParameters._BetaRayleigh, Atmosphere.kRayleighScatteringCoef);
-                    context.cmd.SetGlobalVector(AtmosphereShaderParameters._BetaMie, kMieScatteringCoef);
+                    context.cmd.SetGlobalVector(AtmosphereShaderParameters._BetaRayleigh, Atmosphere.kRayleighScatteringCoef * data.scatteringScaleR);
+                    context.cmd.SetGlobalVector(AtmosphereShaderParameters._BetaMie, Atmosphere.kMieScatteringCoef * data.scatteringScaleM);
                     context.cmd.SetGlobalFloat(AtmosphereShaderParameters._MieG, data.mieG);
                     context.cmd.SetGlobalColor(AtmosphereShaderParameters._SunLightColor, data.sunLightColor);
                     context.cmd.SetViewport(cameraData.camera.pixelRect);
