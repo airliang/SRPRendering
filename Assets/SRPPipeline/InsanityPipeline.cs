@@ -38,12 +38,22 @@ namespace Insanity
             m_RenderGraph = null;
         }
 
+        void UpdateGlobalRenderSettings(Camera camera)
+        {
+            GlobalRenderSettings.HDREnable = asset.HDREnable;
+            GlobalRenderSettings.HDRExposure = asset.Exposure;
+            GlobalRenderSettings.ResolutionRate = asset.ResolutionRate;
+            GlobalRenderSettings.screenResolution = new Rect(camera.pixelRect.x, camera.pixelRect.y,
+                camera.pixelRect.width * GlobalRenderSettings.ResolutionRate, camera.pixelRect.height * GlobalRenderSettings.ResolutionRate);
+        }
+
         protected override void Render(ScriptableRenderContext context, Camera[] cameras)
         {
             BeginFrameRendering(context, cameras);
 
             foreach (Camera camera in cameras)
             {
+                UpdateGlobalRenderSettings(camera);
                 BeginCameraRendering(context, camera);
 
                 //Culling

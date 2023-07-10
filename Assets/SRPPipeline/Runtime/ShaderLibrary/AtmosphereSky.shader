@@ -28,6 +28,8 @@ Shader "Insanity/AtmosphereSky"
             #include "AtmosphereScattering.hlsl"
 
             sampler3D _SkyboxLUT;
+            sampler3D _MultipleScatteringLUT;
+            float multipleScattering;
 
             float3 GetSkyViewDirWS(float2 positionCS)
             {

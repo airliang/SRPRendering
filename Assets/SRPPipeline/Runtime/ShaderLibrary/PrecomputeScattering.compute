@@ -49,3 +49,149 @@ void PrecomputeScattering(uint3 id : SV_DispatchThreadID)
     float4 scattering = IntegrateInScattering(rayStart, rayEnd, sunDir, earthCenter);
     _SkyboxLUT[id] = scattering;
 }
+
+
+#pragma kernel PrecomputeKOrderScattering
+
+
+Texture3D<float4> _PreOrderScatteringLUT;
+RWTexture3D<float4> _OutScatteringLUT;
+
+float4 GatherLight(float3 p, float3 view, float3 sunDir)
+{
+    float w, h, d;
+    _PreOrderScatteringLUT.GetDimensions(w, h, d);
+    float integrationSteps = 64;
+    float stepSize = 2.0 * PI / integrationSteps;
+    float4 gatherLight = float4(0, 0, 0, 0);
+    float3 earthCenter = float3(0, -_EarthRadius, 0);
+    float height = max(length(p - earthCenter) - _EarthRadius, 0);
+    float3 groundNormal = normalize(p - earthCenter);
+    float cosView = dot(groundNormal, view);
+    float3 texCoords;
+    texCoords.x = pow(height / _AtmosphereHeight, 0.5);
+    float ch = -sqrt(height * (2 * _EarthRadius + height)) / (_EarthRadius + height);
+
+    texCoords.y = cosView > ch ? (0.5 * pow((cosView - ch) / (1.0 - ch), 0.2) + 0.5)
+        : (0.5 * pow((ch - cosView) / (1.0 + ch), 0.2));
+
+    for (float theta = 0; theta < 2 * PI; theta += stepSize)
+    {
+        float cosSun = cos(theta);
+        texCoords.z = 0.5 * ((atan(max(cosSun, -0.1975) * tan(1.26 * 1.1)) / 1.1) + (1 - 0.26));
+        
+        float3 lightDir = -normalize(float3(sqrt(saturate(1 - cosSun * cosSun)), cosSun, 0));
+        int3 texCoordsInt = int3(texCoords * float3(w, h, d));
+        float4 scattering = _PreOrderScatteringLUT[texCoordsInt];
+        float cosTheta = dot(-lightDir, view);
+        gatherLight.rgb += scattering.rgb * GetModifyRayleighPhase(cosTheta) * _BetaRayleigh / (4.0 * PI);
+        gatherLight.a += scattering.a * GetHGMiePhase(cosTheta, _MieG) * _BetaMie / (4.0 * PI);
+    }
+    gatherLight *= 4.0 * PI / integrationSteps;
+    return gatherLight;
+}
+
+float4 IntegrateMultipleScattering(float3 rayStart, float3 rayEnd, float3 sunLight, float3 earthCenter)
+{
+    float sampleCount = 64.0;
+    float3 step = (rayEnd - rayStart) / sampleCount;
+    float stepSize = length(step);
+    float3 scatteringR = 0;
+    float3 scatteringM = 0;
+    float3 tRayleigh = 0;
+    float3 tMie = 0;
+    float3 preScatteringR = 0;
+    float3 preScatteringM = 0;
+    float3 view = normalize(rayEnd - rayStart);
+    
+    for (float i = 0.5; i < sampleCount; i++)
+    {
+        float3 samplePoint = rayStart + step * i;
+        float4 gatherLight = GatherLight(samplePoint, view, sunLight);
+        float height = abs(length(samplePoint - earthCenter) - _EarthRadius);
+        float2 localDensity = exp(-height.xx / _HeightScales.xy);
+        float3 tPAR = 0;
+        float3 tPAM = 0;
+        float2 densityPA = Transmittance(rayStart, samplePoint, earthCenter);
+        float2 densityCP = 0;
+
+
+        float2 intersection = RaySphereIntersection(samplePoint, -sunLight, earthCenter, _EarthRadius);
+
+        if (intersection.x > 0)
+        {
+            // intersection with planet, write high density
+            densityCP = 1e+20;
+        }
+        else
+        {
+            intersection = RaySphereIntersection(samplePoint, -sunLight, earthCenter, _EarthRadius + _AtmosphereHeight);
+            //because we are in the atmosphere, intersection.x is always negative, so we use intersection.y as the raylength.
+            float3 pc = samplePoint - intersection.y * sunLight;
+            densityCP = Transmittance(samplePoint, pc, earthCenter);
+        }
+
+        float2 densityCPA = densityCP + densityPA;
+        float3 tR = densityCPA.x * _BetaRayleigh;
+        //extinction of Mie equals betaMie_s + betaMie_a, but Bruneton and Neyret[BN08] suggest that extinction equals betaMie_s / 0.9
+        float3 extinctionM = _BetaMie / 0.9;
+        float3 tM = densityCPA.y * extinctionM;
+        float3 t = exp(-tR - tM);
+        float3 currentScatteringR = t * localDensity.x;
+        float3 currentScatteringM = t * localDensity.y;
+        gatherLight.rgb *= t * localDensity.x;
+        gatherLight.a *= t * localDensity.y;
+        scatteringR += (currentScatteringR + preScatteringR + gatherLight.rgb) * stepSize * 0.5;
+        scatteringM += (currentScatteringM + preScatteringM + gatherLight.aaa) * stepSize * 0.5;
+        preScatteringR = currentScatteringR;
+        preScatteringM = currentScatteringM;
+    }
+    //scatteringR *= _BetaRayleigh / (4.0 * PI);
+    //scatteringM *= _BetaMie / (4.0 * PI);
+    return float4(scatteringR, scatteringM.x);
+}
+
+#pragma kernel PrecomputeKOrderScattering
+
+[numthreads(1, 1, 1)]
+void PrecomputeKOrderScattering(uint3 id : SV_DispatchThreadID)
+{
+    float w, h, d;
+    _OutScatteringLUT.GetDimensions(w, h, d);
+
+    float3 texCoords = float3(id.x / w, id.y / h, id.z / d);
+
+    float height = texCoords.x * texCoords.x * _AtmosphereHeight;
+    float cosViewZenith = texCoords.y * 2.0 - 1.0;
+    float cosSunZenith = texCoords.z * 2.0 - 1.0;
+    float cv = cosViewZenith;
+    float ch = -sqrt(height * (2 * _EarthRadius + height)) / (_EarthRadius + height);
+
+    if (texCoords.y > 0.5)
+    {
+        cv = ch + pow(cosViewZenith, 5) * (1 - ch);
+    }
+    else
+    {
+        cv = ch - pow(cosViewZenith + 1, 5) * (1 + ch);
+    }
+
+    float cs = tan((cosSunZenith + 0.26) * 0.75) / tan(1.26 * 0.75);
+
+    float3 rayStart = float3(0, height, 0);
+
+
+    float3 rayDir = normalize(float3(sqrt(saturate(1 - cv * cv)), cv, 0));
+
+    float3 sunDir = -normalize(float3(sqrt(saturate(1 - cs * cs)), cs, 0));
+    float3 earthCenter = float3(0, -_EarthRadius, 0);
+
+    float2 intersection = RaySphereIntersection(rayStart, rayDir, earthCenter, _EarthRadius + _AtmosphereHeight);
+    float rayLength = intersection.y;
+    intersection = RaySphereIntersection(rayStart, rayDir, earthCenter, _EarthRadius);
+    if (intersection.x > 0)
+        rayLength = min(rayLength, intersection.x);
+    float3 rayEnd = rayStart + rayDir * rayLength;
+    float4 scattering = IntegrateMultipleScattering(rayStart, rayEnd, sunDir, earthCenter);
+    _OutScatteringLUT[id] = scattering;
+}

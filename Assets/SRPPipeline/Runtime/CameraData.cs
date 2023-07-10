@@ -213,7 +213,9 @@ namespace Insanity
                 lastTime = 0;
             }
 
-            Rect finalViewport = GetPixelRect();   
+            Rect finalViewport = GetPixelRect();
+            finalViewport.width *= GlobalRenderSettings.ResolutionRate;
+            finalViewport.height *= GlobalRenderSettings.ResolutionRate;
 
             actualWidth = Math.Max((int)finalViewport.size.x, 1);
             actualHeight = Math.Max((int)finalViewport.size.y, 1);

@@ -1,0 +1,8 @@
+/Library
+/Logs
+/obj
+/Temp
+/.vs
+/*.csproj
+/*.sln
+/UpgradeLog.htm

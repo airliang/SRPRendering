@@ -22,19 +22,19 @@ namespace Insanity
 
         private TextureHandle CreateDepthTexture(RenderGraph graph, Camera camera)
         {
-            bool colorRT_sRGB = false;
-
             //Texture description
-            TextureDesc colorRTDesc = new TextureDesc(camera.pixelWidth, camera.pixelHeight);
-            colorRTDesc.colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Depth, colorRT_sRGB);
-            colorRTDesc.depthBufferBits = DepthBits.Depth24;
-            colorRTDesc.msaaSamples = MSAASamples.None;
-            colorRTDesc.enableRandomWrite = false;
-            colorRTDesc.clearBuffer = true;
-            colorRTDesc.clearColor = Color.black;
-            colorRTDesc.name = "Depth";
+            float width = GlobalRenderSettings.ResolutionRate * camera.pixelWidth;
+            float height = GlobalRenderSettings.ResolutionRate * camera.pixelHeight;
+            TextureDesc depthRTDesc = new TextureDesc((int)width, (int)height);
+            depthRTDesc.colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Depth, false);
+            depthRTDesc.depthBufferBits = DepthBits.Depth24;
+            depthRTDesc.msaaSamples = MSAASamples.None;
+            depthRTDesc.enableRandomWrite = false;
+            depthRTDesc.clearBuffer = true;
+            depthRTDesc.clearColor = Color.black;
+            depthRTDesc.name = "Depth";
 
-            return graph.CreateTexture(colorRTDesc);
+            return graph.CreateTexture(depthRTDesc);
         }
 
         private TextureHandle CreateColorTexture(RenderGraph graph, Camera camera, string name)
@@ -42,8 +42,11 @@ namespace Insanity
             bool colorRT_sRGB = (QualitySettings.activeColorSpace == ColorSpace.Linear);
 
             //Texture description
-            TextureDesc colorRTDesc = new TextureDesc(camera.pixelWidth, camera.pixelHeight);
-            colorRTDesc.colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, colorRT_sRGB);
+            float width = GlobalRenderSettings.ResolutionRate * camera.pixelWidth;
+            float height = GlobalRenderSettings.ResolutionRate * camera.pixelHeight;
+            TextureDesc colorRTDesc = new TextureDesc((int)width, (int)height);
+            colorRTDesc.colorFormat = GlobalRenderSettings.HDREnable ? GraphicsFormat.R16G16B16A16_SFloat 
+                : GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, colorRT_sRGB);
             colorRTDesc.depthBufferBits = 0;
             colorRTDesc.msaaSamples = MSAASamples.None;
             colorRTDesc.enableRandomWrite = false;

@@ -77,6 +77,30 @@ namespace Insanity
             return new InsanityPipeline();
         }
 
+        #region Rendering
+        [SerializeField] bool m_HDREnable = false;
+        [SerializeField] float m_Exposure = 1.0f;
+        [SerializeField] float m_ResolutionRate = 1.0f;
+
+        public bool HDREnable
+        {
+            get { return m_HDREnable; }
+            set { m_HDREnable = value; }
+        }
+
+        public float Exposure
+        {
+            get { return m_Exposure; }
+            set { m_Exposure = value; }
+        }
+
+        public float ResolutionRate
+        {
+            get { return m_ResolutionRate; }
+            set { m_ResolutionRate = value; }
+        }
+        #endregion
+
         #region Shadowmap
         // Shadows Settings
         [SerializeField] float m_ShadowDistance = 50.0f;
@@ -212,12 +236,22 @@ namespace Insanity
         #endregion
 
         #region Atmosphere scattring
+        [SerializeField] AtmosphereResources m_AtmosphereResources;
+
+        public AtmosphereResources AtmosphereResources
+        {
+            get { return m_AtmosphereResources; }
+            set { m_AtmosphereResources = value; }
+        }
+
         //Atmosphere Settings
-        [SerializeField] float m_ScatteringScaleR = 1.0f;
-        [SerializeField] float m_ScatteringScaleM = 1.0f;
-        [SerializeField] float m_MieG = 0.76f;
         [SerializeField] Color m_SunLightColor = Color.white;
         [SerializeField] bool m_physicalBasedSky = false;
+        //[SerializeField] float m_ScatteringScaleR = 1.0f;
+        //[SerializeField] float m_ScatteringScaleM = 1.0f;
+        //[SerializeField] float m_MieG = 0.76f;
+        //[SerializeField] bool m_multipleScatteringEnable = false;
+        //[SerializeField] int m_multipleScatteringOrder = 0;
 
         private bool m_RecalculateSkyLUT = true;
 
@@ -227,6 +261,7 @@ namespace Insanity
             set { m_RecalculateSkyLUT = value; }
         }
 
+        /*
         public float ScatteringScaleR
         {
             get { return m_ScatteringScaleR; }
@@ -244,6 +279,7 @@ namespace Insanity
             get { return m_MieG; }
             set { m_MieG = value;}
         }
+        */
 
         public Color SunLightColor
         {
@@ -259,6 +295,20 @@ namespace Insanity
                 m_physicalBasedSky = value;
             }
         }
+
+
+        //public int MultipleScatteringOrder
+        //{
+        //    get { return m_multipleScatteringOrder; }
+        //    set 
+        //    { 
+        //        if (value != m_multipleScatteringOrder)
+        //        {
+        //            m_multipleScatteringOrder = value;
+        //            RecalculateSkyLUT = true;
+        //        }
+        //    }
+        //}
 
         #endregion
 

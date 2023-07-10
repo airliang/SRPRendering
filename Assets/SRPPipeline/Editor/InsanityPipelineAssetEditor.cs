@@ -17,6 +17,11 @@ namespace UnityEditor.Insanity
     {
         internal class Styles
         {
+            public static GUIContent renderSettingText = EditorGUIUtility.TrTextContent("Render Settings");
+            public static GUIContent hdrEnableText = EditorGUIUtility.TrTextContent("HDR Enable", "Controls the global HDR settings.");
+            public static GUIContent hdrExposureText = EditorGUIUtility.TrTextContent("Exposure", "Controls the global HDR exposure settings.");
+            public static GUIContent screenPercentageText = EditorGUIUtility.TrTextContent("Screen Resolution Percentage", "Controls the global screen resolution settings.");
+
             public static GUIContent shadowSettingsText = EditorGUIUtility.TrTextContent("Shadows");
 
             public static GUIContent shadowDistanceText = EditorGUIUtility.TrTextContent("Distance", "Maximum shadow rendering distance.");
@@ -41,17 +46,23 @@ namespace UnityEditor.Insanity
             public static string[] gaussianFilterRadiusOptions = { "3x3", "5x5", "9x9", "13x13" };
 
             public static GUIContent atmosphereSettingsText = EditorGUIUtility.TrTextContent("Atmosphere");
+            public static GUIContent atmosphereResourcesText = EditorGUIUtility.TrTextContent("Atmosphere setting resources", "Atmosphere setting resources");
             public static GUIContent physicalBasedSkyEnable = EditorGUIUtility.TrTextContent("Physical based sky Enable", "Enable Atmosphere scattering rendering in sky.");
             public static GUIContent scatteringScaleRayleigh = EditorGUIUtility.TrTextContent("Scattering Scale Rayleigh", "The Rayleigh scattering scale.");
             public static GUIContent scatteringScaleMie = EditorGUIUtility.TrTextContent("Scattering Scale Mie", "The Mie scattering scale.");
             public static GUIContent mieG = EditorGUIUtility.TrTextContent("Mie G", "The Mie G value.");
             public static GUIContent sunLightColor = EditorGUIUtility.TrTextContent("Sun Light Color", "The sun light color.");
+            public static GUIContent multipleScatteringEnableText = EditorGUIUtility.TrTextContent("Multiple Scattering Enable", "Enable multiple scattering in atmosphere.");
+            public static GUIContent multipleScatteringOrderText = EditorGUIUtility.TrTextContent("Multiple Scattering Order", "The multiple scattering order.");
 
             public static GUIContent resourcesSettingsText = EditorGUIUtility.TrTextContent("Resources");
             public static GUIContent pipelineResourcesText = EditorGUIUtility.TrTextContent("Pipeline Resources", 
                     "The pipeline resources asset that contains all the shaders and other resources used by the pipeline.");
         }
-
+        SavedBool m_RenderSettingsFoldout;
+        SerializedProperty m_HDRSupportProp;
+        SerializedProperty m_HDRExposureProp;
+        SerializedProperty m_ScreenResolutionProp;
 
         SavedBool m_ShadowSettingsFoldout;
 
@@ -81,17 +92,20 @@ namespace UnityEditor.Insanity
         SerializedProperty m_PipelineResources;
 
         SavedBool m_AtmosphereSettingsFoldout;
+        SerializedProperty m_AtmosphereResources;
         SerializedProperty m_PhysicalBaseSky;
-        SerializedProperty m_ScatteringScaleRayleigh;
-        SerializedProperty m_ScatteringScaleMie;
-        SerializedProperty m_MieG;
+        //SerializedProperty m_ScatteringScaleRayleigh;
+        //SerializedProperty m_ScatteringScaleMie;
+        //SerializedProperty m_MieG;
         SerializedProperty m_SunLightColor;
+        //SerializedProperty m_MultipleScatteringOrder;
              
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
 
             DrawPipelineResources();
+            DrawRenderSettings();
             DrawShadowSettings();
             DrawAtmosphereScatteringSettings();
 
@@ -100,6 +114,11 @@ namespace UnityEditor.Insanity
 
         void OnEnable()
         {
+            m_RenderSettingsFoldout = new SavedBool($"{target.GetType()}.RenderSettingsFoldout", true);
+            m_HDRSupportProp = serializedObject.FindProperty("m_HDREnable");
+            m_HDRExposureProp = serializedObject.FindProperty("m_Exposure");
+            m_ScreenResolutionProp = serializedObject.FindProperty("m_ResolutionRate");
+
             m_ShadowSettingsFoldout = new SavedBool($"{target.GetType()}.ShadowSettingsFoldout", false);
 
             m_ShadowDistanceProp = serializedObject.FindProperty("m_ShadowDistance");
@@ -123,13 +142,33 @@ namespace UnityEditor.Insanity
             m_PipelineResources = serializedObject.FindProperty("m_PipelineResources");
 
             m_AtmosphereSettingsFoldout = new SavedBool($"{target.GetType()}.AtmosphereSettingsFoldout", false);
+            m_AtmosphereResources = serializedObject.FindProperty("m_AtmosphereResources");
             m_PhysicalBaseSky = serializedObject.FindProperty("m_physicalBasedSky");
-            m_ScatteringScaleRayleigh = serializedObject.FindProperty("m_ScatteringScaleR");
-            m_ScatteringScaleMie = serializedObject.FindProperty("m_ScatteringScaleM");
-            m_MieG = serializedObject.FindProperty("m_MieG");
+            //m_ScatteringScaleRayleigh = serializedObject.FindProperty("m_ScatteringScaleR");
+            //m_ScatteringScaleMie = serializedObject.FindProperty("m_ScatteringScaleM");
+            //m_MieG = serializedObject.FindProperty("m_MieG");
             m_SunLightColor = serializedObject.FindProperty("m_SunLightColor");
+            //m_MultipleScatteringOrder = serializedObject.FindProperty("m_multipleScatteringOrder");
 
             m_ResourcesSettingsFoldout = new SavedBool($"{target.GetType()}.ResourcesSettingsFoldout", false);
+        }
+
+        void DrawRenderSettings()
+        {
+            m_RenderSettingsFoldout.value = EditorGUILayout.BeginFoldoutHeaderGroup(m_RenderSettingsFoldout.value, Styles.renderSettingText);
+            if (m_RenderSettingsFoldout.value)
+            {
+                EditorGUILayout.PropertyField(m_HDRSupportProp, Styles.hdrEnableText);
+
+                if (m_HDRSupportProp.boolValue)
+                {
+                    m_HDRExposureProp.floatValue = EditorGUILayout.Slider(Styles.hdrExposureText, m_HDRExposureProp.floatValue,
+                    0.0f, 2.0f);
+                }
+
+                m_ScreenResolutionProp.floatValue = EditorGUILayout.Slider(Styles.screenPercentageText, m_ScreenResolutionProp.floatValue, 0.1f, 1.0f);
+            }
+            EditorGUILayout.EndFoldoutHeaderGroup();
         }
 
         void DrawShadowSettings()
@@ -205,14 +244,17 @@ namespace UnityEditor.Insanity
             if (m_AtmosphereSettingsFoldout.value)
             {
                 EditorGUI.indentLevel++;
+                m_AtmosphereResources.objectReferenceValue = EditorGUILayout.ObjectField(Styles.atmosphereResourcesText,
+                m_AtmosphereResources.objectReferenceValue, typeof(AtmosphereResources), false);
                 m_PhysicalBaseSky.boolValue = EditorGUILayout.Toggle(Styles.physicalBasedSkyEnable, m_PhysicalBaseSky.boolValue);
                 if (m_PhysicalBaseSky.boolValue)
                 {
-                    m_ScatteringScaleRayleigh.floatValue = EditorGUILayout.Slider(Styles.scatteringScaleRayleigh, 
-                        m_ScatteringScaleRayleigh.floatValue, 0.0f, 5.0f);
-                    m_ScatteringScaleMie.floatValue = EditorGUILayout.Slider(Styles.scatteringScaleMie, m_ScatteringScaleMie.floatValue, 0.0f, 5.0f);
-                    m_MieG.floatValue = EditorGUILayout.Slider(Styles.mieG, m_MieG.floatValue, 0.0f, 1.0f);
+                    //m_ScatteringScaleRayleigh.floatValue = EditorGUILayout.Slider(Styles.scatteringScaleRayleigh,
+                    //    m_ScatteringScaleRayleigh.floatValue, 0.0f, 5.0f);
+                    //m_ScatteringScaleMie.floatValue = EditorGUILayout.Slider(Styles.scatteringScaleMie, m_ScatteringScaleMie.floatValue, 0.0f, 5.0f);
+                    //m_MieG.floatValue = EditorGUILayout.Slider(Styles.mieG, m_MieG.floatValue, 0.0f, 1.0f);
                     m_SunLightColor.colorValue = EditorGUILayout.ColorField(Styles.sunLightColor, m_SunLightColor.colorValue, true, false, true);
+                    //m_MultipleScatteringOrder.intValue = EditorGUILayout.IntSlider(Styles.multipleScatteringOrderText, m_MultipleScatteringOrder.intValue, 0, 50);
                 }
                 EditorGUI.indentLevel--;
                 EditorGUILayout.Space();

@@ -13,8 +13,8 @@
 float _AtmosphereHeight;
 float _EarthRadius;
 const static float2 _HeightScales = float2(8000.0, 1200.0);
-float3 _BetaRayleigh;   //β_R
-float3 _BetaMie;        //β_M
+float3 _BetaRayleigh;   //β_R, scattering coefficient of Rayleigh
+float3 _BetaMie;        //β_M, scattering coefficient of Mie
 float _MieG;
 float3 _SunLightColor;
 
@@ -97,13 +97,9 @@ float2 Transmittance(float3 rayStart, float3 rayEnd, float3 earthCenter)
     {
         float3 samplePoint = rayStart + step * s;
         float height = max(length(samplePoint - earthCenter) - _EarthRadius, 0);
-        //tRayleigh += densityR * stepSize;
-        //tMie += densityM * stepSize;
         densityIntegral += GetAtmosphereDensity(height) * stepSize;
     }
-    //float3 tRayleigh = densityIntegral.x * _BetaRayleigh;
-    //float3 tMie = densityIntegral.y * _BetaMie;
-    //return exp(-(tRayleigh + tMie));
+
     return densityIntegral;
 }
 
@@ -146,7 +142,9 @@ float4 IntegrateInScattering(float3 rayStart, float3 rayEnd, float3 sunLight, fl
 
         float2 densityCPA = densityCP + densityPA;
         float3 tR = densityCPA.x * _BetaRayleigh;
-        float3 tM = densityCPA.y * _BetaMie;
+        //extinction of Mie equals betaMie_s + betaMie_a, but Bruneton and Neyret[BN08] suggest that extinction equals betaMie_s / 0.9
+        float3 extinctionM = _BetaMie / 0.9;
+        float3 tM = densityCPA.y * extinctionM;
         float3 t = exp(-tR - tM);
         float3 currentScatteringR = t * localDensity.x;
         float3 currentScatteringM = t * localDensity.y;
@@ -155,7 +153,6 @@ float4 IntegrateInScattering(float3 rayStart, float3 rayEnd, float3 sunLight, fl
         preScatteringR = currentScatteringR;
         preScatteringM = currentScatteringM;
     }
-
     return float4(scatteringR, scatteringM.x);
 }
 

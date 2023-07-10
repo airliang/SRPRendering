@@ -13,6 +13,8 @@ namespace Insanity
         public TextureHandle m_Source;
         //public TextureHandle m_Color;
         public bool flip;
+        public bool tonemapping = false;
+        public float exposure = 1.0f;
         public Material m_finalBlitMaterial;
     }
 
@@ -30,10 +32,14 @@ namespace Insanity
                 passData.flip = cameraData.isMainGameView;                
                 passData.m_Source = builder.ReadTexture(forwardPassData.m_Albedo);
                 passData.m_finalBlitMaterial = m_finalBlitMaterial;
+                passData.tonemapping = GlobalRenderSettings.HDREnable;
+                passData.exposure = GlobalRenderSettings.HDRExposure;
                 //TextureHandle dest = builder.WriteTexture(TextureHandle.nullHandle);
                 builder.SetRenderFunc((FinalBlitPassData data, RenderGraphContext context) =>
                 {
+                    CoreUtils.SetKeyword(context.cmd, "_TONEMAPPING", passData.tonemapping);
                     m_finalBlitMaterial.SetInt("_FlipY", data.flip ? 1 : 0);
+                    m_finalBlitMaterial.SetFloat("_Exposure", data.exposure);
                     //cameraData.UpdateCustomViewConstans(Matrix4x4.identity, Matrix4x4.identity, Vector3.zero);
                     //UpdateGlobalConstantBuffers(cameraData, context.cmd);
 

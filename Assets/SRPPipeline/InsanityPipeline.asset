@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d72a3831e2ca99e4c8b40d19d42278a6, type: 3}
   m_Name: InsanityPipeline
   m_EditorClassIdentifier: 
+  m_HDREnable: 1
+  m_Exposure: 1.5
+  m_ResolutionRate: 1
   m_ShadowDistance: 50
   m_ShadowCascades: 0
   m_Cascade2Split: 0.25
@@ -30,9 +33,14 @@ MonoBehaviour:
   m_ShadowPrefitlerGaussianRadius: 1
   m_EVSMExponents: {x: 5, y: 5}
   m_LightBleedingReduction: 0.255
+  m_AtmosphereResources: {fileID: 11400000, guid: c30c5a287b3154b428069571e2d497fe,
+    type: 2}
   m_ScatteringScaleR: 1
-  m_ScatteringScaleM: 1
-  m_MieG: 0.76
+  m_ScatteringScaleM: 1.15
+  m_MieG: 0.634
+  m_SunLightColor: {r: 5.562989, g: 5.562989, b: 5.562989, a: 1}
   m_physicalBasedSky: 1
+  m_multipleScatteringEnable: 0
+  m_multipleScatteringOrder: 10
   m_PipelineResources: {fileID: 11400000, guid: e267fa520b4e57140aaa0481ee785b42,
     type: 2}
