@@ -6,6 +6,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "LightInput.hlsl"
 #include "ShaderVariablesGlobal.hlsl"
+#include "ColorConvert.hlsl"
 
 #if defined(STEREO_INSTANCING_ON) && (defined(SHADER_API_D3D11) || defined(SHADER_API_GLES3) || defined(SHADER_API_GLCORE) || defined(SHADER_API_PSSL) || defined(SHADER_API_VULKAN))
 #define UNITY_STEREO_INSTANCING_ENABLED
@@ -101,13 +102,13 @@ float4 unity_LightmapST;
 float4 unity_DynamicLightmapST;
 
 // SH block feature
-real4 unity_SHAr;
-real4 unity_SHAg;
-real4 unity_SHAb;
-real4 unity_SHBr;
-real4 unity_SHBg;
-real4 unity_SHBb;
-real4 unity_SHC;
+float4 unity_SHAr;
+float4 unity_SHAg;
+float4 unity_SHAb;
+float4 unity_SHBr;
+float4 unity_SHBg;
+float4 unity_SHBb;
+float4 unity_SHC;
 
 // Velocity
 float4x4 unity_MatrixPreviousM;
@@ -162,11 +163,11 @@ float4x4 glstate_matrix_transpose_modelview0;
 
 // ----------------------------------------------------------------------------
 
-real4 glstate_lightmodel_ambient;
-real4 unity_AmbientSky;
-real4 unity_AmbientEquator;
-real4 unity_AmbientGround;
-real4 unity_IndirectSpecColor;
+//real4 glstate_lightmodel_ambient;
+//real4 unity_AmbientSky;
+//real4 unity_AmbientEquator;
+//real4 unity_AmbientGround;
+//real4 unity_IndirectSpecColor;
 float4 unity_FogParams;
 real4  unity_FogColor;
 
@@ -320,5 +321,52 @@ float SampleCameraDepth(float2 uv)
 //#define UNITY_MATRIX_MVP   mul(UNITY_MATRIX_VP, UNITY_MATRIX_M)
 //#define UNITY_PREV_MATRIX_M   unity_MatrixPreviousM
 //#define UNITY_PREV_MATRIX_I_M unity_MatrixPreviousMI
+
+// normal should be normalized, w=1.0
+half3 SHEvalLinearL0L1(half4 normal)
+{
+    half3 x;
+
+    // Linear (L1) + constant (L0) polynomial terms
+    x.r = dot(_SHAr, normal);
+    x.g = dot(_SHAg, normal);
+    x.b = dot(_SHAb, normal);
+
+    return x;
+}
+
+// normal should be normalized, w=1.0
+half3 SHEvalLinearL2(half4 normal)
+{
+    half3 x1, x2;
+    // 4 of the quadratic (L2) polynomials
+    half4 vB = normal.xyzz * normal.yzzx;
+    x1.r = dot(_SHBr, vB);
+    x1.g = dot(_SHBg, vB);
+    x1.b = dot(_SHBb, vB);
+
+    // Final (5th) quadratic (L2) polynomial
+    half vC = normal.x * normal.x - normal.y * normal.y;
+    x2 = _SHC.rgb * vC;
+
+    return x1 + x2;
+}
+
+// normal should be normalized, w=1.0
+// output in active color space
+half3 ShadeSH9(half4 normal)
+{
+    // Linear + constant polynomial terms
+    half3 res = SHEvalLinearL0L1(normal);
+
+    // Quadratic polynomials
+    res += SHEvalLinearL2(normal);
+
+#ifdef UNITY_COLORSPACE_GAMMA
+    //res = LinearToGammaSpace(res);
+#endif
+
+    return res;
+}
 
 #endif

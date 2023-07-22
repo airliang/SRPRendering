@@ -1,9 +1,7 @@
 ﻿#ifndef ATMOSPHERE_SCATTERING_INCLUDED
 #define ATMOSPHERE_SCATTERING_INCLUDED
 
-#include "PipelineCore.hlsl"
-
-
+#define PI          3.14159265358979323846
 //In-Scattering Equation:
 //I(po, v, l, λ) = I(λ) F(θ) β_R,M ∫[pa, pb] ρ(h(p)) T(pc,p,λ) T(p,pa,λ) dp
 //where pa is the point on the ray where it enters the atmosphere, pb is the point where it leaves the atmosphere, 

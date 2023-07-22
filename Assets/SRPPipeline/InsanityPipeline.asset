@@ -27,7 +27,7 @@ MonoBehaviour:
   m_CSMBlendDistance: 0.493
   m_ShadowType: 1
   m_ShadowPCFFilter: 0
-  m_PCSSSoftness: 1
+  m_PCSSSoftness: 1.054
   m_PCSSSoftnessFalloff: 3
   m_VSMSATEnable: 0
   m_ShadowPrefitlerGaussianRadius: 1
@@ -35,12 +35,7 @@ MonoBehaviour:
   m_LightBleedingReduction: 0.255
   m_AtmosphereResources: {fileID: 11400000, guid: c30c5a287b3154b428069571e2d497fe,
     type: 2}
-  m_ScatteringScaleR: 1
-  m_ScatteringScaleM: 1.15
-  m_MieG: 0.634
   m_SunLightColor: {r: 5.562989, g: 5.562989, b: 5.562989, a: 1}
   m_physicalBasedSky: 1
-  m_multipleScatteringEnable: 0
-  m_multipleScatteringOrder: 10
   m_PipelineResources: {fileID: 11400000, guid: e267fa520b4e57140aaa0481ee785b42,
     type: 2}

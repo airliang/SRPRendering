@@ -17,8 +17,6 @@ namespace Insanity
             public Shader HDRISky;
             [Reload("Runtime/ShaderLibrary/ParallelScan.compute")]
             public ComputeShader ParallelScan;
-
-            public ComputeShader PrecomputeScattering;
         }
 
         [Serializable, ReloadGroup]

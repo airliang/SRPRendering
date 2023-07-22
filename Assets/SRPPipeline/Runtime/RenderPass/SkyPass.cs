@@ -18,12 +18,12 @@ namespace Insanity
     {
         public TextureHandle m_Albedo;
         public Texture m_SkyboxLUT;
-        //public Texture3D m_SkyboxLUTTest;
         public Material m_skybox;
         public float mieG;
-        public float scatteringScaleR;
-        public float scatteringScaleM;
+        public Vector4 scatteringCoefR;
+        public Vector4 scatteringCoefM;
         public Color sunLightColor;
+        public bool runderSun = true;
     }
 
     public partial class InsanityPipeline
@@ -59,19 +59,19 @@ namespace Insanity
             SkyboxLUTPassData skyboxLUTPassData = null;
             if (m_atmosphere == null)
             {
-                m_atmosphere= new Atmosphere();
+                m_atmosphere = new Atmosphere();
                 
             }
-
+            AtmosphereResources atmosphereResources = pipelineAsset.AtmosphereResources;
             Texture skyboxLUT;
-            if (!m_atmosphere.IsSkyboxLUTValid() || pipelineAsset.RecalculateSkyLUT)
+            if (pipelineAsset.RecalculateSkyLUT)
             {
-                skyboxLUTPassData = m_atmosphere.GenerateSkyboxLUT(graph, asset, asset.InsanityPipelineResources.shaders.PrecomputeScattering);
+                skyboxLUTPassData = m_atmosphere.GenerateSkyboxLUT(graph, asset, atmosphereResources.PrecomputeScattering);
 
                 if (skyboxLUTPassData.multipleScatteringOrder > 0)
                 {
                     skyboxLUTPassData = m_atmosphere.PrecomputeMultipleScatteringLUT(graph,
-                        asset.InsanityPipelineResources.shaders.PrecomputeScattering, skyboxLUTPassData.skyboxLUT, asset.AtmosphereResources.MultipleScatteringOrder);
+                        atmosphereResources.PrecomputeScattering, skyboxLUTPassData.skyboxLUT, atmosphereResources.MultipleScatteringOrder);
                 }
                 skyboxLUT = skyboxLUTPassData.skyboxLUT;
 
@@ -79,8 +79,9 @@ namespace Insanity
                 pipelineAsset.RecalculateSkyLUT = false;
             }
             else
-                skyboxLUT = pipelineAsset.AtmosphereResources.SkyboxLUT;//m_atmosphere.SkyboxLUT;
+                skyboxLUT = atmosphereResources.SkyboxLUT;//m_atmosphere.SkyboxLUT;
             //Texture3D skyboxLUTAsset = pipelineAsset.AtmosphereResources.SkyboxLUT;
+            m_atmosphere.BakeSkyToSHAmbient(atmosphereResources, m_sunLight);
 
             using (var builder = graph.AddRenderPass<PhysicalBaseSkyPassData>("Atmosphere Scattering SkyPass", 
                 out var passData, new ProfilingSampler("Atmosphere Scattering SkyPass Profiler")))
@@ -91,22 +92,25 @@ namespace Insanity
                 builder.UseColorBuffer(depthData.m_Albedo, 0);
                 builder.UseDepthBuffer(depthData.m_Depth, DepthAccess.Read);
                 passData.m_SkyboxLUT = skyboxLUT;
-                passData.mieG = pipelineAsset.AtmosphereResources.MieG;
-                passData.scatteringScaleR = pipelineAsset.AtmosphereResources.ScaleRayleigh;
-                passData.scatteringScaleM = pipelineAsset.AtmosphereResources.ScaleRayleigh;
+                passData.mieG = atmosphereResources.MieG;
+                passData.runderSun = atmosphereResources.RenderSun;
+                Vector4 rayleightScatteringCoef = atmosphereResources.ScatteringCoefficientRayleigh * 0.000001f * atmosphereResources.ScaleRayleigh;
+                Vector4 mieScatteringCoef = atmosphereResources.ScatteringCoefficientMie * 0.00001f * atmosphereResources.ScaleMie;
+                passData.scatteringCoefR = rayleightScatteringCoef;
+                passData.scatteringCoefM = mieScatteringCoef;
                 passData.sunLightColor = asset.SunLightColor;
-                //passData.m_SkyboxLUTTest = skyboxLUTAsset;
 
                 builder.SetRenderFunc((PhysicalBaseSkyPassData data, RenderGraphContext context) =>
                 {
                     context.cmd.SetGlobalFloat(AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
                     context.cmd.SetGlobalFloat(AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
-                    context.cmd.SetGlobalVector(AtmosphereShaderParameters._BetaRayleigh, Atmosphere.kRayleighScatteringCoef * data.scatteringScaleR);
-                    context.cmd.SetGlobalVector(AtmosphereShaderParameters._BetaMie, Atmosphere.kMieScatteringCoef * data.scatteringScaleM);
+                    context.cmd.SetGlobalVector(AtmosphereShaderParameters._BetaRayleigh, data.scatteringCoefR);
+                    context.cmd.SetGlobalVector(AtmosphereShaderParameters._BetaMie, data.scatteringCoefM);
                     context.cmd.SetGlobalFloat(AtmosphereShaderParameters._MieG, data.mieG);
                     context.cmd.SetGlobalColor(AtmosphereShaderParameters._SunLightColor, data.sunLightColor);
                     context.cmd.SetViewport(GlobalRenderSettings.screenResolution);
                     context.cmd.SetGlobalTexture(Atmosphere.AtmosphereShaderParameters._SkyboxLUT, data.m_SkyboxLUT);
+                    data.m_skybox.SetFloat(AtmosphereShaderParameters._RunderSun, data.runderSun ? 1.0f : 0.0f);
                     CoreUtils.DrawFullScreen(context.cmd, data.m_skybox);
                     
                 });

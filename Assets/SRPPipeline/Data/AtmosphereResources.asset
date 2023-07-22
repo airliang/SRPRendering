@@ -14,10 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   PrecomputeScattering: {fileID: 7200000, guid: f29ed63cf0dc4584e905a83c826a0b6e,
     type: 3}
-  SkyboxLUT: {fileID: 11700000, guid: f8e779248f58570459ae85917157f16f, type: 2}
-  ScatteringCoefficientRayleigh: {x: 6.55, y: 17.3, z: 23}
+  ProjAtmosphereToSH: {fileID: 7200000, guid: 1f7919f1bf397e14a9ba8286128230ae, type: 3}
+  SkyboxLUT: {fileID: 0}
+  ScatteringCoefficientRayleigh: {x: 5.8, y: 13.5, z: 33.1}
   ScatteringCoefficientMie: {x: 2, y: 2, z: 2}
   ScaleRayleigh: 1
   ScaleMie: 1
-  MieG: 0.6
+  MieG: 0.625
+  RenderSun: 1
   MultipleScatteringOrder: 10

@@ -24,6 +24,7 @@ namespace Insanity
 #endif
         [Reload("Runtime/ShaderLibrary/PrecomputeScattering.compute")]
         public ComputeShader PrecomputeScattering;
+        public ComputeShader ProjAtmosphereToSH;
         public Texture3D SkyboxLUT;
 
         public Vector3 ScatteringCoefficientRayleigh = new Vector3(6.55f, 17.3f, 23.0f);
@@ -31,6 +32,7 @@ namespace Insanity
         public float ScaleRayleigh = 1.0f;
         public float ScaleMie = 1.0f;
         public float MieG = 0.6f;
+        public bool RenderSun = true;
         public int MultipleScatteringOrder = 0;
     }
 }

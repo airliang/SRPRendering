@@ -146,8 +146,7 @@ float4 IntegrateMultipleScattering(float3 rayStart, float3 rayEnd, float3 sunLig
         preScatteringR = currentScatteringR;
         preScatteringM = currentScatteringM;
     }
-    //scatteringR *= _BetaRayleigh / (4.0 * PI);
-    //scatteringM *= _BetaMie / (4.0 * PI);
+
     return float4(scatteringR, scatteringM.x);
 }
 

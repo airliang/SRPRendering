@@ -10,6 +10,7 @@ public class AtmosphereWindow : EditorWindow
     static AtmosphereWindow _thisInstance;
     Editor editor;
     public AtmosphereResources _AtmosphereResources;
+    public Light _SunLight;
 
     [MenuItem("Insanity/Atmosphere LUT Precompute", false, 200)]
     static void ShowWindow()
@@ -33,12 +34,17 @@ public class AtmosphereWindow : EditorWindow
                 path = path.Substring(0, index + 1);
             }
             AssetDatabase.CreateAsset(skyboxLUT, path + "SkyboxLUT.asset");
+            AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             _AtmosphereResources.SkyboxLUT = AssetDatabase.LoadAssetAtPath(path + "SkyboxLUT.asset", typeof(Texture3D)) as Texture3D;
-
-            AssetDatabase.SaveAssets();
-            //DestroyImmediate(skyboxLUT);
         }
+    }
+
+    private void BakeAtmosphereSHTest()
+    {
+        Atmosphere atmosphere = new Atmosphere();
+        atmosphere.ClearSamples();
+        atmosphere.BakeSkyToSHAmbient(_AtmosphereResources, _SunLight);
     }
 
     private void OnGUI()
@@ -57,6 +63,14 @@ public class AtmosphereWindow : EditorWindow
         if (GUILayout.Button("Precompute Atmosphere LUT"))
         {
             Precompute();
+        }
+
+        if (GUILayout.Button("Bake Atmosphere spherical harnomics"))
+        {
+            if (_SunLight != null)
+            {
+                BakeAtmosphereSHTest();
+            }
         }
     }
 }

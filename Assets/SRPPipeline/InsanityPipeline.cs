@@ -49,6 +49,7 @@ namespace Insanity
 
         protected override void Render(ScriptableRenderContext context, Camera[] cameras)
         {
+            GraphicsSettings.lightsUseLinearIntensity = (QualitySettings.activeColorSpace == ColorSpace.Linear);
             BeginFrameRendering(context, cameras);
 
             foreach (Camera camera in cameras)

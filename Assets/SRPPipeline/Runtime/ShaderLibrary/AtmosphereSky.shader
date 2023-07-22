@@ -25,11 +25,13 @@ Shader "Insanity/AtmosphereSky"
             #pragma enable_d3d11_debug_symbols
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/EntityLighting.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+            #include "PipelineCore.hlsl"
             #include "AtmosphereScattering.hlsl"
 
             sampler3D _SkyboxLUT;
             sampler3D _MultipleScatteringLUT;
             float multipleScattering;
+            float _RunderSun;
 
             float3 GetSkyViewDirWS(float2 positionCS)
             {
@@ -84,8 +86,9 @@ Shader "Insanity/AtmosphereSky"
                 half3 scatteringR = scattering.rgb * GetModifyRayleighPhase(cosTheta) * _BetaRayleigh / (4.0 * PI);
                 half3 sM = scattering.rgb * scattering.w / scattering.r;
                 half3 scatteringM = sM * GetHGMiePhase(cosTheta, _MieG) * _BetaMie / (4.0 * PI);
-                half3 skyColor = (scatteringR + scatteringM) * _MainLightIntensity * _SunLightColor 
-                    + SunSimulation(cosTheta) * sM * _MainLightIntensity;
+                half3 skyColor = (scatteringR + scatteringM) * _MainLightIntensity * _SunLightColor;
+                if (_RunderSun > 0)
+                    skyColor += SunSimulation(cosTheta) * sM * _MainLightIntensity;
                 return half4(skyColor, 1);
             }
             ENDHLSL

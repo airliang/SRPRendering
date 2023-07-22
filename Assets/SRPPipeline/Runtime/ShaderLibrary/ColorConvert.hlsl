@@ -7,7 +7,7 @@ float3 XYZToRGB(float3 xyz) {
         0.055648f * xyz.x - 0.204043f * xyz.y + 1.057311f * xyz.z);
 }
 
-/*
+
 inline half3 GammaToLinearSpace(half3 sRGB)
 {
     // Approximate version from http://chilliant.blogspot.com.au/2012/08/srgb-approximations-for-hlsl.html?m=1
@@ -27,7 +27,7 @@ inline half3 LinearToGammaSpace(half3 linRGB)
     // Exact version, useful for debugging.
     //return half3(LinearToGammaSpaceExact(linRGB.r), LinearToGammaSpaceExact(linRGB.g), LinearToGammaSpaceExact(linRGB.b));
 }
-*/
+
 
 half3 NeutralCurve(half3 x, half a, half b, half c, half d, half e, half f)
 {

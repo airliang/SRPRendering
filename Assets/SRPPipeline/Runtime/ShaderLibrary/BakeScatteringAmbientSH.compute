@@ -1,0 +1,373 @@
+
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel PresumSHCoefficient
+#pragma enable_d3d11_debug_symbols
+#include "AtmosphereScattering.hlsl"
+#include "SHUtils.hlsl"
+
+struct SHCoefficientL2
+{
+    float3 c0;
+    float3 c1;
+    float3 c2;
+    float3 c3;
+    float3 c4;
+    float3 c5;
+    float3 c6;
+    float3 c7;
+    float3 c8;
+    float  pack;
+};
+
+Texture3D<float4>   _SkyboxLUT;
+RWStructuredBuffer<SHCoefficientL2> _SHCoefficients;
+
+StructuredBuffer<float4> _BakeSamples;
+#define SAMPLE_COUNT 512
+#define THREAD_NUM_X 128
+//groupshared float3 TempTexture0[THREAD_NUM_X * 2];
+//groupshared float3 TempTexture1[THREAD_NUM_X * 2];
+//groupshared float3 TempTexture2[THREAD_NUM_X * 2];
+//groupshared float3 TempTexture3[THREAD_NUM_X * 2];
+groupshared SHCoefficientL2 TempSH[THREAD_NUM_X * 2];
+
+float3 _MainLightPosition;
+float _MainLightIntensity;
+
+void PreSumArray(int thid)
+{
+    int offset = 1;
+    //up pass
+    for (int d = THREAD_NUM_X; d > 0; d >>= 1)
+    {
+        GroupMemoryBarrierWithGroupSync();
+        if (thid < d)
+        {
+            int ai = offset * (2 * thid + 1) - 1;
+            int bi = offset * (2 * thid + 2) - 1;
+            //TempTexture0[bi] += TempTexture0[ai];
+            //TempTexture1[bi] += TempTexture1[ai];
+            //TempTexture2[bi] += TempTexture2[ai];
+            //TempTexture3[bi] += TempTexture3[ai];
+            TempSH[bi].c0 += TempSH[ai].c0;
+            TempSH[bi].c1 += TempSH[ai].c1;
+            TempSH[bi].c2 += TempSH[ai].c2;
+            TempSH[bi].c3 += TempSH[ai].c3;
+            TempSH[bi].c4 += TempSH[ai].c4;
+            TempSH[bi].c5 += TempSH[ai].c5;
+            TempSH[bi].c6 += TempSH[ai].c6;
+            TempSH[bi].c7 += TempSH[ai].c7;
+            TempSH[bi].c8 += TempSH[ai].c8;
+            TempSH[bi].pack += TempSH[ai].pack;
+        }
+        offset <<= 1;
+    }
+
+    //down pass
+    //because the fisrt loop should at the sum and the last element, the sum has been already caculate,
+    //so the last element should be zero.
+    if (thid == 0)
+    {
+        //TempTexture0[THREAD_NUM_X * 2 - 1] = float3(0, 0, 0);
+        //TempTexture1[THREAD_NUM_X * 2 - 1] = float3(0, 0, 0);
+        //TempTexture2[THREAD_NUM_X * 2 - 1] = float3(0, 0, 0);
+        //TempTexture3[THREAD_NUM_X * 2 - 1] = float3(0, 0, 0);
+        TempSH[THREAD_NUM_X * 2 - 1] = (SHCoefficientL2)0;
+    }
+
+    for (int d = 1; d <= THREAD_NUM_X; d *= 2)
+    {
+        offset >>= 1;
+        GroupMemoryBarrierWithGroupSync();
+        if (thid < d)
+        {
+            int ai = offset * (2 * thid + 1) - 1;
+            int bi = offset * (2 * thid + 2) - 1;
+ 
+            SHCoefficientL2 t = TempSH[ai];
+            TempSH[ai] = TempSH[bi];
+            TempSH[bi].c0 += t.c0;
+            TempSH[bi].c1 += t.c1;
+            TempSH[bi].c2 += t.c2;
+            TempSH[bi].c3 += t.c3;
+            TempSH[bi].c4 += t.c4;
+            TempSH[bi].c5 += t.c5;
+            TempSH[bi].c6 += t.c6;
+            TempSH[bi].c7 += t.c7;
+            TempSH[bi].c8 += t.c8;
+            TempSH[bi].pack += t.pack;
+        }
+    }
+}
+
+half3 GetSkyColor(float3 viewDirWS, float3 sunDir)
+{
+    float w, h, d;
+    _SkyboxLUT.GetDimensions(w, h, d);
+    // Reverse it to point into the scene
+    float3 rayStart = float3(0, 1, 0);
+    float3 earthCenter = float3(0, -_EarthRadius, 0);
+    float height = max(length(rayStart - earthCenter) - _EarthRadius, 0);
+    float3 groundNormal = normalize(rayStart - earthCenter);
+    float cosView = dot(groundNormal, viewDirWS);
+    float cosSun = dot(groundNormal, -sunDir);
+
+    float3 texCoords;
+    texCoords.x = pow(height / _AtmosphereHeight, 0.5);
+    float ch = -sqrt(height * (2 * _EarthRadius + height)) / (_EarthRadius + height);
+
+    texCoords.y = cosView > ch ? (0.5 * pow((cosView - ch) / (1.0 - ch), 0.2) + 0.5)
+        : (0.5 * pow((ch - cosView) / (1.0 + ch), 0.2));
+
+    texCoords.z = 0.5 * ((atan(max(cosSun, -0.1975) * tan(1.26 * 1.1)) / 1.1) + (1 - 0.26));
+    int3 texCoordsInt = int3(texCoords * float3(w, h, d));
+    half4 scattering = _SkyboxLUT[texCoordsInt];//tex3D(_SkyboxLUT, texCoords);
+    //return scattering;
+    //
+    float cosTheta = dot(viewDirWS, -sunDir);
+    half3 scatteringR = scattering.rgb * GetModifyRayleighPhase(cosTheta) * _BetaRayleigh / (4.0 * PI);
+    half3 sM = scattering.rgb * scattering.w / scattering.r;
+    half3 scatteringM = sM * GetHGMiePhase(cosTheta, _MieG) * _BetaMie / (4.0 * PI);
+    half3 skyColor = (scatteringR + scatteringM) * _MainLightIntensity * _SunLightColor;
+    return skyColor;
+}
+
+[numthreads(THREAD_NUM_X,1,1)]
+void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+{
+    uint thid = GTid.x;
+    uint textureAddr = 2 * thid + groupId.x * THREAD_NUM_X;
+    
+    float3 sunDir = -normalize(_MainLightPosition.xyz);
+    //calculate the incoming light from the atmosphere
+    
+    
+    SHCoefficientL2 sh = (SHCoefficientL2)0;
+    SHCoefficientL2 zeroSh = (SHCoefficientL2)0;
+    
+    
+    if (textureAddr < SAMPLE_COUNT)
+    {
+        float3 viewDirWS = _BakeSamples[textureAddr];
+        half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+        sh.c0 = skyColor * 0.2820947917;
+        sh.c1 = Y1(viewDirWS) * skyColor;
+        sh.c2 = Y2(viewDirWS) * skyColor;
+        sh.c3 = Y3(viewDirWS) * skyColor;
+        sh.c4 = Y4(viewDirWS) * skyColor;
+        sh.c5 = Y5(viewDirWS) * skyColor;
+        sh.c6 = Y6(viewDirWS) * skyColor;
+        sh.c7 = Y7(viewDirWS) * skyColor;
+        sh.c8 = Y8(viewDirWS) * skyColor;
+        sh.pack = 1.0;
+    }
+
+    TempSH[2 * thid] = sh;//textureAddr.x < SAMPLE_COUNT ? sh : zeroSh;
+
+    uint textureAddrNext = textureAddr + 1;
+    SHCoefficientL2 shNext = (SHCoefficientL2)0;
+    if (textureAddrNext < SAMPLE_COUNT)
+    {
+        float3 viewDirWS = _BakeSamples[textureAddrNext];
+        half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+        shNext.c0 = skyColor * 0.2820947917;
+        shNext.c1 = Y1(viewDirWS) * skyColor;
+        shNext.c2 = Y2(viewDirWS) * skyColor;
+        shNext.c3 = Y3(viewDirWS) * skyColor;
+        shNext.c4 = Y4(viewDirWS) * skyColor;
+        shNext.c5 = Y5(viewDirWS) * skyColor;
+        shNext.c6 = Y6(viewDirWS) * skyColor;
+        shNext.c7 = Y7(viewDirWS) * skyColor;
+        shNext.c8 = Y8(viewDirWS) * skyColor;
+        shNext.pack = 1.0;
+    }
+    TempSH[2 * thid + 1] = shNext;
+
+    PreSumArray(thid);
+
+    GroupMemoryBarrierWithGroupSync();
+    uint outputTextureAddr = groupId.x * THREAD_NUM_X + thid * 2;
+    uint outputTextureAddr1 = groupId.x * THREAD_NUM_X + thid * 2 + 1;
+    if ((2 * thid) < THREAD_NUM_X)
+    {
+        if (outputTextureAddr < SAMPLE_COUNT)
+        {
+            _SHCoefficients[outputTextureAddr] = TempSH[2 * thid + 1];
+        }
+        else
+        {
+            _SHCoefficients[outputTextureAddr] = zeroSh;
+        }
+    }
+    if ((2 * thid + 1) < THREAD_NUM_X)
+    {
+        if (outputTextureAddr1 < SAMPLE_COUNT)
+        {
+            _SHCoefficients[outputTextureAddr1] = TempSH[2 * thid + 2];
+        }
+        else
+        {
+            _SHCoefficients[outputTextureAddr1] = zeroSh;
+        }
+    }
+    
+}
+
+#pragma kernel PreSumGroupSH
+int _ArrayLengthPerThreadGroup;
+StructuredBuffer<SHCoefficientL2> _InputSHCoefficients;
+RWStructuredBuffer<SHCoefficientL2> _SHCoefficientsGroupSumArray;
+[numthreads(THREAD_NUM_X, 1, 1)]
+void PreSumGroupSH(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+{
+    // TODO: insert actual code here!
+    uint shCoefBufLength;
+    uint shCoefStride;
+    _InputSHCoefficients.GetDimensions(shCoefBufLength, shCoefStride);
+    uint thid = DTid.x;
+    uint textureAddr = (2 * thid + 1) * THREAD_NUM_X - 1;
+    uint textureAddr1 = (2 * thid + 2) * THREAD_NUM_X - 1;
+    SHCoefficientL2 zeroSh = (SHCoefficientL2)0;
+    if (textureAddr < shCoefBufLength)
+    {
+        TempSH[2 * thid] = _InputSHCoefficients[textureAddr];
+    }
+    else
+    {
+        TempSH[2 * thid] = zeroSh;
+    }
+
+    if (textureAddr1 < shCoefBufLength)
+    {
+        TempSH[2 * thid + 1] = _InputSHCoefficients[textureAddr1];
+    }
+    else
+    {
+        TempSH[2 * thid + 1] = zeroSh;
+    }
+
+    PreSumArray(thid);
+
+    GroupMemoryBarrierWithGroupSync();
+    if ((2 * thid) < _ArrayLengthPerThreadGroup)
+    {
+        uint outputAddress = 2 * thid;
+        _SHCoefficientsGroupSumArray[outputAddress] = TempSH[2 * thid + 1];
+    }
+    if ((2 * thid + 1) < _ArrayLengthPerThreadGroup)
+    {
+        uint outputAddress = 2 * thid + 1;
+        _SHCoefficientsGroupSumArray[outputAddress] = TempSH[2 * thid + 2];
+    }
+}
+
+#pragma kernel BakeSHToTexture
+
+struct PolynomialSHL2
+{
+    float4 SHAr;
+    float4 SHAg;
+    float4 SHAb;
+    float4 SHBr;
+    float4 SHBg;
+    float4 SHBb;
+    float4 SHC;
+};
+
+float4 _fC0to3;
+float _fC4;
+
+PolynomialSHL2 GetEnvmapSHPolyCoef(SHCoefficientL2 sh)
+{
+    PolynomialSHL2 polyShCoef;
+    float fC0 = _fC0to3.x;
+    float fC1 = _fC0to3.y;
+    float fC2 = _fC0to3.z;
+    float fC3 = _fC0to3.w;
+    polyShCoef.SHAr = float4(-fC1 * sh.c3.x, -fC1 * sh.c1.x, fC1 * sh.c2.x, fC0 * sh.c0.x - fC3 * sh.c6.x);
+    polyShCoef.SHAg = float4(-fC1 * sh.c3.y, -fC1 * sh.c1.y, fC1 * sh.c2.y, fC0 * sh.c0.y - fC3 * sh.c6.y);
+    polyShCoef.SHAb = float4(-fC1 * sh.c3.z, -fC1 * sh.c1.z, fC1 * sh.c2.z, fC0 * sh.c0.z - fC3 * sh.c6.z);
+
+    polyShCoef.SHBr = float4(fC2 * sh.c4.x, -fC2 * sh.c5.x, 3.0f * fC2 * sh.c6.x, -fC2 * sh.c7.x);
+    polyShCoef.SHBg = float4(fC2 * sh.c4.y, -fC2 * sh.c5.y, 3.0f * fC2 * sh.c6.y, -fC2 * sh.c7.y);
+    polyShCoef.SHBb = float4(fC2 * sh.c4.z, -fC2 * sh.c5.z, 3.0f * fC2 * sh.c6.z, -fC2 * sh.c7.z);
+
+    polyShCoef.SHC = float4(_fC4 * sh.c8.x, _fC4 * sh.c8.y, _fC4 * sh.c8.z, 1.0);
+
+    return polyShCoef;
+}
+
+PolynomialSHL2 GetSHPolyCoef(SHCoefficientL2 sh)
+{
+    PolynomialSHL2 polyShCoef;
+
+    return polyShCoef;
+}
+
+
+StructuredBuffer<SHCoefficientL2> _SHCoefficientsGroupSumArrayInput;
+RWStructuredBuffer<PolynomialSHL2> _FinalProjSH;
+[numthreads(1, 1, 1)]
+void BakeSHToTexture(uint3 DTid : SV_DispatchThreadID)
+{
+    uint shCoefBufLength;
+    uint shCoefStride;
+    _SHCoefficientsGroupSumArrayInput.GetDimensions(shCoefBufLength, shCoefStride);
+    int lastElementIndex = shCoefBufLength - 1;
+    SHCoefficientL2 sh = _SHCoefficientsGroupSumArrayInput[lastElementIndex];
+    float factor = 4.0 * PI / SAMPLE_COUNT;
+    sh.c0 *= factor;
+    sh.c1 *= factor;
+    sh.c2 *= factor;
+    sh.c3 *= factor;
+    sh.c4 *= factor;
+    sh.c5 *= factor;
+    sh.c6 *= factor;
+    sh.c7 *= factor;
+    sh.c8 *= factor;
+    _FinalProjSH[0] = GetEnvmapSHPolyCoef(sh);
+    //_OutputProjSH[uint2(0, 0)] = sh.c0;
+    //_OutputProjSH[uint2(1, 0)] = sh.c1;
+    //_OutputProjSH[uint2(2, 0)] = sh.c2;
+    //_OutputProjSH[uint2(3, 0)] = sh.c3;
+    //_OutputProjSH[uint2(4, 0)] = sh.c4;
+    //_OutputProjSH[uint2(5, 0)] = sh.c5;
+    //_OutputProjSH[uint2(6, 0)] = sh.c6;
+    //_OutputProjSH[uint2(7, 0)] = sh.c7;
+    //_OutputProjSH[uint2(8, 0)] = sh.c8;
+}
+
+#pragma kernel BakeSHDirect
+[numthreads(1, 1, 1)]
+void BakeSHDirect(uint3 DTid : SV_DispatchThreadID)
+{
+    float3 sunDir = -normalize(_MainLightPosition.xyz);
+    SHCoefficientL2 sh = (SHCoefficientL2)0;
+    for (int i = 0; i < SAMPLE_COUNT; ++i)
+    {
+        float3 viewDirWS = _BakeSamples[i];
+        half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+        sh.c0 += skyColor * 0.2820947917;
+        sh.c1 += Y1(viewDirWS) * skyColor;
+        sh.c2 += Y2(viewDirWS) * skyColor;
+        sh.c3 += Y3(viewDirWS) * skyColor;
+        sh.c4 += Y4(viewDirWS) * skyColor;
+        sh.c5 += Y5(viewDirWS) * skyColor;
+        sh.c6 += Y6(viewDirWS) * skyColor;
+        sh.c7 += Y7(viewDirWS) * skyColor;
+        sh.c8 += Y8(viewDirWS) * skyColor;
+    }
+
+    float factor = 4.0 * PI / SAMPLE_COUNT;
+    sh.c0 *= factor;
+    sh.c1 *= factor;
+    sh.c2 *= factor;
+    sh.c3 *= factor;
+    sh.c4 *= factor;
+    sh.c5 *= factor;
+    sh.c6 *= factor;
+    sh.c7 *= factor;
+    sh.c8 *= factor;
+    _FinalProjSH[0] = GetEnvmapSHPolyCoef(sh);
+}
