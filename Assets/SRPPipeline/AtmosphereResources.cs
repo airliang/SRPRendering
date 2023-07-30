@@ -2,11 +2,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+#if UNITY_EDITOR
 using UnityEditor;
-using UnityEditorInternal.VR;
+#endif
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.UIElements;
 
 namespace Insanity
 {
@@ -25,7 +25,8 @@ namespace Insanity
         [Reload("Runtime/ShaderLibrary/PrecomputeScattering.compute")]
         public ComputeShader PrecomputeScattering;
         public ComputeShader ProjAtmosphereToSH;
-        public Texture3D SkyboxLUT;
+        public Texture SkyboxLUT;
+        public Color[] SkyboxLUTPixels;
 
         public Vector3 ScatteringCoefficientRayleigh = new Vector3(6.55f, 17.3f, 23.0f);
         public Vector3 ScatteringCoefficientMie = new Vector3(2.0f, 2.0f, 2.0f);

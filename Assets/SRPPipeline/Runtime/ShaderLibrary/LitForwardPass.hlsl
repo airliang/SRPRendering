@@ -73,6 +73,8 @@ void InitializeInputData(Varyings input, out InputData inputData)
 #else
     inputData.shadowCoord = float4(0, 0, 0, 0);
 #endif
+
+    inputData.bakedGI = max(half3(0,0,0), ShadeSH9(half4(inputData.normalWS, 1.0)));
 }
 
 ///////////////////////////////////////////////////////////////////////////////

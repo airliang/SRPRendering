@@ -6,6 +6,8 @@
 #include "AtmosphereScattering.hlsl"
 #include "SHUtils.hlsl"
 
+#define _OPTIMIZE_BAKE 1
+
 struct SHCoefficientL2
 {
     float3 c0;
@@ -21,16 +23,19 @@ struct SHCoefficientL2
 };
 
 Texture3D<float4>   _SkyboxLUT;
-RWStructuredBuffer<SHCoefficientL2> _SHCoefficients;
-
-StructuredBuffer<float4> _BakeSamples;
 #define SAMPLE_COUNT 512
 #define THREAD_NUM_X 128
-//groupshared float3 TempTexture0[THREAD_NUM_X * 2];
-//groupshared float3 TempTexture1[THREAD_NUM_X * 2];
-//groupshared float3 TempTexture2[THREAD_NUM_X * 2];
-//groupshared float3 TempTexture3[THREAD_NUM_X * 2];
+
+#if _OPTIMIZE_BAKE
+RWTexture2D<float4> _SHCoefficients;
+groupshared float4 TempSH[THREAD_NUM_X * 2];
+#else
+RWStructuredBuffer<SHCoefficientL2> _SHCoefficients;
 groupshared SHCoefficientL2 TempSH[THREAD_NUM_X * 2];
+#endif
+
+StructuredBuffer<float4> _BakeSamples;
+
 
 float3 _MainLightPosition;
 float _MainLightIntensity;
@@ -46,10 +51,9 @@ void PreSumArray(int thid)
         {
             int ai = offset * (2 * thid + 1) - 1;
             int bi = offset * (2 * thid + 2) - 1;
-            //TempTexture0[bi] += TempTexture0[ai];
-            //TempTexture1[bi] += TempTexture1[ai];
-            //TempTexture2[bi] += TempTexture2[ai];
-            //TempTexture3[bi] += TempTexture3[ai];
+#if _OPTIMIZE_BAKE
+            TempSH[bi] += TempSH[ai];
+#else
             TempSH[bi].c0 += TempSH[ai].c0;
             TempSH[bi].c1 += TempSH[ai].c1;
             TempSH[bi].c2 += TempSH[ai].c2;
@@ -60,6 +64,7 @@ void PreSumArray(int thid)
             TempSH[bi].c7 += TempSH[ai].c7;
             TempSH[bi].c8 += TempSH[ai].c8;
             TempSH[bi].pack += TempSH[ai].pack;
+#endif
         }
         offset <<= 1;
     }
@@ -69,11 +74,11 @@ void PreSumArray(int thid)
     //so the last element should be zero.
     if (thid == 0)
     {
-        //TempTexture0[THREAD_NUM_X * 2 - 1] = float3(0, 0, 0);
-        //TempTexture1[THREAD_NUM_X * 2 - 1] = float3(0, 0, 0);
-        //TempTexture2[THREAD_NUM_X * 2 - 1] = float3(0, 0, 0);
-        //TempTexture3[THREAD_NUM_X * 2 - 1] = float3(0, 0, 0);
+#if _OPTIMIZE_BAKE
+        TempSH[THREAD_NUM_X * 2 - 1] = 0;
+#else
         TempSH[THREAD_NUM_X * 2 - 1] = (SHCoefficientL2)0;
+#endif
     }
 
     for (int d = 1; d <= THREAD_NUM_X; d *= 2)
@@ -84,7 +89,11 @@ void PreSumArray(int thid)
         {
             int ai = offset * (2 * thid + 1) - 1;
             int bi = offset * (2 * thid + 2) - 1;
- 
+#if _OPTIMIZE_BAKE
+            float4 t = TempSH[ai];
+            TempSH[ai] = TempSH[bi];
+            TempSH[bi] += t;
+#else
             SHCoefficientL2 t = TempSH[ai];
             TempSH[ai] = TempSH[bi];
             TempSH[bi].c0 += t.c0;
@@ -97,6 +106,7 @@ void PreSumArray(int thid)
             TempSH[bi].c7 += t.c7;
             TempSH[bi].c8 += t.c8;
             TempSH[bi].pack += t.pack;
+#endif
         }
     }
 }
@@ -142,7 +152,41 @@ void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_Group
     float3 sunDir = -normalize(_MainLightPosition.xyz);
     //calculate the incoming light from the atmosphere
     
-    
+#if _OPTIMIZE_BAKE
+    float3 sh = (float3)0;
+    if (textureAddr < SAMPLE_COUNT)
+    {
+        float3 viewDirWS = _BakeSamples[textureAddr];
+        half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+        sh = Y(groupId.y, viewDirWS) * skyColor;
+    }
+
+    TempSH[2 * thid] = float4(sh, 0);
+
+    uint textureAddrNext = textureAddr + 1;
+    float3 shNext = 0;
+    if (textureAddrNext < SAMPLE_COUNT)
+    {
+        float3 viewDirWS = _BakeSamples[textureAddrNext];
+        half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+        shNext = Y(groupId.y, viewDirWS) * skyColor;
+    }
+    TempSH[2 * thid + 1] = float4(shNext, 0);
+
+    PreSumArray(thid);
+
+    GroupMemoryBarrierWithGroupSync();
+    uint2 outputTextureAddr = uint2(groupId.x * THREAD_NUM_X + thid * 2, groupId.y);
+    uint2 outputTextureAddr1 = uint2(groupId.x * THREAD_NUM_X + thid * 2 + 1, groupId.y);
+    if ((2 * thid) < THREAD_NUM_X)
+    {
+        _SHCoefficients[outputTextureAddr] = outputTextureAddr.x < SAMPLE_COUNT ? TempSH[2 * thid + 1] : 0;
+    }
+    if ((2 * thid + 1) < THREAD_NUM_X)
+    {
+        _SHCoefficients[outputTextureAddr1] = outputTextureAddr1.x < SAMPLE_COUNT ? TempSH[2 * thid + 2] : 0;
+    }
+#else
     SHCoefficientL2 sh = (SHCoefficientL2)0;
     SHCoefficientL2 zeroSh = (SHCoefficientL2)0;
     
@@ -211,17 +255,46 @@ void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_Group
             _SHCoefficients[outputTextureAddr1] = zeroSh;
         }
     }
-    
+#endif
 }
 
 #pragma kernel PreSumGroupSH
 int _ArrayLengthPerThreadGroup;
+#if _OPTIMIZE_BAKE
+Texture2D<float4> _InputSHCoefficients;
+RWTexture2D<float4> _SHCoefficientsGroupSumArray;
+#else
 StructuredBuffer<SHCoefficientL2> _InputSHCoefficients;
 RWStructuredBuffer<SHCoefficientL2> _SHCoefficientsGroupSumArray;
+#endif
 [numthreads(THREAD_NUM_X, 1, 1)]
 void PreSumGroupSH(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
 {
     // TODO: insert actual code here!
+#if _OPTIMIZE_BAKE
+    uint w,h;
+    _InputSHCoefficients.GetDimensions(w, h);
+    uint thid = DTid.x;
+    uint2 textureAddr = uint2((2 * thid + 1) * THREAD_NUM_X - 1, groupId.y);
+    uint2 textureAddr1 = uint2((2 * thid + 2) * THREAD_NUM_X - 1, groupId.y);
+
+    TempSH[2 * thid] = textureAddr.x < w ? _InputSHCoefficients[textureAddr] : 0;
+    TempSH[2 * thid + 1] = textureAddr1.x < w ? _InputSHCoefficients[textureAddr1] : 0;
+
+    PreSumArray(thid);
+
+    GroupMemoryBarrierWithGroupSync();
+    if ((2 * thid) < _ArrayLengthPerThreadGroup)
+    {
+        uint2 outputAddress = uint2(2 * thid, groupId.y);
+        _SHCoefficientsGroupSumArray[outputAddress] = TempSH[2 * thid + 1];
+    }
+    if ((2 * thid + 1) < _ArrayLengthPerThreadGroup)
+    {
+        uint2 outputAddress = uint2(2 * thid + 1, groupId.y);
+        _SHCoefficientsGroupSumArray[outputAddress] = TempSH[2 * thid + 2];
+    }
+#else
     uint shCoefBufLength;
     uint shCoefStride;
     _InputSHCoefficients.GetDimensions(shCoefBufLength, shCoefStride);
@@ -260,6 +333,7 @@ void PreSumGroupSH(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThread
         uint outputAddress = 2 * thid + 1;
         _SHCoefficientsGroupSumArray[outputAddress] = TempSH[2 * thid + 2];
     }
+#endif
 }
 
 #pragma kernel BakeSHToTexture
@@ -305,17 +379,36 @@ PolynomialSHL2 GetSHPolyCoef(SHCoefficientL2 sh)
     return polyShCoef;
 }
 
-
+#if _OPTIMIZE_BAKE
+Texture2D<float4> _SHCoefficientsGroupSumArrayInput;
+#else
 StructuredBuffer<SHCoefficientL2> _SHCoefficientsGroupSumArrayInput;
+#endif
 RWStructuredBuffer<PolynomialSHL2> _FinalProjSH;
 [numthreads(1, 1, 1)]
 void BakeSHToTexture(uint3 DTid : SV_DispatchThreadID)
 {
+#if _OPTIMIZE_BAKE
+    uint w, h;
+    _SHCoefficientsGroupSumArrayInput.GetDimensions(w, h);
+    int lastElementIndex = w - 1;
+    SHCoefficientL2 sh;
+    sh.c0 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 0)];
+    sh.c1 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 1)];
+    sh.c2 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 2)];
+    sh.c3 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 3)];
+    sh.c4 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 4)];
+    sh.c5 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 5)];
+    sh.c6 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 6)];
+    sh.c7 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 7)];
+    sh.c8 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 8)];
+#else
     uint shCoefBufLength;
     uint shCoefStride;
     _SHCoefficientsGroupSumArrayInput.GetDimensions(shCoefBufLength, shCoefStride);
     int lastElementIndex = shCoefBufLength - 1;
     SHCoefficientL2 sh = _SHCoefficientsGroupSumArrayInput[lastElementIndex];
+#endif
     float factor = 4.0 * PI / SAMPLE_COUNT;
     sh.c0 *= factor;
     sh.c1 *= factor;

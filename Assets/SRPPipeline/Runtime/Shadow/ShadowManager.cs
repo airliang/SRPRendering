@@ -2,8 +2,6 @@ using Insanity;
 using System.Collections;
 using System.Collections.Generic;
 using System.Xml.Linq;
-using UnityEditor;
-using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;

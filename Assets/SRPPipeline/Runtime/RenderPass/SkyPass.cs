@@ -53,6 +53,7 @@ namespace Insanity
         }
 
         Atmosphere m_atmosphere = new Atmosphere();
+        Vector3 m_sunDirectionLastFrame;
 
         public void Render_PhysicalBaseSky(CameraData cameraData, RenderGraph graph, DepthPrepassData depthData, InsanityPipelineAsset pipelineAsset)
         {
@@ -60,7 +61,6 @@ namespace Insanity
             if (m_atmosphere == null)
             {
                 m_atmosphere = new Atmosphere();
-                
             }
             AtmosphereResources atmosphereResources = pipelineAsset.AtmosphereResources;
             Texture skyboxLUT;
@@ -81,7 +81,11 @@ namespace Insanity
             else
                 skyboxLUT = atmosphereResources.SkyboxLUT;//m_atmosphere.SkyboxLUT;
             //Texture3D skyboxLUTAsset = pipelineAsset.AtmosphereResources.SkyboxLUT;
-            m_atmosphere.BakeSkyToSHAmbient(atmosphereResources, m_sunLight);
+            //if (m_sunLight.transform.forward != m_sunDirectionLastFrame)
+            {
+                m_atmosphere.BakeSkyToSHAmbient(atmosphereResources, m_sunLight);
+                m_sunDirectionLastFrame = m_sunLight.transform.forward;
+            }
 
             using (var builder = graph.AddRenderPass<PhysicalBaseSkyPassData>("Atmosphere Scattering SkyPass", 
                 out var passData, new ProfilingSampler("Atmosphere Scattering SkyPass Profiler")))

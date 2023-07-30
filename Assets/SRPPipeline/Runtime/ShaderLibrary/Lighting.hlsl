@@ -592,25 +592,51 @@ half3 VertexLighting(float3 positionWS, half3 normalWS)
     return vertexLightColor;
 }
 
+half3 GlobalIllumination(BRDFData brdfData, half3 bakedGI, half occlusion, float3 positionWS, half3 normalWS, half3 viewDirectionWS)
+{
+    half3 reflectVector = reflect(-viewDirectionWS, normalWS);
+    half fresnelTerm = Pow4(1.0 - saturate(dot(normalWS, viewDirectionWS)));
 
+    half3 indirectDiffuse = bakedGI * occlusion;
+    half3 indirectSpecular = half3(0, 0, 0);//GlossyEnvironmentReflection(reflectVector, brdfData.perceptualRoughness, occlusion, positionWS);
+
+    return EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
+}
 
 half4 FragmentBlinnPhong(InputData inputData, half3 diffuse, half4 specularGloss, half smoothness, half3 emission, half alpha, ShadowSampleCoords shadowSample)
 {
-    Light mainLight = GetMainLight(shadowSample);
-    //Light mainLight = GetMainLight(inputData.shadowCoord);
-    //MixRealtimeAndBakedGI(mainLight, inputData.normalWS, inputData.bakedGI, half4(0, 0, 0, 0));
+    Light mainLight = GetMainLight(shadowSample);    
 
     half3 attenuatedLightColor = mainLight.color * (mainLight.distanceAttenuation * mainLight.shadowAttenuation);
-    half3 diffuseColor = LightingLambert(attenuatedLightColor, mainLight.direction, inputData.normalWS);
+    half3 diffuseColor = inputData.bakedGI + LightingLambert(attenuatedLightColor, mainLight.direction, inputData.normalWS);
     half3 specularColor = LightingSpecular(attenuatedLightColor, mainLight.direction, inputData.normalWS, inputData.viewDirectionWS, specularGloss, smoothness);
 
     half3 finalColor = diffuseColor * diffuse + emission;
-
 #if defined(_SPECGLOSSMAP) || defined(_SPECULAR_COLOR)
     finalColor += specularColor;
 #endif
 
     return half4(finalColor, alpha);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//                      Fragment Functions                                   //
+//       Used by ShaderGraph and others builtin renderers                    //
+///////////////////////////////////////////////////////////////////////////////
+half4 UniversalFragmentPBR(InputData inputData, half3 albedo, half metallic, half3 specular,
+    half smoothness, half occlusion, half3 emission, half alpha, ShadowSampleCoords shadowSample)
+{
+    // initialize brdf data.
+    BRDFData brdfData;
+    InitializeBRDFData(albedo, metallic, specular, smoothness, alpha, brdfData);
+
+    Light mainLight = GetMainLight(shadowSample);
+
+    half3 color = GlobalIllumination(brdfData, inputData.bakedGI, occlusion, inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS);
+    color += LightingPhysicallyBased(brdfData, mainLight, inputData.normalWS, inputData.viewDirectionWS);
+
+    color += emission;
+    return half4(color, alpha);
 }
 
 #endif

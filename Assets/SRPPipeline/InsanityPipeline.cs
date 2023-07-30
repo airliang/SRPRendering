@@ -50,6 +50,7 @@ namespace Insanity
         protected override void Render(ScriptableRenderContext context, Camera[] cameras)
         {
             GraphicsSettings.lightsUseLinearIntensity = (QualitySettings.activeColorSpace == ColorSpace.Linear);
+            GraphicsSettings.useScriptableRenderPipelineBatching = asset.UseSRPBatcher;
             BeginFrameRendering(context, cameras);
 
             foreach (Camera camera in cameras)
@@ -175,6 +176,19 @@ namespace Insanity
             ConstantBuffer.ReleaseAll();
 
             CameraData.ClearAll();
+
+            if (m_atmosphere != null)
+            {
+                m_atmosphere.Release();
+                m_atmosphere = null;
+            }
+            m_satRenderer = null;
+            m_ShadowMananger.Clear();
+        }
+
+        private void InitializeRenderPipeline()
+        {
+
         }
     }
 }

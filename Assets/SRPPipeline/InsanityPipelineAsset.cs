@@ -81,6 +81,7 @@ namespace Insanity
         [SerializeField] bool m_HDREnable = false;
         [SerializeField] float m_Exposure = 1.0f;
         [SerializeField] float m_ResolutionRate = 1.0f;
+        [SerializeField] bool m_UseSRPBatcher = true;
 
         public bool HDREnable
         {
@@ -98,6 +99,12 @@ namespace Insanity
         {
             get { return m_ResolutionRate; }
             set { m_ResolutionRate = value; }
+        }
+
+        public bool UseSRPBatcher
+        {
+            get { return m_UseSRPBatcher; }
+            set { m_UseSRPBatcher = value; }
         }
         #endregion
 
@@ -247,11 +254,6 @@ namespace Insanity
         //Atmosphere Settings
         [SerializeField] Color m_SunLightColor = Color.white;
         [SerializeField] bool m_physicalBasedSky = false;
-        //[SerializeField] float m_ScatteringScaleR = 1.0f;
-        //[SerializeField] float m_ScatteringScaleM = 1.0f;
-        //[SerializeField] float m_MieG = 0.76f;
-        //[SerializeField] bool m_multipleScatteringEnable = false;
-        //[SerializeField] int m_multipleScatteringOrder = 0;
 
         private bool m_RecalculateSkyLUT = true;
 
@@ -260,26 +262,6 @@ namespace Insanity
             get { return m_RecalculateSkyLUT; }
             set { m_RecalculateSkyLUT = value; }
         }
-
-        /*
-        public float ScatteringScaleR
-        {
-            get { return m_ScatteringScaleR; }
-            set { m_ScatteringScaleR = value; RecalculateSkyLUT = true; }
-        }
-
-        public float ScatteringScaleM
-        {
-            get { return m_ScatteringScaleM; }
-            set { m_ScatteringScaleM = value; RecalculateSkyLUT = true; }
-        }
-
-        public float MieG
-        {
-            get { return m_MieG; }
-            set { m_MieG = value;}
-        }
-        */
 
         public Color SunLightColor
         {
@@ -295,20 +277,6 @@ namespace Insanity
                 m_physicalBasedSky = value;
             }
         }
-
-
-        //public int MultipleScatteringOrder
-        //{
-        //    get { return m_multipleScatteringOrder; }
-        //    set 
-        //    { 
-        //        if (value != m_multipleScatteringOrder)
-        //        {
-        //            m_multipleScatteringOrder = value;
-        //            RecalculateSkyLUT = true;
-        //        }
-        //    }
-        //}
 
         #endregion
 

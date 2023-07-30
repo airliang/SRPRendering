@@ -84,4 +84,32 @@ float Y15(float3 v)
 {
     return -0.59004359 * v.x * (v.x * v.x - 3.0f * v.y * v.y);
 }
+
+float Y(uint L, float3 V)
+{
+    switch (L)
+    {
+    case 0:
+        return Y0(V);
+    case 1:
+        return Y1(V);
+    case 2:
+        return Y2(V);
+    case 3:
+        return Y3(V);
+    case 4:
+        return Y4(V);
+    case 5:
+        return Y5(V);
+    case 6:
+        return Y6(V);
+    case 7:
+        return Y7(V);
+    case 8:
+        return Y8(V);
+    default:
+        return 0.0f;
+    }
+}
+
 #endif

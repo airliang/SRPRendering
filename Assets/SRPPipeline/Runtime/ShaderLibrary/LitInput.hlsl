@@ -14,6 +14,7 @@ struct InputData
     float3  positionWS;
     half3   normalWS;
     half3   viewDirectionWS;
+    half3   bakedGI;
     float4  shadowCoord;
     half    fogCoord;
 };

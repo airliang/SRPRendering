@@ -1,12 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Xml.Linq;
-using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
-using static TreeEditor.TextureAtlas;
 
 namespace Insanity
 {
@@ -341,6 +339,11 @@ namespace Insanity
                 });
                 return passData;
             }
+        }
+
+        public void Release()
+        {
+
         }
     }
 
