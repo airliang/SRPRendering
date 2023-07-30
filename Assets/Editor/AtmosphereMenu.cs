@@ -24,7 +24,7 @@ public class AtmosphereWindow : EditorWindow
     {
         //Atmosphere atmosphere = new Atmosphere();
         Texture3D skyboxLUT = Atmosphere.PrecomputeSkyboxLUT(_AtmosphereResources) as Texture3D;
-        //skyboxLUT.Apply(false, false);
+        //skyboxLUT.Apply();
         if (skyboxLUT != null)
         {
             string path = AssetDatabase.GetAssetPath(_AtmosphereResources);
@@ -34,7 +34,7 @@ public class AtmosphereWindow : EditorWindow
                 path = path.Substring(0, index + 1);
             }
 
-            if (AssetDatabase.Contains(_AtmosphereResources.SkyboxLUT))
+            //if (AssetDatabase.Contains(_AtmosphereResources.SkyboxLUT))
             {
                 AssetDatabase.DeleteAsset(path + "SkyboxLUT.asset");
                 AssetDatabase.Refresh();
@@ -42,32 +42,29 @@ public class AtmosphereWindow : EditorWindow
 
             AssetDatabase.CreateAsset(skyboxLUT, path + "SkyboxLUT.asset");
 
-            //_AtmosphereResources.SkyboxLUTPixels = skyboxLUT.GetPixels();
-            //Texture3D skyTemp = new Texture3D(skyboxLUT.width, skyboxLUT.height, skyboxLUT.depth, skyboxLUT.format, false);
-            //skyTemp.SetPixels(_AtmosphereResources.SkyboxLUTPixels);
-            //skyTemp.Apply(false, true);
             _AtmosphereResources.SkyboxLUT = AssetDatabase.LoadAssetAtPath(path + "SkyboxLUT.asset", typeof(Texture3D)) as Texture;
             //EditorUtility.SetDirty(_AtmosphereResources);
+            
+            //Texture3D testAsset = AssetDatabase.LoadAssetAtPath(path + "test3DTex.asset", typeof(Texture3D)) as Texture3D; 
+            //if (testAsset == null) 
+            //{
+            //    testAsset = new Texture3D(2, 2, 2, TextureFormat.RGBAHalf, false);
+            //    testAsset.SetPixels(new Color[] { Color.red, Color.green, Color.blue, Color.white, Color.black, Color.yellow, Color.cyan, Color.magenta });
+            //    testAsset.Apply();
+            //    AssetDatabase.CreateAsset(testAsset, path + "test3DTex.asset");
+            //}
+            
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            //Texture2D texture2D = new Texture2D(4, 4, TextureFormat.ARGB32, false);
-            //Color[] colors = new Color[16];
-            //for (int i = 0; i < 16; i++)
-            //{
-            //    colors[i] = Color.red;
-            //}
-            //texture2D.SetPixels(colors);
-            //AssetDatabase.CreateAsset(texture2D, path + "redTexture.asset");
-            //AssetDatabase.SaveAssets();
-            //AssetDatabase.Refresh();
         }
     }
 
     private void BakeAtmosphereSHTest()
     {
-        Atmosphere atmosphere = new Atmosphere();
-        atmosphere.ClearSamples();
-        atmosphere.BakeSkyToSHAmbient(_AtmosphereResources, _SunLight);
+        //Atmosphere atmosphere = new Atmosphere();
+        //atmosphere.ClearSamples();
+        //atmosphere.BakeSkyToSHAmbient(_AtmosphereResources, _SunLight);
     }
 
     private void OnGUI()

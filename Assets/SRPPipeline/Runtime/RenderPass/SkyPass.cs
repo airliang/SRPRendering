@@ -81,11 +81,7 @@ namespace Insanity
             else
                 skyboxLUT = atmosphereResources.SkyboxLUT;//m_atmosphere.SkyboxLUT;
             //Texture3D skyboxLUTAsset = pipelineAsset.AtmosphereResources.SkyboxLUT;
-            //if (m_sunLight.transform.forward != m_sunDirectionLastFrame)
-            {
-                m_atmosphere.BakeSkyToSHAmbient(atmosphereResources, m_sunLight);
-                m_sunDirectionLastFrame = m_sunLight.transform.forward;
-            }
+            
 
             using (var builder = graph.AddRenderPass<PhysicalBaseSkyPassData>("Atmosphere Scattering SkyPass", 
                 out var passData, new ProfilingSampler("Atmosphere Scattering SkyPass Profiler")))
@@ -124,6 +120,15 @@ namespace Insanity
         public void ClearSkyPass()
         {
             //CoreUtils.Destroy(m_skyMaterial);
+        }
+
+        void BakeAtmosphereSH(ref ScriptableRenderContext context, AtmosphereResources atmosphereResources)
+        {
+            //if (m_sunLight.transform.forward != m_sunDirectionLastFrame)
+            {
+                m_atmosphere.BakeSkyToSHAmbient(ref context, atmosphereResources, m_sunLight);
+                m_sunDirectionLastFrame = m_sunLight.transform.forward;
+            }
         }
     }
 }

@@ -124,6 +124,7 @@ namespace Insanity
                     ForwardPassData forwardPassData = Render_OpaqueFowardPass(cameraData, m_RenderGraph, cull, depthPassData, shadowmap);
                     if (asset.PhysicalBasedSky)
                     {
+                        BakeAtmosphereSH(ref context, asset.AtmosphereResources);
                         Render_PhysicalBaseSky(cameraData, m_RenderGraph, depthPassData, asset);
                     }
                     else
