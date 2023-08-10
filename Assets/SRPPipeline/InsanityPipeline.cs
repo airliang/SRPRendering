@@ -125,6 +125,7 @@ namespace Insanity
                     if (asset.PhysicalBasedSky)
                     {
                         BakeAtmosphereSH(ref context, asset.AtmosphereResources);
+                        m_atmosphere.Update();
                         Render_PhysicalBaseSky(cameraData, m_RenderGraph, depthPassData, asset);
                     }
                     else

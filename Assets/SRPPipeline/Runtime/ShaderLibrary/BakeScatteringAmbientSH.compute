@@ -44,7 +44,7 @@ void PreSumArray(int thid)
 {
     int offset = 1;
     //up pass
-    for (int d = THREAD_NUM_X; d > 0; d >>= 1)
+    for (int d = THREAD_NUM_X >> 1; d > 0; d >>= 1)
     {
         GroupMemoryBarrierWithGroupSync();
         if (thid < d)
@@ -67,47 +67,6 @@ void PreSumArray(int thid)
 #endif
         }
         offset <<= 1;
-    }
-
-    //down pass
-    //because the fisrt loop should at the sum and the last element, the sum has been already caculate,
-    //so the last element should be zero.
-    if (thid == 0)
-    {
-#if _OPTIMIZE_BAKE
-        TempSH[THREAD_NUM_X * 2 - 1] = 0;
-#else
-        TempSH[THREAD_NUM_X * 2 - 1] = (SHCoefficientL2)0;
-#endif
-    }
-
-    for (int d = 1; d <= THREAD_NUM_X; d *= 2)
-    {
-        offset >>= 1;
-        GroupMemoryBarrierWithGroupSync();
-        if (thid < d)
-        {
-            int ai = offset * (2 * thid + 1) - 1;
-            int bi = offset * (2 * thid + 2) - 1;
-#if _OPTIMIZE_BAKE
-            float4 t = TempSH[ai];
-            TempSH[ai] = TempSH[bi];
-            TempSH[bi] += t;
-#else
-            SHCoefficientL2 t = TempSH[ai];
-            TempSH[ai] = TempSH[bi];
-            TempSH[bi].c0 += t.c0;
-            TempSH[bi].c1 += t.c1;
-            TempSH[bi].c2 += t.c2;
-            TempSH[bi].c3 += t.c3;
-            TempSH[bi].c4 += t.c4;
-            TempSH[bi].c5 += t.c5;
-            TempSH[bi].c6 += t.c6;
-            TempSH[bi].c7 += t.c7;
-            TempSH[bi].c8 += t.c8;
-            TempSH[bi].pack += t.pack;
-#endif
-        }
     }
 }
 
@@ -180,11 +139,11 @@ void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_Group
     uint2 outputTextureAddr1 = uint2(groupId.x * THREAD_NUM_X + thid * 2 + 1, groupId.y);
     if ((2 * thid) < THREAD_NUM_X)
     {
-        _SHCoefficients[outputTextureAddr] = outputTextureAddr.x < SAMPLE_COUNT ? TempSH[2 * thid + 1] : 0;
+        _SHCoefficients[outputTextureAddr] = outputTextureAddr.x < SAMPLE_COUNT ? TempSH[2 * thid] : 0;
     }
     if ((2 * thid + 1) < THREAD_NUM_X)
     {
-        _SHCoefficients[outputTextureAddr1] = outputTextureAddr1.x < SAMPLE_COUNT ? TempSH[2 * thid + 2] : 0;
+        _SHCoefficients[outputTextureAddr1] = outputTextureAddr1.x < SAMPLE_COUNT ? TempSH[2 * thid + 1] : 0;
     }
 #else
     SHCoefficientL2 sh = (SHCoefficientL2)0;
@@ -287,12 +246,12 @@ void PreSumGroupSH(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThread
     if ((2 * thid) < _ArrayLengthPerThreadGroup)
     {
         uint2 outputAddress = uint2(2 * thid, groupId.y);
-        _SHCoefficientsGroupSumArray[outputAddress] = TempSH[2 * thid + 1];
+        _SHCoefficientsGroupSumArray[outputAddress] = TempSH[2 * thid];
     }
     if ((2 * thid + 1) < _ArrayLengthPerThreadGroup)
     {
         uint2 outputAddress = uint2(2 * thid + 1, groupId.y);
-        _SHCoefficientsGroupSumArray[outputAddress] = TempSH[2 * thid + 2];
+        _SHCoefficientsGroupSumArray[outputAddress] = TempSH[2 * thid + 1];
     }
 #else
     uint shCoefBufLength;

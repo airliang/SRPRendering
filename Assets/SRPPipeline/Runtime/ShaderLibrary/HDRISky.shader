@@ -34,7 +34,13 @@ Shader "Insanity/HDRISky"
 
             float3 GetSkyViewDirWS(float2 positionCS)
             {
-                float4 viewDirWS = mul(float4(positionCS.xy, 1.0f, 1.0f), _PixelCoordToViewDirWS);
+                float2 positionNDC = positionCS * _ScreenSize.zw;
+#if UNITY_REVERSED_Z
+                float depth = 0;
+#else
+                float depth = 1;
+#endif
+                float4 viewDirWS = float4(ComputeWorldSpacePosition(positionNDC, depth, UNITY_MATRIX_I_VP), 1.0);//mul(float4(positionCS.xy, 1.0f, 1.0f), _PixelCoordToViewDirWS);
                 return normalize(viewDirWS.xyz);
             }
 
@@ -60,7 +66,7 @@ Shader "Insanity/HDRISky"
             {
                 float3 viewDirWS = GetSkyViewDirWS(input.positionCS.xy);
                 // Reverse it to point into the scene
-                float3 dir = -viewDirWS;
+                float3 dir = viewDirWS;
                 half3 skyColor = DecodeHDREnvironment(SAMPLE_TEXTURECUBE_LOD(_Cubemap, sampler_Cubemap, dir, 0), _Cubemap_HDR);
                 return half4(skyColor, 1);
             }

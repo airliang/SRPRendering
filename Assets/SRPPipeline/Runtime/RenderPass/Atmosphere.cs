@@ -44,6 +44,8 @@ namespace Insanity
         public Vector4[] m_bakeSHSamples;
         const int SHSampleCount = 128;
 
+        public Queue<AsyncGPUReadbackRequest> m_SHBakeReadbacks = new Queue<AsyncGPUReadbackRequest>();
+
         public class AtmosphereShaderParameters
         {
             public static int _AtmosphereHeight;
@@ -480,6 +482,7 @@ namespace Insanity
 
         void GetAmbientSHData(ComputeBuffer ambientSHBuffer)
         {
+            /*
             AsyncGPUReadback.Request(ambientSHBuffer, callback =>
             {
                 if (callback.done)
@@ -487,7 +490,7 @@ namespace Insanity
                     NativeArray<GPUPolynomialSHL2> result = callback.GetData<GPUPolynomialSHL2>();
                     result.CopyTo(m_finalPolySHL2);
                 }
-                
+
 
                 Shader.SetGlobalVector(ProjSHShaderParameters._SHAr, m_finalPolySHL2[0].SHAr);
                 Shader.SetGlobalVector(ProjSHShaderParameters._SHAg, m_finalPolySHL2[0].SHAg);
@@ -497,6 +500,9 @@ namespace Insanity
                 Shader.SetGlobalVector(ProjSHShaderParameters._SHBb, m_finalPolySHL2[0].SHBb);
                 Shader.SetGlobalVector(ProjSHShaderParameters._SHC, m_finalPolySHL2[0].SHC);
             });
+            */
+            AsyncGPUReadbackRequest singleReadBack = AsyncGPUReadback.Request(ambientSHBuffer);
+            m_SHBakeReadbacks.Enqueue(singleReadBack);
         }
 
         const string m_BakeSHProfilerTag = "Baking Atmophere Scattering to SHs";
@@ -533,6 +539,7 @@ namespace Insanity
                 {
                     m_skySHSetting.m_SHCoefficientsTexture = new RenderTexture(m_bakeSHSamples.Length, 9, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
                     m_skySHSetting.m_SHCoefficientsTexture.enableRandomWrite = true;
+                    m_skySHSetting.m_SHCoefficientsTexture.Create();
                 }
 
                 if (m_skySHSetting.m_SHCoefficientsGroupSumTexture == null)
@@ -540,6 +547,7 @@ namespace Insanity
                     m_skySHSetting.m_SHCoefficientsGroupSumTexture = new RenderTexture(m_bakeSHSamples.Length / AtmosphereSHSetting.THREAD_NUM_PER_GROUP,
                         9, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
                     m_skySHSetting.m_SHCoefficientsGroupSumTexture.enableRandomWrite = true;
+                    m_skySHSetting.m_SHCoefficientsGroupSumTexture.Create();
                 }
             }
             else
@@ -556,21 +564,29 @@ namespace Insanity
 
 
             ComputeShader csProjAtmosphereToSH = atmosphereResources.ProjAtmosphereToSH;
-            //CommandBuffer cmd = CommandBufferPool.Get(m_BakeSHProfilerTag);
-            //using (new ProfilingScope(cmd, m_BakeSHProfilingSampler))
-            //{
+            CommandBuffer cmd = CommandBufferPool.Get(m_BakeSHProfilerTag);
+            
+            using (new ProfilingScope(cmd, m_BakeSHProfilingSampler))
+            {
                 //set the cs parameters
                 Vector4 rayleightScatteringCoef = atmosphereResources.ScatteringCoefficientRayleigh * 0.000001f * atmosphereResources.ScaleRayleigh;
                 Vector4 mieScatteringCoef = atmosphereResources.ScatteringCoefficientMie * 0.00001f * atmosphereResources.ScaleMie;
-                csProjAtmosphereToSH.SetFloat(AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
-                csProjAtmosphereToSH.SetFloat(AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
-                csProjAtmosphereToSH.SetVector(AtmosphereShaderParameters._BetaRayleigh, rayleightScatteringCoef);
-                csProjAtmosphereToSH.SetVector(AtmosphereShaderParameters._BetaMie, mieScatteringCoef);
-                csProjAtmosphereToSH.SetFloat(AtmosphereShaderParameters._MieG, atmosphereResources.MieG);
+                //csProjAtmosphereToSH.SetFloat(AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
+                //csProjAtmosphereToSH.SetFloat(AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
+                //csProjAtmosphereToSH.SetVector(AtmosphereShaderParameters._BetaRayleigh, rayleightScatteringCoef);
+                //csProjAtmosphereToSH.SetVector(AtmosphereShaderParameters._BetaMie, mieScatteringCoef);
+                //csProjAtmosphereToSH.SetFloat(AtmosphereShaderParameters._MieG, atmosphereResources.MieG);
+                cmd.SetComputeFloatParam(csProjAtmosphereToSH, AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
+                cmd.SetComputeFloatParam(csProjAtmosphereToSH, AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
+                cmd.SetComputeVectorParam(csProjAtmosphereToSH, AtmosphereShaderParameters._BetaRayleigh, rayleightScatteringCoef);
+                cmd.SetComputeVectorParam(csProjAtmosphereToSH, AtmosphereShaderParameters._BetaMie, mieScatteringCoef);
+                cmd.SetComputeFloatParam(csProjAtmosphereToSH, AtmosphereShaderParameters._MieG, atmosphereResources.MieG);
                 Vector4 mainLightPosition = -sunLight.transform.localToWorldMatrix.GetColumn(2);
                 mainLightPosition.w = 0;
-                csProjAtmosphereToSH.SetVector(ProjSHShaderParameters._MainLightPosition, mainLightPosition);
-                csProjAtmosphereToSH.SetFloat(ProjSHShaderParameters._MainLightIntensity, sunLight.intensity);
+                //csProjAtmosphereToSH.SetVector(ProjSHShaderParameters._MainLightPosition, mainLightPosition);
+                //csProjAtmosphereToSH.SetFloat(ProjSHShaderParameters._MainLightIntensity, sunLight.intensity);
+                cmd.SetComputeVectorParam(csProjAtmosphereToSH, ProjSHShaderParameters._MainLightPosition, mainLightPosition);
+                cmd.SetComputeFloatParam(csProjAtmosphereToSH, ProjSHShaderParameters._MainLightIntensity, sunLight.intensity);
 
                 float sqrtPI = Mathf.Sqrt(Mathf.PI);
                 float fC0 = (1.0f / (2.0f * sqrtPI));
@@ -579,8 +595,10 @@ namespace Insanity
                 float fC3 = (Mathf.Sqrt(5.0f) / (16.0f * sqrtPI));
                 float fC4 = (0.5f * fC2);
 
-                csProjAtmosphereToSH.SetVector(ProjSHShaderParameters._fC0to3, new Vector4(fC0, fC1, fC2, fC3));
-                csProjAtmosphereToSH.SetFloat(ProjSHShaderParameters._fC4, fC4);
+                //csProjAtmosphereToSH.SetVector(ProjSHShaderParameters._fC0to3, new Vector4(fC0, fC1, fC2, fC3));
+                //csProjAtmosphereToSH.SetFloat(ProjSHShaderParameters._fC4, fC4);
+                cmd.SetComputeVectorParam(csProjAtmosphereToSH, ProjSHShaderParameters._fC0to3, new Vector4(fC0, fC1, fC2, fC3));
+                cmd.SetComputeFloatParam(csProjAtmosphereToSH, ProjSHShaderParameters._fC4, fC4);
 
                 if (AtmosphereSHSetting.DIRECT_BAKING)
                 {
@@ -588,20 +606,15 @@ namespace Insanity
                     if (kBakeDirect == -1)
                         return;
 
-                    csProjAtmosphereToSH.SetTexture(kBakeDirect, AtmosphereShaderParameters._SkyboxLUT, atmosphereResources.SkyboxLUT);
-                    csProjAtmosphereToSH.SetBuffer(kBakeDirect, ProjSHShaderParameters._BakeSamples, m_skySHSetting.m_BakeSamples);
-                    csProjAtmosphereToSH.SetBuffer(kBakeDirect, ProjSHShaderParameters._FinalProjSH, m_skySHSetting.m_FinalProjSH);
-
-                    csProjAtmosphereToSH.Dispatch(kBakeDirect, 1, 1, 1);
+                    //csProjAtmosphereToSH.SetTexture(kBakeDirect, AtmosphereShaderParameters._SkyboxLUT, atmosphereResources.SkyboxLUT);
+                    //csProjAtmosphereToSH.SetBuffer(kBakeDirect, ProjSHShaderParameters._BakeSamples, m_skySHSetting.m_BakeSamples);
+                    //csProjAtmosphereToSH.SetBuffer(kBakeDirect, ProjSHShaderParameters._FinalProjSH, m_skySHSetting.m_FinalProjSH);
+                    //csProjAtmosphereToSH.Dispatch(kBakeDirect, 1, 1, 1);
+                    cmd.SetComputeTextureParam(csProjAtmosphereToSH, kBakeDirect, AtmosphereShaderParameters._SkyboxLUT, atmosphereResources.SkyboxLUT);
+                    cmd.SetComputeBufferParam(csProjAtmosphereToSH, kBakeDirect, ProjSHShaderParameters._BakeSamples, m_skySHSetting.m_BakeSamples);
+                    cmd.SetComputeBufferParam(csProjAtmosphereToSH, kBakeDirect, ProjSHShaderParameters._FinalProjSH, m_skySHSetting.m_FinalProjSH);
+                    cmd.DispatchCompute(csProjAtmosphereToSH, kBakeDirect, 1, 1, 1);
                     GetAmbientSHData(m_skySHSetting.m_FinalProjSH);
-                    //m_skySHSetting.m_FinalProjSH.GetData(m_finalPolySHL2);
-                    //Shader.SetGlobalVector(ProjSHShaderParameters._SHAr, m_finalPolySHL2[0].SHAr);
-                    //Shader.SetGlobalVector(ProjSHShaderParameters._SHAg, m_finalPolySHL2[0].SHAg);
-                    //Shader.SetGlobalVector(ProjSHShaderParameters._SHAb, m_finalPolySHL2[0].SHAb);
-                    //Shader.SetGlobalVector(ProjSHShaderParameters._SHBr, m_finalPolySHL2[0].SHBr);
-                    //Shader.SetGlobalVector(ProjSHShaderParameters._SHBg, m_finalPolySHL2[0].SHBg);
-                    //Shader.SetGlobalVector(ProjSHShaderParameters._SHBb, m_finalPolySHL2[0].SHBb);
-                    //Shader.SetGlobalVector(ProjSHShaderParameters._SHC, m_finalPolySHL2[0].SHC);
                 }
                 else
                 {
@@ -610,18 +623,24 @@ namespace Insanity
                         return;
 
                     //pass 1 parallen sum the sh coefficients into array.
-                    csProjAtmosphereToSH.SetTexture(kPreSumSH, AtmosphereShaderParameters._SkyboxLUT, atmosphereResources.SkyboxLUT);
-                    csProjAtmosphereToSH.SetBuffer(kPreSumSH, ProjSHShaderParameters._BakeSamples, m_skySHSetting.m_BakeSamples);
+                    //csProjAtmosphereToSH.SetTexture(kPreSumSH, AtmosphereShaderParameters._SkyboxLUT, atmosphereResources.SkyboxLUT);
+                    //csProjAtmosphereToSH.SetBuffer(kPreSumSH, ProjSHShaderParameters._BakeSamples, m_skySHSetting.m_BakeSamples);
+                    cmd.SetComputeTextureParam(csProjAtmosphereToSH, kPreSumSH, AtmosphereShaderParameters._SkyboxLUT, atmosphereResources.SkyboxLUT);
+                    cmd.SetComputeBufferParam(csProjAtmosphereToSH, kPreSumSH, ProjSHShaderParameters._BakeSamples, m_skySHSetting.m_BakeSamples);
                     int groupsNumX = m_bakeSHSamples.Length / 128;
                     if (AtmosphereSHSetting.OPTIMIZE_BAKING)
                     {
-                        csProjAtmosphereToSH.SetTexture(kPreSumSH, ProjSHShaderParameters._SHCoefficients, m_skySHSetting.m_SHCoefficientsTexture);
-                        csProjAtmosphereToSH.Dispatch(kPreSumSH, groupsNumX, 9, 1);
+                        //csProjAtmosphereToSH.SetTexture(kPreSumSH, ProjSHShaderParameters._SHCoefficients, m_skySHSetting.m_SHCoefficientsTexture);
+                        //csProjAtmosphereToSH.Dispatch(kPreSumSH, groupsNumX, 9, 1);
+                        cmd.SetComputeTextureParam(csProjAtmosphereToSH, kPreSumSH, ProjSHShaderParameters._SHCoefficients, m_skySHSetting.m_SHCoefficientsTexture);
+                        cmd.DispatchCompute(csProjAtmosphereToSH, kPreSumSH, groupsNumX, 9, 1);
                     }
                     else
                     {
-                        csProjAtmosphereToSH.SetBuffer(kPreSumSH, ProjSHShaderParameters._SHCoefficients, m_skySHSetting.m_SHCoefficientsArray);
-                        csProjAtmosphereToSH.Dispatch(kPreSumSH, groupsNumX, 1, 1);
+                        //csProjAtmosphereToSH.SetBuffer(kPreSumSH, ProjSHShaderParameters._SHCoefficients, m_skySHSetting.m_SHCoefficientsArray);
+                        //csProjAtmosphereToSH.Dispatch(kPreSumSH, groupsNumX, 1, 1);
+                        cmd.SetComputeBufferParam(csProjAtmosphereToSH, kPreSumSH, ProjSHShaderParameters._SHCoefficients, m_skySHSetting.m_SHCoefficientsArray);
+                        cmd.DispatchCompute(csProjAtmosphereToSH, kPreSumSH, groupsNumX, 1, 1);
                     }
 
                     //pass 2, sum the last element of sh coefficients to the group array.
@@ -630,18 +649,27 @@ namespace Insanity
                         int kPreSumSHGroup = csProjAtmosphereToSH.FindKernel("PreSumGroupSH");
                         if (kPreSumSHGroup >= 0)
                         {
-                            csProjAtmosphereToSH.SetInt(ProjSHShaderParameters._ArrayLengthPerThreadGroup, groupsNumX);
+                            //csProjAtmosphereToSH.SetInt(ProjSHShaderParameters._ArrayLengthPerThreadGroup, groupsNumX);
+                            cmd.SetComputeIntParam(csProjAtmosphereToSH, ProjSHShaderParameters._ArrayLengthPerThreadGroup, groupsNumX);
                             if (AtmosphereSHSetting.OPTIMIZE_BAKING)
                             {
-                                csProjAtmosphereToSH.SetTexture(kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, m_skySHSetting.m_SHCoefficientsTexture);
-                                csProjAtmosphereToSH.SetTexture(kPreSumSHGroup, ProjSHShaderParameters._SHCoefficientsGroupSumArray, m_skySHSetting.m_SHCoefficientsGroupSumTexture);
-                                csProjAtmosphereToSH.Dispatch(kPreSumSHGroup, 1, 9, 1);
+                                //csProjAtmosphereToSH.SetTexture(kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, m_skySHSetting.m_SHCoefficientsTexture);
+                                //csProjAtmosphereToSH.SetTexture(kPreSumSHGroup, ProjSHShaderParameters._SHCoefficientsGroupSumArray, m_skySHSetting.m_SHCoefficientsGroupSumTexture);
+                                //csProjAtmosphereToSH.Dispatch(kPreSumSHGroup, 1, 9, 1);
+                                cmd.SetComputeTextureParam(csProjAtmosphereToSH, kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, m_skySHSetting.m_SHCoefficientsTexture);
+                                cmd.SetComputeTextureParam(csProjAtmosphereToSH, kPreSumSHGroup,
+                                    ProjSHShaderParameters._SHCoefficientsGroupSumArray, m_skySHSetting.m_SHCoefficientsGroupSumTexture);
+                                cmd.DispatchCompute(csProjAtmosphereToSH, kPreSumSHGroup, 1, 9, 1);
                             }
                             else
                             {
-                                csProjAtmosphereToSH.SetBuffer(kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, m_skySHSetting.m_SHCoefficientsArray);
-                                csProjAtmosphereToSH.SetBuffer(kPreSumSHGroup, ProjSHShaderParameters._SHCoefficientsGroupSumArray, m_skySHSetting.m_SHCoefficientsGroupSumArray);
-                                csProjAtmosphereToSH.Dispatch(kPreSumSHGroup, 1, 1, 1);
+                                //csProjAtmosphereToSH.SetBuffer(kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, m_skySHSetting.m_SHCoefficientsArray);
+                                //csProjAtmosphereToSH.SetBuffer(kPreSumSHGroup, ProjSHShaderParameters._SHCoefficientsGroupSumArray, m_skySHSetting.m_SHCoefficientsGroupSumArray);
+                                //csProjAtmosphereToSH.Dispatch(kPreSumSHGroup, 1, 1, 1);
+                                cmd.SetComputeBufferParam(csProjAtmosphereToSH, kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, m_skySHSetting.m_SHCoefficientsArray);
+                                cmd.SetComputeBufferParam(csProjAtmosphereToSH, kPreSumSHGroup,
+                                    ProjSHShaderParameters._SHCoefficientsGroupSumArray, m_skySHSetting.m_SHCoefficientsGroupSumArray);
+                                cmd.DispatchCompute(csProjAtmosphereToSH, kPreSumSHGroup, 1, 1, 1);
                             }
 
 
@@ -654,19 +682,27 @@ namespace Insanity
                     {
                         if (AtmosphereSHSetting.OPTIMIZE_BAKING)
                         {
-                            csProjAtmosphereToSH.SetTexture(kBakeSHToTexture, ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, m_skySHSetting.m_SHCoefficientsGroupSumTexture);
+                            //csProjAtmosphereToSH.SetTexture(kBakeSHToTexture, ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, m_skySHSetting.m_SHCoefficientsGroupSumTexture);
+                            cmd.SetComputeTextureParam(csProjAtmosphereToSH, kBakeSHToTexture,
+                                ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, m_skySHSetting.m_SHCoefficientsGroupSumTexture);
                         }
                         else
-                            csProjAtmosphereToSH.SetBuffer(kBakeSHToTexture, ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, m_skySHSetting.m_SHCoefficientsGroupSumArray);
-                        csProjAtmosphereToSH.SetBuffer(kBakeSHToTexture, ProjSHShaderParameters._FinalProjSH, m_skySHSetting.m_FinalProjSH);
-                        csProjAtmosphereToSH.Dispatch(kBakeSHToTexture, 1, 1, 1);
+                        {
+                            //csProjAtmosphereToSH.SetBuffer(kBakeSHToTexture, ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, m_skySHSetting.m_SHCoefficientsGroupSumArray);
+                            cmd.SetComputeBufferParam(csProjAtmosphereToSH, kBakeSHToTexture,
+                                ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, m_skySHSetting.m_SHCoefficientsGroupSumArray);
+                        }
+                        //csProjAtmosphereToSH.SetBuffer(kBakeSHToTexture, ProjSHShaderParameters._FinalProjSH, m_skySHSetting.m_FinalProjSH);
+                        //csProjAtmosphereToSH.Dispatch(kBakeSHToTexture, 1, 1, 1);
+                        cmd.SetComputeBufferParam(csProjAtmosphereToSH, kBakeSHToTexture, ProjSHShaderParameters._FinalProjSH, m_skySHSetting.m_FinalProjSH);
+                        cmd.DispatchCompute(csProjAtmosphereToSH, kBakeSHToTexture, 1, 1, 1);
 
                         GetAmbientSHData(m_skySHSetting.m_FinalProjSH);
                     }
                 }
-            //}
-            //context.ExecuteCommandBuffer(cmd);
-            //CommandBufferPool.Release(cmd);
+            }
+            context.ExecuteCommandBuffer(cmd);
+            CommandBufferPool.Release(cmd);
         }
             
         public void Release()
@@ -675,6 +711,30 @@ namespace Insanity
             {
                 m_skySHSetting.Release();
                 m_skySHSetting = null;
+            }
+        }
+
+        public void Update()
+        {
+            if (m_SHBakeReadbacks.Count == 0)
+                return;
+            while (m_SHBakeReadbacks.Peek().done || m_SHBakeReadbacks.Peek().hasError == true)
+            {
+                // If this has an error, just skip it
+                if (!m_SHBakeReadbacks.Peek().hasError)
+                {
+                    NativeArray<GPUPolynomialSHL2> result = m_SHBakeReadbacks.Peek().GetData<GPUPolynomialSHL2>();
+                    result.CopyTo(m_finalPolySHL2);
+
+                    Shader.SetGlobalVector(ProjSHShaderParameters._SHAr, m_finalPolySHL2[0].SHAr);
+                    Shader.SetGlobalVector(ProjSHShaderParameters._SHAg, m_finalPolySHL2[0].SHAg);
+                    Shader.SetGlobalVector(ProjSHShaderParameters._SHAb, m_finalPolySHL2[0].SHAb);
+                    Shader.SetGlobalVector(ProjSHShaderParameters._SHBr, m_finalPolySHL2[0].SHBr);
+                    Shader.SetGlobalVector(ProjSHShaderParameters._SHBg, m_finalPolySHL2[0].SHBg);
+                    Shader.SetGlobalVector(ProjSHShaderParameters._SHBb, m_finalPolySHL2[0].SHBb);
+                    Shader.SetGlobalVector(ProjSHShaderParameters._SHC, m_finalPolySHL2[0].SHC);
+                }
+                m_SHBakeReadbacks.Dequeue();
             }
         }
     }

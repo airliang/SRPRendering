@@ -15,7 +15,7 @@ Shader "Insanity/AtmosphereSky"
             ZWrite Off
             ZTest LEqual
             Blend Off
-            Cull Off
+            Cull Back
 
             HLSLPROGRAM
             #pragma vertex Vert
@@ -35,7 +35,13 @@ Shader "Insanity/AtmosphereSky"
 
             float3 GetSkyViewDirWS(float2 positionCS)
             {
-                float4 viewDirWS = mul(float4(positionCS.xy, 1.0f, 1.0f), _PixelCoordToViewDirWS);
+                float2 positionNDC = positionCS * _ScreenSize.zw;
+#if UNITY_REVERSED_Z
+                float depth = 0;
+#else
+                float depth = 1;
+#endif
+                float4 viewDirWS = float4(ComputeWorldSpacePosition(positionNDC, depth, UNITY_MATRIX_I_VP), 1.0);//mul(float4(positionCS.xy, 1.0f, 1.0f), _PixelCoordToViewDirWS);
                 return normalize(viewDirWS.xyz);
             }
 
@@ -61,7 +67,8 @@ Shader "Insanity/AtmosphereSky"
             half4 Fragment(Varyings input) : SV_Target
             {
                 float3 rayStart = _WorldSpaceCameraPos;
-                float3 viewDirWS = -GetSkyViewDirWS(input.positionCS.xy);
+
+                float3 viewDirWS = GetSkyViewDirWS(input.positionCS.xy);
                 float3 sunDir = -normalize(_MainLightPosition.xyz);
                 // Reverse it to point into the scene
                 float3 earthCenter = float3(0, -_EarthRadius, 0);
