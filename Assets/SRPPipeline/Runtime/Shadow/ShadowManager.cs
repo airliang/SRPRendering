@@ -555,6 +555,9 @@ namespace Insanity
                             ctx.cmd.Clear();
 
                             ctx.renderContext.DrawShadows(ref data.shadowDrawSettings);
+                            //CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, RendererList.Create(data.shadowDrawSettings));
+
+                            RenderingEventManager.InvokeShadowCasterEvent(ctx.renderContext, ctx.cmd, m_shadowSetting, ref data.shadowDrawSettings, i);
                         }
                         //ctx.cmd.SetGlobalFloat(HDShaderIDs._ZClip, 1.0f);   // Re-enable zclip globally
 

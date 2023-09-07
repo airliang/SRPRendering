@@ -30,7 +30,7 @@ namespace Insanity
 
         RenderGraph m_RenderGraph = new RenderGraph("Insanity");
         ShaderVariablesGlobal m_ShaderVariablesGlobalCB = new ShaderVariablesGlobal();
-        SATRenderer m_satRenderer = new SATRenderer();
+        //SATRenderer m_satRenderer = new SATRenderer();
 
         void CleanupRenderGraph()
         {
@@ -90,6 +90,7 @@ namespace Insanity
                     currentFrameIndex = Time.frameCount
                 };
 
+                RenderingEventManager.BeforeExecuteRenderGraph(m_RenderGraph, camera);
                 using (m_RenderGraph.RecordAndExecute(rgParams))
                 {
                     DepthPrepassData depthPassData = Render_DepthPrePass(cameraData, m_RenderGraph, cull);
@@ -129,7 +130,12 @@ namespace Insanity
                         Render_PhysicalBaseSky(cameraData, m_RenderGraph, depthPassData, asset);
                     }
                     else
+                    {
+                        Cubemap cubemap = asset.InsanityPipelineResources.materials.Skybox.GetTexture("_Cubemap") as Cubemap;
+                        m_atmosphere.BakeCubemapToSHAmbient(ref context, asset.AtmosphereResources, cubemap);
+                        m_atmosphere.Update();
                         Render_SkyPass(cameraData, m_RenderGraph, depthPassData, asset.InsanityPipelineResources.materials.Skybox);
+                    }
                     //SATPassData satData = m_satRenderer.TestParallelScan(m_RenderGraph, asset.InsanityPipelineResources.shaders.ParallelScan);
                     //if (satData != null)
                     //{
@@ -140,6 +146,8 @@ namespace Insanity
                     //    forwardPassData.m_Albedo = shadowPassData.m_ShadowmapSAT;
                     //}
                     FinalBlitPass(cameraData, m_RenderGraph, forwardPassData);
+
+                    
                 }
 
                 context.ExecuteCommandBuffer(cmdRG);
@@ -184,7 +192,7 @@ namespace Insanity
                 m_atmosphere.Release();
                 m_atmosphere = null;
             }
-            m_satRenderer = null;
+
             m_ShadowMananger.Clear();
         }
 

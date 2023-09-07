@@ -1,5 +1,5 @@
-#ifndef DEPTH_ONLY_PASS_INCLUDED
-#define DEPTH_ONLY_PASS_INCLUDED
+#ifndef VOXEL_DEPTH_ONLY_PASS_INCLUDED
+#define VOXEL_DEPTH_ONLY_PASS_INCLUDED
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
@@ -25,9 +25,9 @@ Varyings DepthOnlyVertex(Attributes input)
 {
     Varyings output = (Varyings)0;
     UNITY_SETUP_INSTANCE_ID(input);
-    //UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+    UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
-    output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+    //output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
     output.positionCS = TransformObjectToHClip(input.position.xyz);
     // float3 positionWS = TransformObjectToWorld(positionOS);
     // output.positionCS = TransformWorldToHClip(positionWS);
@@ -36,10 +36,9 @@ Varyings DepthOnlyVertex(Attributes input)
 
 half4 DepthOnlyFragment(Varyings input) : SV_TARGET
 {
-    UNITY_SETUP_INSTANCE_ID(input);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-    Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
+    //Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
     return 0;
 }
 #endif

@@ -8,67 +8,21 @@
 
 #define _OPTIMIZE_BAKE 1
 
-struct SHCoefficientL2
-{
-    float3 c0;
-    float3 c1;
-    float3 c2;
-    float3 c3;
-    float3 c4;
-    float3 c5;
-    float3 c6;
-    float3 c7;
-    float3 c8;
-    float  pack;
-};
-
-Texture3D<float4>   _SkyboxLUT;
-#define SAMPLE_COUNT 512
-#define THREAD_NUM_X 128
-
-#if _OPTIMIZE_BAKE
-RWTexture2D<float4> _SHCoefficients;
-groupshared float4 TempSH[THREAD_NUM_X * 2];
-#else
-RWStructuredBuffer<SHCoefficientL2> _SHCoefficients;
-groupshared SHCoefficientL2 TempSH[THREAD_NUM_X * 2];
-#endif
-
-StructuredBuffer<float4> _BakeSamples;
-
+#pragma multi_compile _ _BAKE_CUBEMAP
 
 float3 _MainLightPosition;
 float _MainLightIntensity;
 
-void PreSumArray(int thid)
+#if defined(_BAKE_CUBEMAP)
+TextureCube<float4> _Cubemap;
+SamplerState _LinearClamp;
+
+half3 GetSkyColor(float3 viewDirWS)
 {
-    int offset = 1;
-    //up pass
-    for (int d = THREAD_NUM_X >> 1; d > 0; d >>= 1)
-    {
-        GroupMemoryBarrierWithGroupSync();
-        if (thid < d)
-        {
-            int ai = offset * (2 * thid + 1) - 1;
-            int bi = offset * (2 * thid + 2) - 1;
-#if _OPTIMIZE_BAKE
-            TempSH[bi] += TempSH[ai];
-#else
-            TempSH[bi].c0 += TempSH[ai].c0;
-            TempSH[bi].c1 += TempSH[ai].c1;
-            TempSH[bi].c2 += TempSH[ai].c2;
-            TempSH[bi].c3 += TempSH[ai].c3;
-            TempSH[bi].c4 += TempSH[ai].c4;
-            TempSH[bi].c5 += TempSH[ai].c5;
-            TempSH[bi].c6 += TempSH[ai].c6;
-            TempSH[bi].c7 += TempSH[ai].c7;
-            TempSH[bi].c8 += TempSH[ai].c8;
-            TempSH[bi].pack += TempSH[ai].pack;
-#endif
-        }
-        offset <<= 1;
-    }
+    return _Cubemap.SampleLevel(_LinearClamp, viewDirWS, 0);
 }
+#else
+Texture3D<float4>   _SkyboxLUT;
 
 half3 GetSkyColor(float3 viewDirWS, float3 sunDir)
 {
@@ -101,6 +55,57 @@ half3 GetSkyColor(float3 viewDirWS, float3 sunDir)
     half3 skyColor = (scatteringR + scatteringM) * _MainLightIntensity * _SunLightColor;
     return skyColor;
 }
+#endif
+
+
+
+#define SAMPLE_COUNT 512
+#define THREAD_NUM_X 128
+
+#if _OPTIMIZE_BAKE
+RWTexture2D<float4> _SHCoefficients;
+groupshared float4 TempSH[THREAD_NUM_X * 2];
+#else
+RWStructuredBuffer<SHCoefficientL2> _SHCoefficients;
+groupshared SHCoefficientL2 TempSH[THREAD_NUM_X * 2];
+#endif
+
+StructuredBuffer<float4> _BakeSamples;
+
+
+
+
+void PreSumArray(int thid, int GroupNumElement)
+{
+    int offset = 1;
+    //up pass
+    for (int d = GroupNumElement >> 1; d > 0; d >>= 1)
+    {
+        GroupMemoryBarrierWithGroupSync();
+        if (thid < d)
+        {
+            int ai = offset * (2 * thid + 1) - 1;
+            int bi = offset * (2 * thid + 2) - 1;
+#if _OPTIMIZE_BAKE
+            TempSH[bi] += TempSH[ai];
+#else
+            TempSH[bi].c0 += TempSH[ai].c0;
+            TempSH[bi].c1 += TempSH[ai].c1;
+            TempSH[bi].c2 += TempSH[ai].c2;
+            TempSH[bi].c3 += TempSH[ai].c3;
+            TempSH[bi].c4 += TempSH[ai].c4;
+            TempSH[bi].c5 += TempSH[ai].c5;
+            TempSH[bi].c6 += TempSH[ai].c6;
+            TempSH[bi].c7 += TempSH[ai].c7;
+            TempSH[bi].c8 += TempSH[ai].c8;
+            TempSH[bi].pack += TempSH[ai].pack;
+#endif
+        }
+        offset <<= 1;
+    }
+}
+
+
 
 [numthreads(THREAD_NUM_X,1,1)]
 void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
@@ -116,7 +121,11 @@ void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_Group
     if (textureAddr < SAMPLE_COUNT)
     {
         float3 viewDirWS = _BakeSamples[textureAddr];
+#if defined(_BAKE_CUBEMAP)
+        half3 skyColor = GetSkyColor(viewDirWS.xyz);
+#else
         half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+#endif
         sh = Y(groupId.y, viewDirWS) * skyColor;
     }
 
@@ -127,12 +136,16 @@ void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_Group
     if (textureAddrNext < SAMPLE_COUNT)
     {
         float3 viewDirWS = _BakeSamples[textureAddrNext];
+#if defined(_BAKE_CUBEMAP)
+        half3 skyColor = GetSkyColor(viewDirWS.xyz);
+#else
         half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+#endif
         shNext = Y(groupId.y, viewDirWS) * skyColor;
     }
     TempSH[2 * thid + 1] = float4(shNext, 0);
 
-    PreSumArray(thid);
+    PreSumArray(thid, THREAD_NUM_X);
 
     GroupMemoryBarrierWithGroupSync();
     uint2 outputTextureAddr = uint2(groupId.x * THREAD_NUM_X + thid * 2, groupId.y);
@@ -153,7 +166,11 @@ void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_Group
     if (textureAddr < SAMPLE_COUNT)
     {
         float3 viewDirWS = _BakeSamples[textureAddr];
+#if defined(_BAKE_CUBEMAP)
+        half3 skyColor = GetSkyColor(viewDirWS.xyz);
+#else
         half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+#endif
         sh.c0 = skyColor * 0.2820947917;
         sh.c1 = Y1(viewDirWS) * skyColor;
         sh.c2 = Y2(viewDirWS) * skyColor;
@@ -173,7 +190,11 @@ void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_Group
     if (textureAddrNext < SAMPLE_COUNT)
     {
         float3 viewDirWS = _BakeSamples[textureAddrNext];
+#if defined(_BAKE_CUBEMAP)
+        half3 skyColor = GetSkyColor(viewDirWS.xyz);
+#else
         half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+#endif
         shNext.c0 = skyColor * 0.2820947917;
         shNext.c1 = Y1(viewDirWS) * skyColor;
         shNext.c2 = Y2(viewDirWS) * skyColor;
@@ -219,6 +240,7 @@ void PresumSHCoefficient(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_Group
 
 #pragma kernel PreSumGroupSH
 int _ArrayLengthPerThreadGroup;
+int _GroupsNumPowOf2;
 #if _OPTIMIZE_BAKE
 Texture2D<float4> _InputSHCoefficients;
 RWTexture2D<float4> _SHCoefficientsGroupSumArray;
@@ -240,7 +262,7 @@ void PreSumGroupSH(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThread
     TempSH[2 * thid] = textureAddr.x < w ? _InputSHCoefficients[textureAddr] : 0;
     TempSH[2 * thid + 1] = textureAddr1.x < w ? _InputSHCoefficients[textureAddr1] : 0;
 
-    PreSumArray(thid);
+    PreSumArray(thid, _GroupsNumPowOf2);
 
     GroupMemoryBarrierWithGroupSync();
     if ((2 * thid) < _ArrayLengthPerThreadGroup)
@@ -279,7 +301,7 @@ void PreSumGroupSH(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThread
         TempSH[2 * thid + 1] = zeroSh;
     }
 
-    PreSumArray(thid);
+    PreSumArray(thid, _ArrayLengthPerThreadGroup);
 
     GroupMemoryBarrierWithGroupSync();
     if ((2 * thid) < _ArrayLengthPerThreadGroup)
@@ -297,17 +319,7 @@ void PreSumGroupSH(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThread
 
 #pragma kernel BakeSHToTexture
 
-struct PolynomialSHL2
-{
-    float4 SHAr;
-    float4 SHAg;
-    float4 SHAb;
-    float4 SHBr;
-    float4 SHBg;
-    float4 SHBb;
-    float4 SHC;
-};
-
+/*
 float4 _fC0to3;
 float _fC4;
 
@@ -330,6 +342,7 @@ PolynomialSHL2 GetEnvmapSHPolyCoef(SHCoefficientL2 sh)
 
     return polyShCoef;
 }
+*/
 
 PolynomialSHL2 GetSHPolyCoef(SHCoefficientL2 sh)
 {
@@ -343,7 +356,7 @@ Texture2D<float4> _SHCoefficientsGroupSumArrayInput;
 #else
 StructuredBuffer<SHCoefficientL2> _SHCoefficientsGroupSumArrayInput;
 #endif
-RWStructuredBuffer<PolynomialSHL2> _FinalProjSH;
+RWStructuredBuffer<SHCoefficientL2> _FinalProjSH;
 [numthreads(1, 1, 1)]
 void BakeSHToTexture(uint3 DTid : SV_DispatchThreadID)
 {
@@ -351,7 +364,7 @@ void BakeSHToTexture(uint3 DTid : SV_DispatchThreadID)
     uint w, h;
     _SHCoefficientsGroupSumArrayInput.GetDimensions(w, h);
     int lastElementIndex = w - 1;
-    SHCoefficientL2 sh;
+    SHCoefficientL2 sh = (SHCoefficientL2)0;
     sh.c0 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 0)];
     sh.c1 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 1)];
     sh.c2 = _SHCoefficientsGroupSumArrayInput[uint2(lastElementIndex, 2)];
@@ -378,7 +391,7 @@ void BakeSHToTexture(uint3 DTid : SV_DispatchThreadID)
     sh.c6 *= factor;
     sh.c7 *= factor;
     sh.c8 *= factor;
-    _FinalProjSH[0] = GetEnvmapSHPolyCoef(sh);
+    _FinalProjSH[0] = sh;//GetEnvmapSHPolyCoef(sh);
     //_OutputProjSH[uint2(0, 0)] = sh.c0;
     //_OutputProjSH[uint2(1, 0)] = sh.c1;
     //_OutputProjSH[uint2(2, 0)] = sh.c2;
@@ -396,22 +409,30 @@ void BakeSHDirect(uint3 DTid : SV_DispatchThreadID)
 {
     float3 sunDir = -normalize(_MainLightPosition.xyz);
     SHCoefficientL2 sh = (SHCoefficientL2)0;
+    float weightSum = 0;
     for (int i = 0; i < SAMPLE_COUNT; ++i)
     {
-        float3 viewDirWS = _BakeSamples[i];
+        float4 bakeSample = _BakeSamples[i];
+        float3 viewDirWS = bakeSample.xyz;
+        float  weight = bakeSample.w;
+#if defined(_BAKE_CUBEMAP)
+        half3 skyColor = GetSkyColor(viewDirWS.xyz);
+#else
         half3 skyColor = GetSkyColor(viewDirWS.xyz, sunDir);
+#endif
         sh.c0 += skyColor * 0.2820947917;
-        sh.c1 += Y1(viewDirWS) * skyColor;
-        sh.c2 += Y2(viewDirWS) * skyColor;
-        sh.c3 += Y3(viewDirWS) * skyColor;
-        sh.c4 += Y4(viewDirWS) * skyColor;
-        sh.c5 += Y5(viewDirWS) * skyColor;
-        sh.c6 += Y6(viewDirWS) * skyColor;
-        sh.c7 += Y7(viewDirWS) * skyColor;
-        sh.c8 += Y8(viewDirWS) * skyColor;
+        sh.c1 += Y1(viewDirWS) * skyColor * weight;
+        sh.c2 += Y2(viewDirWS) * skyColor * weight;
+        sh.c3 += Y3(viewDirWS) * skyColor * weight;
+        sh.c4 += Y4(viewDirWS) * skyColor * weight;
+        sh.c5 += Y5(viewDirWS) * skyColor * weight;
+        sh.c6 += Y6(viewDirWS) * skyColor * weight;
+        sh.c7 += Y7(viewDirWS) * skyColor * weight;
+        sh.c8 += Y8(viewDirWS) * skyColor * weight;
+        weightSum += weight;
     }
 
-    float factor = 4.0 * PI / SAMPLE_COUNT;
+    float factor = 4.0 * PI / weightSum;
     sh.c0 *= factor;
     sh.c1 *= factor;
     sh.c2 *= factor;
@@ -421,5 +442,5 @@ void BakeSHDirect(uint3 DTid : SV_DispatchThreadID)
     sh.c6 *= factor;
     sh.c7 *= factor;
     sh.c8 *= factor;
-    _FinalProjSH[0] = GetEnvmapSHPolyCoef(sh);
+    _FinalProjSH[0] = sh;//GetEnvmapSHPolyCoef(sh);
 }

@@ -120,7 +120,7 @@ namespace UnityEditor.Insanity
             m_HDRSupportProp = serializedObject.FindProperty("m_HDREnable");
             m_HDRExposureProp = serializedObject.FindProperty("m_Exposure");
             m_ScreenResolutionProp = serializedObject.FindProperty("m_ResolutionRate");
-            m_SRPBatcherProp = serializedObject.FindProperty("m_SRPBatcher");
+            m_SRPBatcherProp = serializedObject.FindProperty("m_UseSRPBatcher");
 
             m_ShadowSettingsFoldout = new SavedBool($"{target.GetType()}.ShadowSettingsFoldout", false);
 

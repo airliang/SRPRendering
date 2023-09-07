@@ -2,7 +2,7 @@ Shader "Insanity/HDRISky"
 {
     Properties
     {
-        _Cubemap("", CUBE) = "white" {}
+        _Cubemap("Environment map", CUBE) = "white" {}
     }
 
     SubShader

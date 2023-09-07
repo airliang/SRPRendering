@@ -79,6 +79,7 @@ namespace Insanity
                 builder.SetRenderFunc((DepthPrepassData data, RenderGraphContext context) =>
                 {
                     CoreUtils.DrawRendererList(context.renderContext, context.cmd, data.m_renderList_opaque);
+                    RenderingEventManager.InvokeEvent(RenderingEvents.DepthPassEvent, context.renderContext, context.cmd);
                 });
 
                 return passData;

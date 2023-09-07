@@ -1,0 +1,73 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CullInstance
+
+
+float3 _VoxelExtends;
+float3 _CamPosition;
+float3 _ChunkPosition;
+float4x4 _VP;
+float _ShadowDistance;
+
+StructuredBuffer<float4> _InputPositions;
+RWStructuredBuffer<int> _VisibilityBuffer;
+//RWStructuredBuffer<int> _ShadowVisibilityBuffer;
+RWStructuredBuffer<int> _CounterBuffer;
+RWStructuredBuffer<int> _CounterShadowBuffer;
+
+uint IsVisibleInFrustum(float4 clipPos)
+{
+    return (clipPos.z > clipPos.w
+        || clipPos.x < -clipPos.w
+        || clipPos.x > clipPos.w
+        || clipPos.y < -clipPos.w
+        || clipPos.y > clipPos.w)
+        ? 0 : 1;
+}
+
+uint IsVisibleInShadow(float3 pos)
+{
+    return distance(pos, _CamPosition) < _ShadowDistance ? 1 : 0;
+}
+
+[numthreads(128,1,1)]
+void CullInstance (uint3 id : SV_DispatchThreadID)
+{
+    float4 position = _InputPositions[id.x];
+
+    float3 voxelBoundCenter = position.xyz + _ChunkPosition;
+    float3 minPos = voxelBoundCenter - _VoxelExtends;
+    float3 maxPos = voxelBoundCenter + _VoxelExtends;
+
+    float4 boxCorners[8];
+    boxCorners[0] = float4(minPos.x, minPos.y, minPos.z, 1.0);
+    boxCorners[1] = float4(minPos.x, minPos.y, maxPos.z, 1.0);
+    boxCorners[2] = float4(minPos.x, maxPos.y, minPos.z, 1.0);
+    boxCorners[3] = float4(minPos.x, maxPos.y, maxPos.z, 1.0);
+    boxCorners[4] = float4(maxPos.x, minPos.y, minPos.z, 1.0);
+    boxCorners[5] = float4(maxPos.x, minPos.y, maxPos.z, 1.0);
+    boxCorners[6] = float4(maxPos.x, maxPos.y, minPos.z, 1.0);
+    boxCorners[7] = float4(maxPos.x, maxPos.y, maxPos.z, 1.0);
+    uint isInFrustum = 0;
+    //compute the clip pos of each corner
+    [unroll]
+    for (int i = 0; i < 8; i++)
+    {
+        float4 clipPos = mul(_VP, boxCorners[i]);
+
+        // For Frustum
+        isInFrustum = saturate(isInFrustum + IsVisibleInFrustum(clipPos));
+    }
+
+    //uint isShadowVisible = IsVisibleInShadow(voxelBoundCenter);
+    //isInFrustum = 1; //for test
+    _VisibilityBuffer[id.x] = isInFrustum;
+    //_ShadowVisibilityBuffer[id.x] = isShadowVisible;
+    if (isInFrustum)
+    {
+        _CounterBuffer.IncrementCounter();
+    }
+    //if (isShadowVisible)
+    //{
+    //    _CounterShadowBuffer.IncrementCounter();
+    //}
+}

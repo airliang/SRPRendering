@@ -50,6 +50,7 @@ namespace Insanity
                     if (data.m_ShadowMap.IsValid())
                         context.cmd.SetGlobalTexture("_ShadowMap", data.m_ShadowMap);
                     CoreUtils.DrawRendererList(context.renderContext, context.cmd, data.m_renderList_opaque);
+                    RenderingEventManager.InvokeEvent(RenderingEvents.OpaqueForwardPassEvent, context.renderContext, context.cmd);
                 });
                 return passData;
             }

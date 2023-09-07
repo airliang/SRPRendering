@@ -1,8 +1,8 @@
-﻿Shader "Insanity/Lit"
+﻿Shader "Insanity/VoxelInstance"
 {
 	Properties
 	{
-		[MainTexture] _BaseMap("Albedo", 2D) = "white" {}
+		//[MainTexture] _BaseMap("Albedo", 2D) = "white" {}
 		[MainColor] _BaseColor("Color", Color) = (1,1,1,1)
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
         // Blending state
@@ -13,7 +13,6 @@
         [HideInInspector] _DstBlend("__dst", Float) = 0.0
         [HideInInspector] _ZWrite("__zw", Float) = 1.0
         [HideInInspector] _Cull("__cull", Float) = 2.0
-        [HideInInspector] _ColorMaskShadow("__colormask", Float) = 0
 
         // Stencil State
         [HideInInspector] _StencilRef("__stencilRef", Float) = 128
@@ -36,8 +35,8 @@
 			#pragma vertex DepthOnlyVertex
 			#pragma fragment DepthOnlyFragment
             #pragma multi_compile_instancing
-			#include "LitInput.hlsl"
-			#include "DepthOnlyPass.hlsl"
+			#include "VoxelInput.hlsl"
+			#include "VoxelInstancePass.hlsl"
 			
 			ENDHLSL
 		}
@@ -46,7 +45,7 @@
 		{
 			Name "ShadowCaster"
 			Tags{"LightMode" = "ShadowCaster"}
-            ColorMask [_ColorMaskShadow]
+            ColorMask 0
 			ZWrite On
 			ZTest LEqual
 			Cull[_Cull]
@@ -58,8 +57,7 @@
 			#pragma multi_compile _ _ADAPTIVE_SHADOW_BIAS
             #pragma multi_compile _ _SHADOW_VSM
             #pragma multi_compile _ _SHADOW_EVSM
-			//#pragma prefer_hlslcc gles
-			//#pragma exclude_renderers d3d11_9x
+
 			#pragma target 3.0
 
 
@@ -67,28 +65,27 @@
 			// GPU Instancing
 			#pragma multi_compile_instancing
 
-			#pragma vertex ShadowPassVertex
-			#pragma fragment ShadowPassFragment
+			#pragma vertex DepthOnlyVertex
+			#pragma fragment DepthOnlyFragment
 
-			#include "LitInput.hlsl"
-			#include "ShadowCasterPass.hlsl"
+			#include "VoxelInput.hlsl"
+			#include "VoxelInstancePass.hlsl"
 			ENDHLSL
 		}
 
 		Pass 
 		{
 			Tags { "LightMode" = "InsanityForward" }
-			ZWrite Off
-			ZTest Equal
+			ZWrite On
+			ZTest LEqual
             Cull[_Cull]
 
 			HLSLPROGRAM
-            //#pragma shader_feature_local _ALPHATEST_ON
+
 			#pragma enable_d3d11_debug_symbols
-			#pragma vertex LitPassVertex
-			#pragma fragment LitPassFragment
+			#pragma vertex VoxelInstanceVertex
+			#pragma fragment VoxelInstanceFragment
             #pragma multi_compile_instancing
-            //#pragma shader_feature_local _ALPHATEST_ON
 			#pragma multi_compile _ _MAIN_LIGHT_SHADOWS
 			#pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
 			#pragma multi_compile _ _SHADOWS_SOFT
@@ -97,8 +94,8 @@
             #pragma multi_compile _ _SHADOW_VSM
             #pragma multi_compile _ _SHADOW_EVSM
 			
-			#include "LitInput.hlsl"
-			#include "LitForwardPass.hlsl"
+			#include "VoxelInput.hlsl"
+			#include "VoxelInstancePass.hlsl"
 
 			ENDHLSL			
 		}

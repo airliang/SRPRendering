@@ -1,0 +1,40 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+StructuredBuffer<float4> _InputPositions;
+RWTexture2D<float4> _Positions;
+#define _PositionTextureSize 128
+int _InstanceCount;
+
+[numthreads(128,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    if (id.x >= _InstanceCount)
+        return;
+    int x = id.x % _PositionTextureSize;
+    int y = id.x / _PositionTextureSize;
+    _Positions[uint2(x, y)] = _InputPositions[id.x];
+}
+
+
+#pragma kernel CopyVisibleInstances
+StructuredBuffer<int> _VisibilityBuffer;
+StructuredBuffer<int> _PredicateScanBuffer;
+StructuredBuffer<uint> _GroupSumArray;
+[numthreads(128, 1, 1)]
+void CopyVisibleInstances(uint3 id : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+{
+    uint tid = id.x;
+    uint groupIndex = groupId.x;
+    uint groupSum = groupIndex > 0 ? _GroupSumArray[groupIndex] : 0;
+    if (_VisibilityBuffer[tid] > 0)
+    {
+        int index = _PredicateScanBuffer[tid] + groupSum;
+        int x = index % _PositionTextureSize;
+        int y = index / _PositionTextureSize;
+        _Positions[uint2(x, y)] = _InputPositions[tid];
+    }
+}

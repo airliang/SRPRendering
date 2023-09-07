@@ -112,4 +112,29 @@ float Y(uint L, float3 V)
     }
 }
 
+struct SHCoefficientL2
+{
+    float3 c0;
+    float3 c1;
+    float3 c2;
+    float3 c3;
+    float3 c4;
+    float3 c5;
+    float3 c6;
+    float3 c7;
+    float3 c8;
+    float  pack;
+};
+
+struct PolynomialSHL2
+{
+    float4 SHAr;
+    float4 SHAg;
+    float4 SHAb;
+    float4 SHBr;
+    float4 SHBg;
+    float4 SHBb;
+    float4 SHC;
+};
+
 #endif
