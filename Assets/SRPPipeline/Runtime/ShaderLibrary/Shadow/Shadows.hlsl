@@ -43,6 +43,8 @@ CBUFFER_END
 float4    _ShadowBias; // x: depth bias, y: normal bias
 float4 _LightSplitsNear;
 float4 _LightSplitsFar;
+float3 _LightDirection;
+int    _ActiveCascadeIndex;
 
 TEXTURE2D_SHADOW(_ShadowMap);
 SAMPLER_CMP(sampler_ShadowMap);

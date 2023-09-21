@@ -17,7 +17,7 @@ MonoBehaviour:
   m_ResolutionRate: 1
   m_UseSRPBatcher: 1
   m_ShadowDistance: 50
-  m_ShadowCascades: 1
+  m_ShadowCascades: 0
   m_Cascade2Split: 0.25
   m_Cascade4Split: {x: 0.067, y: 0.2, z: 0.467}
   m_ShadowDepthBias: 0.57
@@ -26,7 +26,7 @@ MonoBehaviour:
   m_AdaptiveShadowBias: 0
   m_EnableCSMBlend: 1
   m_CSMBlendDistance: 0.493
-  m_ShadowType: 2
+  m_ShadowType: 1
   m_ShadowPCFFilter: 0
   m_PCSSSoftness: 1.054
   m_PCSSSoftnessFalloff: 3

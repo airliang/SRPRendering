@@ -4,7 +4,9 @@
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 StructuredBuffer<float4> _InputPositions;
+StructuredBuffer<int> _InputColors;
 RWTexture2D<float4> _Positions;
+RWTexture2D<int> _Colors;
 #define _PositionTextureSize 128
 int _InstanceCount;
 
@@ -36,5 +38,6 @@ void CopyVisibleInstances(uint3 id : SV_DispatchThreadID, uint3 GTid : SV_GroupT
         int x = index % _PositionTextureSize;
         int y = index / _PositionTextureSize;
         _Positions[uint2(x, y)] = _InputPositions[tid];
+        _Colors[uint2(x, y)] = _InputColors[tid];
     }
 }

@@ -265,7 +265,7 @@ MonoBehaviour:
   m_CullingInstances: {fileID: 7200000, guid: bf8385df1d53185409843f8e8aa6389c, type: 3}
   m_ScanInstances: {fileID: 7200000, guid: c43f39e6284de8c41b2a15f6acd11d7c, type: 3}
   m_enablePerInstanceCulling: 1
-  m_casterShadow: 1
+  m_casterShadow: 0
 --- !u!4 &319707416
 Transform:
   m_ObjectHideFlags: 0
@@ -422,7 +422,7 @@ Light:
   m_CookieSize: 10
   m_Shadows:
     m_Type: 2
-    m_Resolution: 1
+    m_Resolution: 2
     m_CustomResolution: -1
     m_Strength: 1
     m_Bias: 0.05
@@ -792,8 +792,8 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
-  m_LocalRotation: {x: -0.047867212, y: 0.9110323, z: 0.11101539, w: 0.3942137}
-  m_LocalPosition: {x: -18.119404, y: 6.4110513, z: 10.425905}
+  m_LocalRotation: {x: -0.0523657, y: -0.8780521, z: 0.0962727, w: -0.46584758}
+  m_LocalPosition: {x: -17.255768, y: 6.852457, z: 12.784563}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

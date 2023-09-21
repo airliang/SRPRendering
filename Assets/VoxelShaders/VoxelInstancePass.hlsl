@@ -20,7 +20,8 @@ struct VoxelVaryings
     float4 positionCS               : SV_POSITION;
     float3 positionWS               : TEXCOORD0;
     float3 normalWS                 : TEXCOORD1;
-
+    half3 color                    : TEXCOORD2;
+    uint   instanceID : SV_InstanceID;
     //UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -67,6 +68,8 @@ VoxelVaryings VoxelInstanceVertex(VoxelAttributes input, uint instanceID : SV_In
     output.positionCS = TransformObjectToHClip(input.positionOS);
     output.positionWS = TransformObjectToWorld(input.positionOS).xyz;
     output.normalWS = normalize(TransformObjectToWorldNormal(input.normalOS));
+    output.color = GetColor(instanceID);
+    output.instanceID = instanceID;
     //UNITY_TRANSFER_INSTANCE_ID(input, output);
     return output;
 }
@@ -82,7 +85,7 @@ half4 VoxelInstanceFragment(VoxelVaryings input) : SV_Target
     uint2 screenCoord = posInput.positionSS;
 
     SurfaceData surfaceData;
-    InitializeLitSurfaceData(surfaceData);
+    InitializeLitSurfaceData(surfaceData, input.color);
 
     InputData inputData;
 
@@ -110,4 +113,65 @@ half4 DepthOnlyFragment(VoxelVaryings input) : SV_TARGET
     return 0;
 }
 
-#endif // LIT_INPUT_INCLUDED
+
+float4 GetShadowPositionHClip(VoxelAttributes input)
+{
+    
+    float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+
+    float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+#if defined(_SHADOW_VSM)
+    float4 positionCS = TransformWorldToHClip(positionWS);
+#else
+#if defined(_ADAPTIVE_SHADOW_BIAS)
+    float4 positionCS = TransformWorldToHClip(ApplyAdaptiveShadowBias(positionWS, normalWS, _LightDirection));
+#else
+    float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, _LightDirection));
+#endif
+#endif
+
+#if UNITY_REVERSED_Z
+    positionCS.z = min(positionCS.z, positionCS.w * UNITY_NEAR_CLIP_VALUE);
+#else
+    positionCS.z = max(positionCS.z, positionCS.w * UNITY_NEAR_CLIP_VALUE);
+#endif
+
+    return positionCS;
+}
+
+
+DepthVaryings ShadowPassVertex(VoxelAttributes input, uint instanceID : SV_InstanceID)
+{
+    DepthVaryings output;
+    //#if defined(UNITY_PROCEDURAL_INSTANCING_ENABLED)
+    GenerateMatrices(instanceID, _ChunkPosition);
+    //#endif
+    output.positionCS = GetShadowPositionHClip(input);
+    return output;
+}
+
+half4 ShadowPassFragment(DepthVaryings input) : SV_TARGET
+{
+#if defined(_SHADOW_VSM) || defined(_SHADOW_EVSM)
+    float depth = input.positionCS.z;
+#if UNITY_REVERSED_Z
+    depth = 1.0 - depth;
+#endif
+#if defined(_SHADOW_EVSM)
+    float pos = exp(_ShadowExponents.x * depth);
+    float neg = -exp(-_ShadowExponents.y * depth);
+    return half4(pos, pos * pos, neg, neg * neg);
+#else
+    float dx = ddx(depth);
+    float dy = ddy(depth);
+
+    //float firstMoment = depth; // redundant
+    float secondMoment = depth * depth + 0.25 * (dx * dx + dy * dy);
+    return half4(depth, secondMoment, 0, 0);
+#endif
+#else
+    return 0;
+#endif
+}
+
+#endif // VOXEL_INSTANCE_PASS_INCLUDED

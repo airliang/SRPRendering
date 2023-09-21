@@ -65,8 +65,8 @@
 			// GPU Instancing
 			#pragma multi_compile_instancing
 
-			#pragma vertex DepthOnlyVertex
-			#pragma fragment DepthOnlyFragment
+			#pragma vertex ShadowPassVertex
+			#pragma fragment ShadowPassFragment
 
 			#include "VoxelInput.hlsl"
 			#include "VoxelInstancePass.hlsl"

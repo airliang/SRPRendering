@@ -59,7 +59,7 @@ public class VoxelWorld
                         voxelChunk = new VoxelChunk(new Vector3(x + voxelSizeHalf, i % VoxelChunk.VOXELS_NUMBER.y + voxelSizeHalf, z + voxelSizeHalf));
                         m_chunksArray.Add(voxelChunk);
                     }
-                    voxelChunk.AddVoxel(new Vector3Int(posInChunk.x, i, posInChunk.z));
+                    voxelChunk.AddVoxel(new Vector3Int(posInChunk.x, i, posInChunk.z), uint.MaxValue);
                 }
             }
         }

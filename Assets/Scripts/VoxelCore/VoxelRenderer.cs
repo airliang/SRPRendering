@@ -8,6 +8,8 @@ using Unity.Mathematics;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Profiling;
 using static Unity.Burst.Intrinsics.X86.Avx;
+using UnityEngine.UIElements;
+using UnityEngine.Experimental.Rendering;
 
 //[ExecuteInEditMode]
 public class VoxelRenderer : MonoBehaviour
@@ -18,6 +20,7 @@ public class VoxelRenderer : MonoBehaviour
     public ComputeBuffer m_transformBuffer;
     public ComputeBuffer m_visibleInstanceSumBuffer;
     private ComputeBuffer m_shadowVisibleInstanceSumBuffer;
+    private ComputeBuffer m_inputColorsBuffer;
     public ComputeBuffer m_groupSumBuffer;
     public ComputeBuffer m_groupSumScanBuffer;
     public ComputeBuffer m_argBuffer;
@@ -42,6 +45,7 @@ public class VoxelRenderer : MonoBehaviour
     int m_kernelGroupSumArray = -1;
     int m_kernelCopyVisibleInstances = -1;
     RenderTexture m_finalTransforms;
+    RenderTexture m_voxelColors;
     VoxelWorld m_voxelWorld = new VoxelWorld();
     bool m_cullingFinished = false;
     uint[] m_args = new uint[5];
@@ -138,20 +142,35 @@ public class VoxelRenderer : MonoBehaviour
             m_finalTransforms = new RenderTexture(128, 128, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             m_finalTransforms.filterMode = FilterMode.Point;
             m_finalTransforms.enableRandomWrite = true;
+            m_finalTransforms.useMipMap = false;
             m_finalTransforms.Create();
             m_finalTransforms.name = "PositionTexture";
+        }
+
+        if (m_voxelColors == null)
+        {
+            m_voxelColors = new RenderTexture(128, 128, 0, GraphicsFormat.R32_UInt, 1);
+            m_voxelColors.filterMode = FilterMode.Point;
+            m_voxelColors.enableRandomWrite = true;
+            m_voxelColors.Create();
+            m_voxelColors.name = "ColorTexture";
         }
 
         if (m_material == null)
         {
             m_material = new Material(m_voxelInstanceShader);
-            m_material.SetTexture("_Positions", m_finalTransforms);
+            //m_material.SetTexture("_Positions", m_finalTransforms);
             m_material.enableInstancing = true;
         }
 
         if (m_transformBuffer == null)
         {
             m_transformBuffer = new ComputeBuffer(MAX_INSTANCE_NUM, Marshal.SizeOf(typeof(Vector4)), ComputeBufferType.Default);
+        }
+
+        if (m_inputColorsBuffer == null)
+        {
+            m_inputColorsBuffer = new ComputeBuffer(MAX_INSTANCE_NUM, sizeof(uint), ComputeBufferType.Default);
         }
 
         if (m_argBuffer == null)
@@ -266,6 +285,7 @@ public class VoxelRenderer : MonoBehaviour
         SafeReleaseBuffer(m_argBuffer);
         SafeReleaseBuffer(m_argShadowBuffer);
         SafeReleaseBuffer(m_transformBuffer);
+        SafeReleaseBuffer(m_inputColorsBuffer);
 
         SafeReleaseBuffer(m_visibilityBuffer);
         SafeReleaseBuffer(m_shadowVisibilityBuffer);
@@ -280,6 +300,12 @@ public class VoxelRenderer : MonoBehaviour
         {
             m_finalTransforms.Release();
             SafeRelease(m_finalTransforms);
+        }
+
+        if (m_voxelColors != null)
+        {
+            m_voxelColors.Release();
+            SafeRelease(m_voxelColors);
         }
 
         m_kernelCopyTransform = -1;
@@ -320,7 +346,8 @@ public class VoxelRenderer : MonoBehaviour
             m_visibleChunks.Clear();
             for (int i = 0; i < parallelCullingJobData._cullingResults.Length; i++)
             {
-                if (parallelCullingJobData._cullingResults[i])
+                m_voxelWorld.ActiveChunks[i].CullResult = parallelCullingJobData._cullingResults[i];
+                if (parallelCullingJobData._cullingResults[i] != (byte)FrustumCullingResult.FRUSTUM_OUTSIDE)
                 {
                     m_visibleChunks.Add(m_voxelWorld.ActiveChunks[i]);
                 }
@@ -379,7 +406,7 @@ public class VoxelRenderer : MonoBehaviour
                 return true;
         }
 
-        return isInShadow > 0;
+        return false;
     }
 
     private void RenderShadowCasterPass(ScriptableRenderContext context, CommandBuffer cmd, ShadowSettings shadowSettings, 
@@ -400,7 +427,7 @@ public class VoxelRenderer : MonoBehaviour
                 m_args[1] = (uint)voxelChunk.Positions.Length;
                 cmd.SetBufferData(m_argShadowBuffer, m_args);
                 int groupThreadX = Mathf.CeilToInt((float)voxelChunk.Positions.Length / 128);
-                if (m_enablePerInstanceCulling)
+                if (m_enablePerInstanceCulling && voxelChunk.CullResult == (byte)FrustumCullingResult.FRUSTUM_INTERSECT)
                 {
                     //culling
                     cmd.SetBufferCounterValue(m_counterShadowBuffer, 0);
@@ -454,8 +481,11 @@ public class VoxelRenderer : MonoBehaviour
                     cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_Positions", m_finalTransforms);
                     cmd.DispatchCompute(m_CopyTransform, m_kernelCopyVisibleInstances, groupThreadX, 1, 1);
 
-                    cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 1, m_argShadowBuffer);
+                    //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
+                    MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
+                    materialPropertyBlock.SetVector("_ChunkPosition", voxelChunk.m_worldPosition);
+                    materialPropertyBlock.SetTexture("_Positions", m_finalTransforms);
+                    cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 1, m_argShadowBuffer, 0, materialPropertyBlock);
                 }
                 else
                 {
@@ -463,8 +493,12 @@ public class VoxelRenderer : MonoBehaviour
                     cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyTransform, "_InputPositions", m_transformBuffer);
                     cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyTransform, "_Positions", m_finalTransforms);
                     cmd.DispatchCompute(m_CopyTransform, m_kernelCopyTransform, groupThreadX, 1, 1);
-                    cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 1, m_argShadowBuffer);
+                    //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
+                    //cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 1, m_argShadowBuffer);
+                    MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
+                    materialPropertyBlock.SetVector("_ChunkPosition", voxelChunk.m_worldPosition);
+                    materialPropertyBlock.SetTexture("_Positions", m_finalTransforms);
+                    cmd.DrawMeshInstancedProcedural(m_mesh, 0, m_material, 2, voxelChunk.Positions.Length, materialPropertyBlock);
                 }
             }
         }
@@ -484,12 +518,13 @@ public class VoxelRenderer : MonoBehaviour
             foreach (var voxelChunk in m_visibleChunks/*m_voxelWorld.ActiveChunks*/)
             {
                 cmd.SetBufferData(m_transformBuffer, voxelChunk.Positions);
+                cmd.SetBufferData(m_inputColorsBuffer, voxelChunk.Colors);
                 
                 m_args[1] = (uint)voxelChunk.Positions.Length;
                 int groupThreadX = Mathf.CeilToInt((float)voxelChunk.Positions.Length / 128.0f);
 
                 cmd.SetBufferData(m_argBuffer, m_args);
-                if (m_enablePerInstanceCulling)
+                if (m_enablePerInstanceCulling && voxelChunk.CullResult == (byte)FrustumCullingResult.FRUSTUM_INTERSECT)
                 {
                     cmd.SetBufferCounterValue(m_counterBuffer, 0);
                     cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingInstance, "_InputPositions", m_transformBuffer);
@@ -539,12 +574,17 @@ public class VoxelRenderer : MonoBehaviour
                     cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_VisibilityBuffer", m_visibilityBuffer);
                     cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_PredicateScanBuffer", m_visibleInstanceSumBuffer);
                     cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_InputPositions", m_transformBuffer);
+                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_InputColors", m_inputColorsBuffer);
                     cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_Positions", m_finalTransforms);
+                    cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_Colors", m_voxelColors);
                     cmd.DispatchCompute(m_CopyTransform, m_kernelCopyVisibleInstances, groupThreadX, 1, 1);
 
-                    cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
-
-                    cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 2, m_argBuffer);
+                    //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
+                    MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
+                    materialPropertyBlock.SetVector("_ChunkPosition", voxelChunk.m_worldPosition);
+                    materialPropertyBlock.SetTexture("_Positions", m_finalTransforms);
+                    materialPropertyBlock.SetTexture("_Colors", m_voxelColors);
+                    cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 2, m_argBuffer, 0, materialPropertyBlock);
 
                     drawCount++;
                 }
@@ -555,8 +595,13 @@ public class VoxelRenderer : MonoBehaviour
                     cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyTransform, "_InputPositions", m_transformBuffer);
                     cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyTransform, "_Positions", m_finalTransforms);
                     cmd.DispatchCompute(m_CopyTransform, m_kernelCopyTransform, groupThreadX, 1, 1);
-                    cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 2, m_argBuffer);
+                    //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
+                    //cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 2, m_argBuffer);
+                    MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
+                    materialPropertyBlock.SetVector("_ChunkPosition", voxelChunk.m_worldPosition);
+                    materialPropertyBlock.SetTexture("_Positions", m_finalTransforms);
+                    materialPropertyBlock.SetTexture("_Colors", m_voxelColors);
+                    cmd.DrawMeshInstancedProcedural(m_mesh, 0, m_material, 2, voxelChunk.Positions.Length, materialPropertyBlock);
                 }
                 //break;
             }

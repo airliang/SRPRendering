@@ -4,8 +4,6 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 #include "Shadow/Shadows.hlsl"
 
-float3 _LightDirection;
-int    _ActiveCascadeIndex;
 
 struct Attributes
 {
