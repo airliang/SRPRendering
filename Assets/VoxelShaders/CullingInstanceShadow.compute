@@ -4,7 +4,7 @@
 
 float3 _VoxelExtends;
 float3 _CamPosition;
-float3 _ChunkPosition;
+//float3 _ChunkPosition;
 float4x4 _VP;
 float _ShadowDistance;
 
@@ -34,7 +34,7 @@ void CullInstance (uint3 id : SV_DispatchThreadID)
 {
     float4 position = _InputPositions[id.x];
 
-    float3 voxelBoundCenter = position.xyz + _ChunkPosition;
+    float3 voxelBoundCenter = position.xyz/* + _ChunkPosition*/;
     float3 minPos = voxelBoundCenter - _VoxelExtends;
     float3 maxPos = voxelBoundCenter + _VoxelExtends;
 

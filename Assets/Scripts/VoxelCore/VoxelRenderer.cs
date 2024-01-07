@@ -14,7 +14,8 @@ using UnityEngine.Experimental.Rendering;
 //[ExecuteInEditMode]
 public class VoxelRenderer : MonoBehaviour
 {
-    public static int MAX_INSTANCE_NUM = VoxelChunk.VOXELS_NUMBER.x * VoxelChunk.VOXELS_NUMBER.y * 6;  //6 face x 32 voxel x 32 voxel 
+
+    public static int MAX_INSTANCE_NUM = 128 * 128;//VoxelChunk.VOXELS_NUMBER.x * VoxelChunk.VOXELS_NUMBER.y * 6;  //6 face x 32 voxel x 32 voxel 
     public ComputeBuffer m_visibilityBuffer;
     public ComputeBuffer m_shadowVisibilityBuffer;
     public ComputeBuffer m_transformBuffer;
@@ -59,6 +60,11 @@ public class VoxelRenderer : MonoBehaviour
     ProfilingSampler m_DrawShadowIndirectProfilingSampler = new ProfilingSampler(m_DrawShadowIndirectProfilerTag);
     private Vector3 m_cameraPos;
     private Camera m_camera;
+
+    List<VoxelRenderBatch> m_FullyInFrustumBatch = new List<VoxelRenderBatch>();
+    List<VoxelRenderBatch> m_PartInFrustumBatch = new List<VoxelRenderBatch>();
+
+    private MaterialPropertyBlock m_materialProperty = null;
 
     public void SafeRelease<T>(T obj) where T : Object
     {
@@ -137,6 +143,10 @@ public class VoxelRenderer : MonoBehaviour
 
     private void InitializeRenderingData()
     {
+        if (m_materialProperty == null)
+        {
+            m_materialProperty = new MaterialPropertyBlock();
+        }
         if (m_finalTransforms == null)
         {
             m_finalTransforms = new RenderTexture(128, 128, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
@@ -417,90 +427,109 @@ public class VoxelRenderer : MonoBehaviour
         ProcessCullingResult();
         using (new ProfilingScope(cmd, m_DrawShadowIndirectProfilingSampler))
         { 
-            foreach (var voxelChunk in m_visibleChunks/*m_voxelWorld.ActiveChunks*/)
+            ClearVoxelRenderBatches();
+            foreach (var voxelChunk in m_visibleChunks)
             {
                 if (!IsVoxelChunkInShadowDistance(voxelChunk, m_cameraPos, shadowSettings.maxShadowDistance))
                 {
                     continue;
                 }
-                cmd.SetBufferData(m_transformBuffer, voxelChunk.Positions);
-                m_args[1] = (uint)voxelChunk.Positions.Length;
-                cmd.SetBufferData(m_argShadowBuffer, m_args);
-                int groupThreadX = Mathf.CeilToInt((float)voxelChunk.Positions.Length / 128);
-                if (m_enablePerInstanceCulling && voxelChunk.CullResult == (byte)FrustumCullingResult.FRUSTUM_INTERSECT)
-                {
-                    //culling
-                    cmd.SetBufferCounterValue(m_counterShadowBuffer, 0);
-                    cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingShadowInstance, "_InputPositions", m_transformBuffer);
-                    cmd.SetComputeVectorParam(m_CullingInstances, "_CamPosition", m_cameraPos);
-                    cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingShadowInstance, "_CounterShadowBuffer", m_counterShadowBuffer);
-                    cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingShadowInstance, "_ShadowVisibilityBuffer", m_shadowVisibilityBuffer);
-                    cmd.SetComputeVectorParam(m_CullingInstances, "_ChunkPosition", voxelChunk.m_worldPosition);
 
-                    cmd.SetComputeVectorParam(m_CullingInstances, "_VoxelExtends", VoxelChunk.VOXEL_HALF_SIZE);
-                    cmd.SetComputeFloatParam(m_CullingInstances, "_InstanceCount", voxelChunk.Positions.Length);
-                    cmd.SetComputeFloatParam(m_CullingInstances, "_ShadowDistance", shadowSettings.maxShadowDistance);
-                    cmd.SetComputeVectorParam(m_CullingInstances, "_ShadowCascadeSphere", shadowDrawSettings.splitData.cullingSphere);
+                bool cullingInstance = m_enablePerInstanceCulling && voxelChunk.CullResult == (byte)FrustumCullingResult.FRUSTUM_INTERSECT;
 
-                    Matrix4x4 v = m_camera.worldToCameraMatrix;
-                    Matrix4x4 p = m_camera.projectionMatrix;
-                    Matrix4x4 vpMatrix = p * v;
-                    //m_CullingInstances.SetMatrix("_VP", vpMatrix);
-                    cmd.SetComputeMatrixParam(m_CullingInstances, "_VP", vpMatrix);
-                    cmd.DispatchCompute(m_CullingInstances, m_kernelCullingShadowInstance, groupThreadX, 1, 1);
-
-                    cmd.CopyCounterValue(m_counterShadowBuffer, m_argShadowBuffer, sizeof(uint));
-
-                    //presum visibility
-                    cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_VisibilityBufferIn", m_shadowVisibilityBuffer);
-                    cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_GroupSumArray", m_groupSumBuffer);
-                    cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_ScannedInstancePredicates", m_visibleInstanceSumBuffer);
-                    cmd.DispatchCompute(m_ScanInstances, m_kernelParallelPreSum, groupThreadX, 1, 1);
-
-
-                    if (groupThreadX > 1)
-                    {
-                        //presum group
-                        cmd.SetComputeBufferParam(m_ScanInstances, m_kernelGroupSumArray, "_GroupSumArrayIn", m_groupSumBuffer);
-                        cmd.SetComputeBufferParam(m_ScanInstances, m_kernelGroupSumArray, "_GroupSumArrayOut", m_groupSumScanBuffer);
-                        cmd.SetComputeIntParam(m_ScanInstances, "_GroupsNum", Mathf.NextPowerOfTwo(groupThreadX));
-
-                        cmd.SetComputeIntParam(m_ScanInstances, "_GroupSumArrayInSize", groupThreadX);
-                        cmd.DispatchCompute(m_ScanInstances, m_kernelGroupSumArray, 1, 1, 1);
-                        cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumScanBuffer);
-                    }
-                    else
-                    {
-                        //m_CopyTransform.SetBuffer(m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumBuffer);
-                        cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumBuffer);
-                    }
-
-                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_VisibilityBuffer", m_shadowVisibilityBuffer);
-                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_PredicateScanBuffer", m_visibleInstanceSumBuffer);
-                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_InputPositions", m_transformBuffer);
-                    cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_Positions", m_finalTransforms);
-                    cmd.DispatchCompute(m_CopyTransform, m_kernelCopyVisibleInstances, groupThreadX, 1, 1);
-
-                    //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
-                    materialPropertyBlock.SetVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    materialPropertyBlock.SetTexture("_Positions", m_finalTransforms);
-                    cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 1, m_argShadowBuffer, 0, materialPropertyBlock);
-                }
-                else
-                {
-                    cmd.SetComputeIntParam(m_CopyTransform, "_InstanceCount", (int)m_args[1]);
-                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyTransform, "_InputPositions", m_transformBuffer);
-                    cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyTransform, "_Positions", m_finalTransforms);
-                    cmd.DispatchCompute(m_CopyTransform, m_kernelCopyTransform, groupThreadX, 1, 1);
-                    //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    //cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 1, m_argShadowBuffer);
-                    MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
-                    materialPropertyBlock.SetVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    materialPropertyBlock.SetTexture("_Positions", m_finalTransforms);
-                    cmd.DrawMeshInstancedProcedural(m_mesh, 0, m_material, 2, voxelChunk.Positions.Length, materialPropertyBlock);
-                }
+                VoxelRenderBatch batch = GetVoxelRenderBatch(voxelChunk, cullingInstance);
+                batch.AddChunk(voxelChunk.Positions, voxelChunk.Colors);
             }
+
+            foreach (var voxelBatch in m_FullyInFrustumBatch)
+            {
+                RenderVoxelBatchShadow(voxelBatch, false, shadowSettings, ref shadowDrawSettings, cascadeIndex, cmd);
+            }
+
+            foreach (var voxelBatch in m_PartInFrustumBatch)
+            {
+                RenderVoxelBatchShadow(voxelBatch, true, shadowSettings, ref shadowDrawSettings, cascadeIndex, cmd);
+            }
+        }
+    }
+
+    private void RenderVoxelBatchShadow(VoxelRenderBatch voxelRenderBatch, bool cullingInstance, ShadowSettings shadowSettings, 
+        ref ShadowDrawingSettings shadowDrawSettings, int cascadeIndex, CommandBuffer cmd)
+    {
+        cmd.SetBufferData(m_transformBuffer, voxelRenderBatch.Positions);
+        m_args[1] = (uint)voxelRenderBatch.ActiveVoxelsNum;
+        cmd.SetBufferData(m_argShadowBuffer, m_args);
+        int groupThreadX = Mathf.CeilToInt((float)voxelRenderBatch.ActiveVoxelsNum / 128);
+        if (cullingInstance)
+        {
+            //culling
+            cmd.SetBufferCounterValue(m_counterShadowBuffer, 0);
+            cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingShadowInstance, "_InputPositions", m_transformBuffer);
+            cmd.SetComputeVectorParam(m_CullingInstances, "_CamPosition", m_cameraPos);
+            cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingShadowInstance, "_CounterShadowBuffer", m_counterShadowBuffer);
+            cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingShadowInstance, "_ShadowVisibilityBuffer", m_shadowVisibilityBuffer);
+            cmd.SetComputeVectorParam(m_CullingInstances, "_ChunkPosition", Vector3.zero);
+
+            cmd.SetComputeVectorParam(m_CullingInstances, "_VoxelExtends", VoxelChunk.VOXEL_HALF_SIZE);
+            cmd.SetComputeFloatParam(m_CullingInstances, "_InstanceCount", m_args[1]);
+            cmd.SetComputeFloatParam(m_CullingInstances, "_ShadowDistance", shadowSettings.maxShadowDistance);
+            cmd.SetComputeVectorParam(m_CullingInstances, "_ShadowCascadeSphere", shadowDrawSettings.splitData.cullingSphere);
+
+            Matrix4x4 v = m_camera.worldToCameraMatrix;
+            Matrix4x4 p = m_camera.projectionMatrix;
+            Matrix4x4 vpMatrix = p * v;
+            //m_CullingInstances.SetMatrix("_VP", vpMatrix);
+            cmd.SetComputeMatrixParam(m_CullingInstances, "_VP", vpMatrix);
+            cmd.DispatchCompute(m_CullingInstances, m_kernelCullingShadowInstance, groupThreadX, 1, 1);
+
+            cmd.CopyCounterValue(m_counterShadowBuffer, m_argShadowBuffer, sizeof(uint));
+
+            //presum visibility
+            cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_VisibilityBufferIn", m_shadowVisibilityBuffer);
+            cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_GroupSumArray", m_groupSumBuffer);
+            cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_ScannedInstancePredicates", m_visibleInstanceSumBuffer);
+            cmd.DispatchCompute(m_ScanInstances, m_kernelParallelPreSum, groupThreadX, 1, 1);
+
+
+            if (groupThreadX > 1)
+            {
+                //presum group
+                cmd.SetComputeBufferParam(m_ScanInstances, m_kernelGroupSumArray, "_GroupSumArrayIn", m_groupSumBuffer);
+                cmd.SetComputeBufferParam(m_ScanInstances, m_kernelGroupSumArray, "_GroupSumArrayOut", m_groupSumScanBuffer);
+                cmd.SetComputeIntParam(m_ScanInstances, "_GroupsNum", Mathf.NextPowerOfTwo(groupThreadX));
+
+                cmd.SetComputeIntParam(m_ScanInstances, "_GroupSumArrayInSize", groupThreadX);
+                cmd.DispatchCompute(m_ScanInstances, m_kernelGroupSumArray, 1, 1, 1);
+                cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumScanBuffer);
+            }
+            else
+            {
+                //m_CopyTransform.SetBuffer(m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumBuffer);
+                cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumBuffer);
+            }
+
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_VisibilityBuffer", m_shadowVisibilityBuffer);
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_PredicateScanBuffer", m_visibleInstanceSumBuffer);
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_InputPositions", m_transformBuffer);
+            cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_Positions", m_finalTransforms);
+            cmd.DispatchCompute(m_CopyTransform, m_kernelCopyVisibleInstances, groupThreadX, 1, 1);
+
+            //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
+            //MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
+            m_materialProperty.SetVector("_ChunkPosition", Vector3.zero);
+            m_materialProperty.SetTexture("_Positions", m_finalTransforms);
+            cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 1, m_argShadowBuffer, 0, m_materialProperty);
+        }
+        else
+        {
+            cmd.SetComputeIntParam(m_CopyTransform, "_InstanceCount", (int)m_args[1]);
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyTransform, "_InputPositions", m_transformBuffer);
+            cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyTransform, "_Positions", m_finalTransforms);
+            cmd.DispatchCompute(m_CopyTransform, m_kernelCopyTransform, groupThreadX, 1, 1);
+
+            m_materialProperty.SetVector("_ChunkPosition", Vector3.zero);
+            m_materialProperty.SetTexture("_Positions", m_finalTransforms);
+            cmd.DrawMeshInstancedProcedural(m_mesh, 0, m_material, 2, (int)m_args[1], m_materialProperty);
         }
     }
 
@@ -514,194 +543,154 @@ public class VoxelRenderer : MonoBehaviour
         ProcessCullingResult();
         using (new ProfilingScope(cmd, m_DrawIndirectProfilingSampler))
         {
+            ClearVoxelRenderBatches();
             int drawCount = 0;
-            foreach (var voxelChunk in m_visibleChunks/*m_voxelWorld.ActiveChunks*/)
+            foreach (var voxelChunk in m_visibleChunks)
             {
-                cmd.SetBufferData(m_transformBuffer, voxelChunk.Positions);
-                cmd.SetBufferData(m_inputColorsBuffer, voxelChunk.Colors);
-                
-                m_args[1] = (uint)voxelChunk.Positions.Length;
-                int groupThreadX = Mathf.CeilToInt((float)voxelChunk.Positions.Length / 128.0f);
+                bool cullingInstance = m_enablePerInstanceCulling && voxelChunk.CullResult == (byte)FrustumCullingResult.FRUSTUM_INTERSECT;
 
-                cmd.SetBufferData(m_argBuffer, m_args);
-                if (m_enablePerInstanceCulling && voxelChunk.CullResult == (byte)FrustumCullingResult.FRUSTUM_INTERSECT)
-                {
-                    cmd.SetBufferCounterValue(m_counterBuffer, 0);
-                    cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingInstance, "_InputPositions", m_transformBuffer);
-                    cmd.SetComputeVectorParam(m_CullingInstances, "_CamPosition", m_cameraPos);
-                    cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingInstance, "_CounterBuffer", m_counterBuffer);
+                VoxelRenderBatch batch = GetVoxelRenderBatch(voxelChunk, cullingInstance);
+                batch.AddChunk(voxelChunk.Positions, voxelChunk.Colors);
+            }
 
-                    cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingInstance, "_VisibilityBuffer", m_visibilityBuffer);
+            foreach (var voxelBatch in m_FullyInFrustumBatch)
+            {
+                RenderVoxelBatch(voxelBatch, false, cmd);
+            }
 
-                    cmd.SetComputeVectorParam(m_CullingInstances, "_CamPosition", m_cameraPos);
-                    cmd.SetComputeVectorParam(m_CullingInstances, "_ChunkPosition", voxelChunk.m_worldPosition);
-
-                    cmd.SetComputeVectorParam(m_CullingInstances, "_VoxelExtends", VoxelChunk.VOXEL_HALF_SIZE);
-                    cmd.SetComputeFloatParam(m_CullingInstances, "_InstanceCount", voxelChunk.Positions.Length);
-                    Matrix4x4 v = m_camera.worldToCameraMatrix;
-                    Matrix4x4 p = m_camera.projectionMatrix;
-                    Matrix4x4 vpMatrix = p * v;
-
-                    cmd.SetComputeMatrixParam(m_CullingInstances, "_VP", vpMatrix);
-                    cmd.DispatchCompute(m_CullingInstances, m_kernelCullingInstance, groupThreadX, 1, 1);
-
-                    cmd.CopyCounterValue(m_counterBuffer, m_argBuffer, sizeof(uint));
-                    
-                    //presum visibility
-                    cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_VisibilityBufferIn", m_visibilityBuffer);
-                    cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_GroupSumArray", m_groupSumBuffer);
-                    cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_ScannedInstancePredicates", m_visibleInstanceSumBuffer);
-                    cmd.DispatchCompute(m_ScanInstances, m_kernelParallelPreSum, groupThreadX, 1, 1);
-
-                    
-                    if (groupThreadX > 1)
-                    {
-                        //presum group
-                        cmd.SetComputeBufferParam(m_ScanInstances, m_kernelGroupSumArray, "_GroupSumArrayIn", m_groupSumBuffer);
-                        cmd.SetComputeBufferParam(m_ScanInstances, m_kernelGroupSumArray, "_GroupSumArrayOut", m_groupSumScanBuffer);
-                        cmd.SetComputeIntParam(m_ScanInstances, "_GroupsNum", Mathf.NextPowerOfTwo(groupThreadX));
-                        
-                        cmd.SetComputeIntParam(m_ScanInstances, "_GroupSumArrayInSize", groupThreadX);
-                        cmd.DispatchCompute(m_ScanInstances, m_kernelGroupSumArray, 1, 1, 1);
-                        cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumScanBuffer);
-                    }
-                    else
-                    {
-                        //m_CopyTransform.SetBuffer(m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumBuffer);
-                        cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumBuffer);
-                    }
-
-                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_VisibilityBuffer", m_visibilityBuffer);
-                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_PredicateScanBuffer", m_visibleInstanceSumBuffer);
-                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_InputPositions", m_transformBuffer);
-                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_InputColors", m_inputColorsBuffer);
-                    cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_Positions", m_finalTransforms);
-                    cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_Colors", m_voxelColors);
-                    cmd.DispatchCompute(m_CopyTransform, m_kernelCopyVisibleInstances, groupThreadX, 1, 1);
-
-                    //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
-                    materialPropertyBlock.SetVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    materialPropertyBlock.SetTexture("_Positions", m_finalTransforms);
-                    materialPropertyBlock.SetTexture("_Colors", m_voxelColors);
-                    cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 2, m_argBuffer, 0, materialPropertyBlock);
-
-                    drawCount++;
-                }
-                else
-                {
-                    //int threadGroupX = Mathf.CeilToInt((float)voxelChunk.Positions.Length / 128);
-                    cmd.SetComputeIntParam(m_CopyTransform, "_InstanceCount", (int)m_args[1]);
-                    cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyTransform, "_InputPositions", m_transformBuffer);
-                    cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyTransform, "_Positions", m_finalTransforms);
-                    cmd.DispatchCompute(m_CopyTransform, m_kernelCopyTransform, groupThreadX, 1, 1);
-                    //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    //cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 2, m_argBuffer);
-                    MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
-                    materialPropertyBlock.SetVector("_ChunkPosition", voxelChunk.m_worldPosition);
-                    materialPropertyBlock.SetTexture("_Positions", m_finalTransforms);
-                    materialPropertyBlock.SetTexture("_Colors", m_voxelColors);
-                    cmd.DrawMeshInstancedProcedural(m_mesh, 0, m_material, 2, voxelChunk.Positions.Length, materialPropertyBlock);
-                }
-                //break;
+            foreach (var voxelBatch in m_PartInFrustumBatch)
+            {
+                RenderVoxelBatch(voxelBatch, true, cmd);
             }
         }
     }
 
-    private void OnBeforeExecuteRenderGraph(RenderGraph renderGraph, Camera camera) 
+    private void RenderVoxelBatch(VoxelRenderBatch voxelRenderBatch, bool cullingInstance, CommandBuffer cmd)
     {
-        Debug.Log("OnBeforeExecuteRenderGraph");
-        ProcessCullingResult();
-        Profiler.BeginSample("m_DrawIndirectProfilerTag");
+        cmd.SetBufferData(m_transformBuffer, voxelRenderBatch.Positions);
+        cmd.SetBufferData(m_inputColorsBuffer, voxelRenderBatch.Colors);
 
-        if (m_enablePerInstanceCulling)
+        m_args[1] = (uint)voxelRenderBatch.ActiveVoxelsNum;
+        int groupThreadX = Mathf.CeilToInt((float)voxelRenderBatch.ActiveVoxelsNum / 128.0f);
+
+        cmd.SetBufferData(m_argBuffer, m_args);
+        if (m_enablePerInstanceCulling && cullingInstance)
         {
-            m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_InputPositions", m_transformBuffer);
-            m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_CounterBuffer", m_counterBuffer);
-            m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_CounterShadowBuffer", m_counterShadowBuffer);
-            m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_VisibilityBuffer", m_visibilityBuffer);
-            m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_ShadowVisibilityBuffer", m_shadowVisibilityBuffer);
-            m_CullingInstances.SetVector("_CamPosition", m_cameraPos);
-            m_CullingInstances.SetVector("_VoxelExtends", VoxelChunk.VOXEL_HALF_SIZE);
-            InsanityPipelineAsset pipelineAsset = GraphicsSettings.currentRenderPipeline as InsanityPipelineAsset;
-            m_CullingInstances.SetFloat("_ShadowDistance", pipelineAsset.shadowDistance);
-            Matrix4x4 v = camera.worldToCameraMatrix;
-            Matrix4x4 p = camera.projectionMatrix;
+            cmd.SetBufferCounterValue(m_counterBuffer, 0);
+            cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingInstance, "_InputPositions", m_transformBuffer);
+            cmd.SetComputeVectorParam(m_CullingInstances, "_CamPosition", m_cameraPos);
+            cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingInstance, "_CounterBuffer", m_counterBuffer);
+
+            cmd.SetComputeBufferParam(m_CullingInstances, m_kernelCullingInstance, "_VisibilityBuffer", m_visibilityBuffer);
+
+            cmd.SetComputeVectorParam(m_CullingInstances, "_CamPosition", m_cameraPos);
+            cmd.SetComputeVectorParam(m_CullingInstances, "_ChunkPosition", Vector3.zero);
+
+            cmd.SetComputeVectorParam(m_CullingInstances, "_VoxelExtends", VoxelChunk.VOXEL_HALF_SIZE);
+            cmd.SetComputeFloatParam(m_CullingInstances, "_InstanceCount", voxelRenderBatch.ActiveVoxelsNum);
+            Matrix4x4 v = m_camera.worldToCameraMatrix;
+            Matrix4x4 p = m_camera.projectionMatrix;
             Matrix4x4 vpMatrix = p * v;
-            m_CullingInstances.SetMatrix("_VP", vpMatrix);
-        }
 
-        foreach (var voxelChunk in m_visibleChunks/*m_voxelWorld.ActiveChunks*/)
-        {
-            m_transformBuffer.SetData(voxelChunk.Positions);
-            
-            if (m_enablePerInstanceCulling)
+            cmd.SetComputeMatrixParam(m_CullingInstances, "_VP", vpMatrix);
+            cmd.DispatchCompute(m_CullingInstances, m_kernelCullingInstance, groupThreadX, 1, 1);
+
+            cmd.CopyCounterValue(m_counterBuffer, m_argBuffer, sizeof(uint));
+
+            //presum visibility
+            cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_VisibilityBufferIn", m_visibilityBuffer);
+            cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_GroupSumArray", m_groupSumBuffer);
+            cmd.SetComputeBufferParam(m_ScanInstances, m_kernelParallelPreSum, "_ScannedInstancePredicates", m_visibleInstanceSumBuffer);
+            cmd.DispatchCompute(m_ScanInstances, m_kernelParallelPreSum, groupThreadX, 1, 1);
+
+
+            if (groupThreadX > 1)
             {
-                m_counterBuffer.SetCounterValue(0);
-                m_counterShadowBuffer.SetCounterValue(0);
+                //presum group
+                cmd.SetComputeBufferParam(m_ScanInstances, m_kernelGroupSumArray, "_GroupSumArrayIn", m_groupSumBuffer);
+                cmd.SetComputeBufferParam(m_ScanInstances, m_kernelGroupSumArray, "_GroupSumArrayOut", m_groupSumScanBuffer);
+                cmd.SetComputeIntParam(m_ScanInstances, "_GroupsNum", Mathf.NextPowerOfTwo(groupThreadX));
 
-                m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_InputPositions", m_transformBuffer);
-                m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_CounterBuffer", m_counterBuffer);
-                m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_CounterShadowBuffer", m_counterShadowBuffer);
-                m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_VisibilityBuffer", m_visibilityBuffer);
-                m_CullingInstances.SetBuffer(m_kernelCullingInstance, "_ShadowVisibilityBuffer", m_shadowVisibilityBuffer);
-                m_CullingInstances.SetVector("_CamPosition", m_cameraPos);
-                m_CullingInstances.SetVector("_VoxelExtends", VoxelChunk.VOXEL_HALF_SIZE);
-                InsanityPipelineAsset pipelineAsset = GraphicsSettings.currentRenderPipeline as InsanityPipelineAsset;
-                m_CullingInstances.SetFloat("_ShadowDistance", pipelineAsset.shadowDistance);
-                Matrix4x4 v = camera.worldToCameraMatrix;
-                Matrix4x4 p = camera.projectionMatrix;
-                Matrix4x4 vpMatrix = p * v;
-                m_CullingInstances.SetMatrix("_VP", vpMatrix);
-
-                m_CullingInstances.Dispatch(m_kernelCullingInstance, 128, 1, 1);
-
-                //presum visibility
-                m_ScanInstances.SetBuffer(m_kernelParallelPreSum, "_VisibilityBufferIn", m_visibilityBuffer);
-                m_ScanInstances.SetBuffer(m_kernelParallelPreSum, "_GroupSumArray", m_groupSumBuffer);
-                m_ScanInstances.SetBuffer(m_kernelParallelPreSum, "_ScannedInstancePredicates", m_visibleInstanceSumBuffer);
-                m_ScanInstances.Dispatch(m_kernelParallelPreSum, 128, 1, 1);
-
-                int groupThreadX = Mathf.CeilToInt((float)MAX_INSTANCE_NUM / 128.0f);
-                if (groupThreadX > 1)
-                {
-                    //presum group
-                    m_ScanInstances.SetBuffer(m_kernelGroupSumArray, "_GroupSumArrayIn", m_groupSumBuffer);
-                    m_ScanInstances.SetBuffer(m_kernelGroupSumArray, "_GroupSumArrayOut", m_groupSumScanBuffer);
-                    m_ScanInstances.Dispatch(m_kernelGroupSumArray, groupThreadX, 1, 1);
-
-                    m_CopyTransform.SetBuffer(m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumScanBuffer);
-                }
-                else
-                {
-                    m_CopyTransform.SetBuffer(m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumBuffer);
-                }
-
-                m_CopyTransform.SetBuffer(m_kernelCopyVisibleInstances, "_VisibilityBuffer", m_visibilityBuffer);
-                m_CopyTransform.SetBuffer(m_kernelCopyVisibleInstances, "_PredicateScanBuffer", m_visibleInstanceSumBuffer);
-                m_CopyTransform.SetBuffer(m_kernelCopyVisibleInstances, "_InputPositions", m_transformBuffer);
-                m_CopyTransform.SetTexture(m_kernelCopyTransform, "_Positions", m_finalTransforms);
-                m_CopyTransform.Dispatch(m_kernelCopyVisibleInstances, 128, 1, 1);
+                cmd.SetComputeIntParam(m_ScanInstances, "_GroupSumArrayInSize", groupThreadX);
+                cmd.DispatchCompute(m_ScanInstances, m_kernelGroupSumArray, 1, 1, 1);
+                cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumScanBuffer);
             }
             else
             {
-                m_CopyTransform.SetBuffer(m_kernelCopyTransform, "_InputPositions", m_transformBuffer);
-                m_CopyTransform.SetTexture(m_kernelCopyTransform, "_Positions", m_finalTransforms);
-                m_CopyTransform.SetInt("_InstanceCount", (int)m_args[1]);
-                m_CopyTransform.Dispatch(m_kernelCopyTransform, 128, 1, 1);
-                m_args[1] = (uint)voxelChunk.Positions.Length;
-                m_argBuffer.SetData(m_args);
+                //m_CopyTransform.SetBuffer(m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumBuffer);
+                cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_GroupSumArray", m_groupSumBuffer);
             }
 
-            //m_material.SetVector("_ChunkPosition", voxelChunk.m_worldPosition);
-            Shader.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
-            Graphics.DrawMeshInstancedIndirect(m_mesh, 0, m_material, voxelChunk.m_worldBound, m_argBuffer, 0, null, ShadowCastingMode.Off);
-            if (m_casterShadow)
-            {
-                Graphics.DrawMeshInstancedIndirect(m_mesh, 0, m_material, voxelChunk.m_worldBound, m_argShadowBuffer, 0, null, ShadowCastingMode.ShadowsOnly);
-            }
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_VisibilityBuffer", m_visibilityBuffer);
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_PredicateScanBuffer", m_visibleInstanceSumBuffer);
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_InputPositions", m_transformBuffer);
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_InputColors", m_inputColorsBuffer);
+            cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_Positions", m_finalTransforms);
+            cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyVisibleInstances, "_Colors", m_voxelColors);
+            cmd.DispatchCompute(m_CopyTransform, m_kernelCopyVisibleInstances, groupThreadX, 1, 1);
+
+            //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
+            //MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
+            m_materialProperty.SetVector("_ChunkPosition", Vector3.zero);
+            m_materialProperty.SetTexture("_Positions", m_finalTransforms);
+            m_materialProperty.SetTexture("_Colors", m_voxelColors);
+            cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 2, m_argBuffer, 0, m_materialProperty);
         }
-        Profiler.EndSample();
+        else
+        {
+            //int threadGroupX = Mathf.CeilToInt((float)voxelChunk.Positions.Length / 128);
+            cmd.SetComputeIntParam(m_CopyTransform, "_InstanceCount", (int)m_args[1]);
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyTransform, "_InputPositions", m_transformBuffer);
+            cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyTransform, "_Positions", m_finalTransforms);
+            cmd.SetComputeBufferParam(m_CopyTransform, m_kernelCopyTransform, "_InputColors", m_inputColorsBuffer);
+            cmd.SetComputeTextureParam(m_CopyTransform, m_kernelCopyTransform, "_Colors", m_voxelColors);
+            cmd.DispatchCompute(m_CopyTransform, m_kernelCopyTransform, groupThreadX, 1, 1);
+            //cmd.SetGlobalVector("_ChunkPosition", voxelChunk.m_worldPosition);
+            //cmd.DrawMeshInstancedIndirect(m_mesh, 0, m_material, 2, m_argBuffer);
+            //MaterialPropertyBlock materialPropertyBlock = voxelChunk.materialProperty;
+            //m_materialProperty.SetVector("_ChunkPosition", Vector3.zero);
+            m_materialProperty.SetTexture("_Positions", m_finalTransforms);
+            m_materialProperty.SetTexture("_Colors", m_voxelColors);
+            cmd.DrawMeshInstancedProcedural(m_mesh, 0, m_material, 2, voxelRenderBatch.ActiveVoxelsNum, m_materialProperty);
+        }
+    }
+
+
+    VoxelRenderBatch GetVoxelRenderBatch(VoxelChunk chunk, bool cullingInstance)
+    {
+        List<VoxelRenderBatch> renderList = cullingInstance ? m_PartInFrustumBatch : m_FullyInFrustumBatch;
+        if (renderList.Count == 0)
+        {
+            VoxelRenderBatch voxelRenderBatch = VoxelRenderBatch.Get();
+            renderList.Add(voxelRenderBatch);
+            return voxelRenderBatch;
+        }
+
+        VoxelRenderBatch active = renderList[renderList.Count - 1];
+        if ((active.ActiveVoxelsNum + chunk.VoxelsNum) >= MAX_INSTANCE_NUM)
+        {
+            active = VoxelRenderBatch.Get();
+            renderList.Add(active);
+        }
+
+        return active;
+    }
+
+    void ClearVoxelRenderBatches()
+    {
+        foreach (var batch in  m_PartInFrustumBatch)
+        {
+            batch.ClearData();
+            VoxelRenderBatch.Release(batch);
+        }
+        m_PartInFrustumBatch.Clear();
+
+        foreach (var batch in m_FullyInFrustumBatch)
+        { 
+            batch.ClearData();
+            VoxelRenderBatch.Release(batch);
+        }
+        m_FullyInFrustumBatch.Clear();
     }
 
     private void LateUpdate()

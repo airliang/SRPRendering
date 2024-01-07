@@ -59,6 +59,8 @@ namespace UnityEditor.Insanity
             public static GUIContent resourcesSettingsText = EditorGUIUtility.TrTextContent("Resources");
             public static GUIContent pipelineResourcesText = EditorGUIUtility.TrTextContent("Pipeline Resources", 
                     "The pipeline resources asset that contains all the shaders and other resources used by the pipeline.");
+            public static GUIContent renderDataText = EditorGUIUtility.TrTextContent("Renderer Data",
+                    "Renderer Data defines which render path should be used in the render pipeline.");
         }
         SavedBool m_RenderSettingsFoldout;
         SerializedProperty m_HDRSupportProp;
@@ -92,6 +94,7 @@ namespace UnityEditor.Insanity
 
         SavedBool m_ResourcesSettingsFoldout;
         SerializedProperty m_PipelineResources;
+        SerializedProperty m_RendererData;
 
         SavedBool m_AtmosphereSettingsFoldout;
         SerializedProperty m_AtmosphereResources;
@@ -143,6 +146,7 @@ namespace UnityEditor.Insanity
             m_ExponentialConstants = serializedObject.FindProperty("m_EVSMExponents");
             m_LightBleedingReduction = serializedObject.FindProperty("m_LightBleedingReduction");
             m_PipelineResources = serializedObject.FindProperty("m_PipelineResources");
+            m_RendererData = serializedObject.FindProperty("m_RenderPathData");
 
             m_AtmosphereSettingsFoldout = new SavedBool($"{target.GetType()}.AtmosphereSettingsFoldout", false);
             m_AtmosphereResources = serializedObject.FindProperty("m_AtmosphereResources");
@@ -276,6 +280,9 @@ namespace UnityEditor.Insanity
                 EditorGUI.indentLevel++;
                 m_PipelineResources.objectReferenceValue = EditorGUILayout.ObjectField(Styles.pipelineResourcesText,
                 m_PipelineResources.objectReferenceValue, typeof(InsanityPipelineResources), false);
+
+                m_RendererData.objectReferenceValue = EditorGUILayout.ObjectField(Styles.renderDataText,
+                m_RendererData.objectReferenceValue, typeof(RenderPathData), false);
 
                 EditorGUI.indentLevel--;
                 EditorGUILayout.Space();

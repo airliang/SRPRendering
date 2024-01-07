@@ -43,11 +43,11 @@ inline void InitializeLitSurfaceData(out SurfaceData outSurfaceData, half3 color
     outSurfaceData.alpha = 1; //Alpha(albedoAlpha.a, _BaseColor, _Cutoff);
 }
 
-void GenerateMatrices(uint instanceId, float3 chunkPosition)
+void GenerateMatrices(uint instanceId)
 {
     int u = instanceId % 128;
     int v = instanceId / 128;
-    float4 position = _Positions.Load(int3(u, v, 0)) + float4(chunkPosition, 0);
+    float4 position = _Positions.Load(int3(u, v, 0));
     float scale = position.w;
     float revertScale = 1.0f / scale;
     unity_ObjectToWorld = float4x4(float4(scale,0,0,position.x), float4(0, scale, 0, position.y), float4(0, 0, scale, position.z), float4(0, 0, 0, 1));

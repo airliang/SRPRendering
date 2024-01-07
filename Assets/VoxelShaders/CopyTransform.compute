@@ -19,6 +19,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     int x = id.x % _PositionTextureSize;
     int y = id.x / _PositionTextureSize;
     _Positions[uint2(x, y)] = _InputPositions[id.x];
+    _Colors[uint2(x, y)] = _InputColors[id.x];
 }
 
 

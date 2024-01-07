@@ -121,11 +121,29 @@ namespace Insanity
         Vector4[] m_ShadowBias;
         Material m_ScreenSpaceShadowsMaterial;
         bool m_supportSoftShadow = true;
-        ShadowSettings m_shadowSetting;
-        IShadowCaster m_shadowCaster;
+        ShadowSettings m_shadowSettings = new ShadowSettings();
+
         PrefilterShadowPass m_prefilterPass;
         SATRenderer m_SATRenderer;
-        
+
+        static ShadowManager s_instance = null;
+        public static ShadowManager Instance
+        {
+            get
+            {
+                if (s_instance == null)
+                {
+                    s_instance = new ShadowManager();
+                }
+                return s_instance;
+            }
+            
+        }
+
+        public ShadowSettings shadowSettings
+        {
+            get { return m_shadowSettings; }
+        }
 
         private static class MainLightShadowConstantBuffer
         {
@@ -163,7 +181,7 @@ namespace Insanity
             public static int _LightBleedingReduction;
         }
 
-        public ShadowManager()
+        protected ShadowManager()
         {
             m_ShadowRequests = new ShadowRequest[k_MaxCascades];
             for (int i = 0; i < k_MaxCascades; i++)
@@ -277,8 +295,39 @@ namespace Insanity
             m_CascadeSplitSpheres[cascadeIndex] = cullingSphere;
         }
 
-        public void Setup(ShadowSettings shadowSettings)
+        public void Setup(bool mainLightCastShadows, ref CullingResults cullResults, CameraData cameraData, int mainLightIndex)
         {
+            VisibleLight mainLight = cullResults.visibleLights[mainLightIndex];
+            m_shadowSettings.supportsMainLightShadows = SystemInfo.supportsShadows && mainLightCastShadows;
+            m_shadowSettings.maxShadowDistance = asset.shadowDistance;
+            m_shadowSettings.supportSoftShadow = asset.supportsSoftShadows;
+            m_shadowSettings.shadowType = asset.ShadowType;
+            m_shadowSettings.shadowPCFFilter = asset.PCFFilter;
+            m_shadowSettings.cascade2Split = asset.cascade2Split;
+            m_shadowSettings.cascade4Split = asset.cascade4Split;
+            m_shadowSettings.adaptiveShadowBias = asset.adaptiveShadowBias;
+            m_shadowSettings.depthBias = asset.shadowDepthBias;
+            m_shadowSettings.normalBias = asset.shadowNormalBias;
+            m_shadowSettings.csmBlendDistance = asset.CSMBlendDistance;
+            m_shadowSettings.csmBlendEnable = asset.enableCSMBlend;
+            m_shadowSettings.pcssSoftness = asset.PCSSSoftness;
+            m_shadowSettings.pcssSoftnessFalloff = asset.PCSSSoftnessFalloff;
+            m_shadowSettings.vsmSatEnable = asset.VSMSATEnable;
+            m_shadowSettings.mainLightResolution = GetLightShadowResolution(mainLight.light);
+            m_shadowSettings.prefilterGaussianRadius = asset.ShadowPrefilterGaussian;
+            m_shadowSettings.exponentialConstants = asset.EVSMExponentConstants;
+            m_shadowSettings.lightBleedingReduction = asset.LightBleedingReduction;
+            if (asset.shadowCascadeOption == ShadowCascadesOption.NoCascades)
+            {
+                m_shadowSettings.mainLightShadowCascadesCount = 1;
+            }
+            else if (asset.shadowCascadeOption == ShadowCascadesOption.TwoCascades)
+            {
+                m_shadowSettings.mainLightShadowCascadesCount = 2;
+            }
+            else
+                m_shadowSettings.mainLightShadowCascadesCount = 4;
+
             m_ShadowCasterCascadesCount = shadowSettings.mainLightShadowCascadesCount;
             m_ShadowmapWidth = shadowSettings.mainLightResolution;
             m_ShadowmapHeight = (m_ShadowCasterCascadesCount == 2) ?
@@ -299,7 +348,17 @@ namespace Insanity
                     break;
             }
 
-            m_shadowSetting = shadowSettings;
+            //m_shadowSetting = shadowSettings;
+            Matrix4x4 invViewProjection = Matrix4x4.identity;
+
+            for (int i = 0; i < m_shadowSettings.mainLightShadowCascadesCount; i++)
+            {
+                ShadowRequest shadowRequest = ShadowManager.Instance.GetShadowRequest(i);
+                UpdateDirectionalShadowRequest(shadowRequest, m_shadowSettings, mainLight,
+                    ref cullResults, i, mainLightIndex, cameraData.mainViewConstants.worldSpaceCameraPos, out invViewProjection);
+
+                SetShadowRequestSetting(shadowRequest, i, cameraData.mainViewConstants.worldSpaceCameraPos, invViewProjection);
+            }
         }
 
         public int GetShadowResolution()
@@ -393,11 +452,11 @@ namespace Insanity
 
         public void ExecuteShadowInitPass(RenderGraph renderGraph)
         {
-            if (m_shadowSetting.supportsMainLightShadows)
+            if (shadowSettings.supportsMainLightShadows)
                 return;
             using (var builder = renderGraph.AddRenderPass<ShadowInitPassData>("Init Shadow", out var passData, new ProfilingSampler("Init Shadow Profiler")))
             {
-                passData.m_supportMainLightShadow = m_shadowSetting.supportsMainLightShadows;
+                passData.m_supportMainLightShadow = shadowSettings.supportsMainLightShadows;
 
                 builder.SetRenderFunc(
                     (ShadowInitPassData data, RenderGraphContext ctx) =>
@@ -458,11 +517,11 @@ namespace Insanity
                     float far = (b - 1) / a;
                     m_MainLightShadowDepthRanges[i] = far - near;
 
-                    m_ShadowBias[i] = ShadowUtils.GetShadowBias(m_MainLight, m_mainLightShadowIndex, m_shadowSetting, m_ShadowRequests[i].projection, m_ShadowResolution);
+                    m_ShadowBias[i] = ShadowUtils.GetShadowBias(m_MainLight, m_mainLightShadowIndex, shadowSettings, m_ShadowRequests[i].projection, m_ShadowResolution);
                 }
 
-                TextureHandle shadowmap = GetShadowMap(renderGraph, m_shadowSetting.shadowType);
-                if (m_shadowSetting.shadowType == ShadowType.VSM || m_shadowSetting.shadowType == ShadowType.EVSM)
+                TextureHandle shadowmap = GetShadowMap(renderGraph, shadowSettings.shadowType);
+                if (shadowSettings.shadowType == ShadowType.VSM || shadowSettings.shadowType == ShadowType.EVSM)
                 {
                     builder.UseDepthBuffer(GetShadowMapDepthBuffer(renderGraph), DepthAccess.ReadWrite);
                     passData.m_Shadowmap = builder.UseColorBuffer(shadowmap, 0);
@@ -486,7 +545,7 @@ namespace Insanity
                 float invHalfShadowAtlasWidth = 0.5f * invShadowAtlasWidth;
                 float invHalfShadowAtlasHeight = 0.5f * invShadowAtlasHeight;
                 float softShadowsProp = softShadows ? 1.0f : 0.0f;
-                passData.m_ShadowParams = new Vector4(m_MainLight.shadowStrength, softShadowsProp, m_shadowSetting.csmBlendEnable ? m_shadowSetting.csmBlendDistance : 0, (float)passData.cascadeCount);
+                passData.m_ShadowParams = new Vector4(m_MainLight.shadowStrength, softShadowsProp, shadowSettings.csmBlendEnable ? shadowSettings.csmBlendDistance : 0, (float)passData.cascadeCount);
                 passData.m_ShadowmapSize = new Vector4(invShadowAtlasWidth,
                                 invShadowAtlasHeight,
                                 m_ShadowmapWidth, m_ShadowmapHeight);
@@ -494,15 +553,15 @@ namespace Insanity
                 passData.m_ShadowBias = m_ShadowBias;
                 Vector3 lightDirection = -m_MainLight.transform.localToWorldMatrix.GetColumn(2);
                 passData.m_ShadowLightDirection = lightDirection;
-                passData.m_AdaptiveShadowBias = m_shadowSetting.adaptiveShadowBias;
-                passData.m_PCSSSoftness = m_shadowSetting.pcssSoftness / 64.0f / Mathf.Sqrt(m_shadowSetting.maxShadowDistance);
-                passData.m_ShadowType = m_shadowSetting.shadowType;
-                passData.m_PCSSSoftnessFalloff = m_shadowSetting.pcssSoftnessFalloff;
-                passData.m_ShadowDistance = m_shadowSetting.maxShadowDistance;
-                passData.m_ShadowPrefilterGaussianRadius = m_shadowSetting.prefilterGaussianRadius;
-                passData.m_ShadowExponents = m_shadowSetting.exponentialConstants;
-                passData.m_LightBleedingReduction = m_shadowSetting.lightBleedingReduction;
-                passData.m_VSMSATEnable = m_shadowSetting.vsmSatEnable;
+                passData.m_AdaptiveShadowBias = shadowSettings.adaptiveShadowBias;
+                passData.m_PCSSSoftness = shadowSettings.pcssSoftness / 64.0f / Mathf.Sqrt(shadowSettings.maxShadowDistance);
+                passData.m_ShadowType = shadowSettings.shadowType;
+                passData.m_PCSSSoftnessFalloff = shadowSettings.pcssSoftnessFalloff;
+                passData.m_ShadowDistance = shadowSettings.maxShadowDistance;
+                passData.m_ShadowPrefilterGaussianRadius = shadowSettings.prefilterGaussianRadius;
+                passData.m_ShadowExponents = shadowSettings.exponentialConstants;
+                passData.m_LightBleedingReduction = shadowSettings.lightBleedingReduction;
+                passData.m_VSMSATEnable = shadowSettings.vsmSatEnable;
 
                 builder.SetRenderFunc(
                     (ShadowPassData data, RenderGraphContext ctx) =>
@@ -557,7 +616,7 @@ namespace Insanity
                             ctx.renderContext.DrawShadows(ref data.shadowDrawSettings);
                             //CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, RendererList.Create(data.shadowDrawSettings));
 
-                            RenderingEventManager.InvokeShadowCasterEvent(ctx.renderContext, ctx.cmd, m_shadowSetting, ref data.shadowDrawSettings, i);
+                            RenderingEventManager.InvokeShadowCasterEvent(ctx.renderContext, ctx.cmd, shadowSettings, ref data.shadowDrawSettings, i);
                         }
                         //ctx.cmd.SetGlobalFloat(HDShaderIDs._ZClip, 1.0f);   // Re-enable zclip globally
 
@@ -686,7 +745,7 @@ namespace Insanity
             };
             renderGraph.CreateTextureIfInvalid(outputDesc, ref m_ShadowMapSAT);
             SATTexture outputTexture = new SATTexture(m_ShadowMapSAT, shadowPassData.m_ShadowmapWidth, shadowPassData.m_ShadowmapHeight, TextureFormat.RFloat, new Vector4(1,1,0,0));
-            for (int i = 0; i < m_shadowSetting.mainLightShadowCascadesCount; ++i)
+            for (int i = 0; i < shadowSettings.mainLightShadowCascadesCount; ++i)
             {
                 ShadowRequest shadowRequest = m_ShadowRequests[i];
                 int shadowResolution = GetShadowResolution();
@@ -713,6 +772,25 @@ namespace Insanity
                 
             }
             return satPassData;
+        }
+
+        int GetLightShadowResolution(Light light)
+        {
+            switch (light.shadowResolution)
+            {
+                case LightShadowResolution.FromQualitySettings:
+                    return 512;
+                case LightShadowResolution.Low:
+                    return 512;
+                case LightShadowResolution.Medium:
+                    return 1024;
+                case LightShadowResolution.High:
+                    return 2048;
+                case LightShadowResolution.VeryHigh:
+                    return 4096;
+                default:
+                    return 512;
+            }
         }
     }
 }

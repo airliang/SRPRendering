@@ -16,35 +16,36 @@ namespace Insanity
         public TextureHandle m_ShadowMap;
     }
 
-    public partial class InsanityPipeline
+    public partial class RenderPasses
     {
-        ShaderTagId m_ForwardPass = new ShaderTagId("InsanityForward");
+        static ShaderTagId m_ForwardPass = new ShaderTagId("InsanityForward");
 
 
-        public ForwardPassData Render_OpaqueFowardPass(CameraData cameraData, RenderGraph graph, CullingResults cull, 
-            DepthPrepassData depthData, TextureHandle shadowmap)
+        public static ForwardPassData Render_OpaqueFowardPass(RenderingData renderingData,
+            TextureHandle colorTarget, TextureHandle depthTarget, TextureHandle shadowmap)
         {
-            using (var builder = graph.AddRenderPass<ForwardPassData>("Opaque Forward Pass", out var passData, 
+            using (var builder = renderingData.renderGraph.AddRenderPass<ForwardPassData>("Opaque Forward Pass", out var passData, 
                 new ProfilingSampler("Opaque Forward Pass Profiler")))
             {
                 //TextureHandle Albedo = CreateColorTexture(graph, cameraData.camera, "Albedo");
-                passData.m_Albedo = builder.UseColorBuffer(depthData.m_Albedo, 0);
-                builder.UseDepthBuffer(depthData.m_Depth, DepthAccess.Read);
+                passData.m_Albedo = builder.UseColorBuffer(colorTarget, 0);
+                builder.UseDepthBuffer(depthTarget, DepthAccess.Read);
                 //if (shadowData != null)
                 if (shadowmap.IsValid())
                     passData.m_ShadowMap = builder.ReadTexture(shadowmap);
+                
                 // Renderers
-                UnityEngine.Rendering.RendererUtils.RendererListDesc rendererDesc_base_Opaque = 
-                    new UnityEngine.Rendering.RendererUtils.RendererListDesc(m_ForwardPass, cull, cameraData.camera);
+                UnityEngine.Rendering.RendererUtils.RendererListDesc rendererDesc_base_Opaque =
+                    new UnityEngine.Rendering.RendererUtils.RendererListDesc(m_ForwardPass, renderingData.cullingResults, renderingData.cameraData.camera);
                 rendererDesc_base_Opaque.sortingCriteria = SortingCriteria.CommonOpaque;
                 rendererDesc_base_Opaque.renderQueueRange = RenderQueueRange.opaque;
-                RendererListHandle rHandle_base_Opaque = graph.CreateRendererList(rendererDesc_base_Opaque);
+                RendererListHandle rHandle_base_Opaque = renderingData.renderGraph.CreateRendererList(rendererDesc_base_Opaque);
                 passData.m_renderList_opaque = builder.UseRendererList(rHandle_base_Opaque);
 
-                UnityEngine.Rendering.RendererUtils.RendererListDesc rendererDesc_base_Transparent = 
-                    new UnityEngine.Rendering.RendererUtils.RendererListDesc(m_ForwardPass, cull, cameraData.camera);
-               
+                UnityEngine.Rendering.RendererUtils.RendererListDesc rendererDesc_base_Transparent =
+                    new UnityEngine.Rendering.RendererUtils.RendererListDesc(m_ForwardPass, renderingData.cullingResults, renderingData.cameraData.camera);
 
+                builder.AllowPassCulling(false);
                 builder.SetRenderFunc((ForwardPassData data, RenderGraphContext context) =>
                 {
                     if (data.m_ShadowMap.IsValid())

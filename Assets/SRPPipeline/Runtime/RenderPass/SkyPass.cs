@@ -26,23 +26,24 @@ namespace Insanity
         public bool runderSun = true;
     }
 
-    public partial class InsanityPipeline
+    public partial class RenderPasses
     {
         // Start is called before the first frame update
-        bool hasPrecomputedSkyLut = false;
+        static bool hasPrecomputedSkyLut = false;
 
-        public void Render_SkyPass(CameraData cameraData, RenderGraph graph, DepthPrepassData depthData, Material skybox)
+        public static void Render_SkyPass(RenderingData renderingData, TextureHandle colorTarget, TextureHandle depthTarget, Material skybox)
         {
             //if (m_skyMaterial == null)
             //    m_skyMaterial = Resources.Load<Material>("Materials/Skybox");//CoreUtils.CreateEngineMaterial("Insanity/HDRISky");
 
-            using (var builder = graph.AddRenderPass<SkyPassData>("SkyPass", out var passData, new ProfilingSampler("SkyPass Profiler")))
+            using (var builder = renderingData.renderGraph.AddRenderPass<SkyPassData>("SkyPass", out var passData, new ProfilingSampler("SkyPass Profiler")))
             {
                 //TextureHandle Depth = builder.ReadTexture(depthData.m_Depth);
                 //TextureHandle Albedo = builder.ReadTexture(depthData.m_Albedo);
                 passData.m_skybox = skybox;
-                builder.UseColorBuffer(depthData.m_Albedo, 0);
-                builder.UseDepthBuffer(depthData.m_Depth, DepthAccess.Read);
+                builder.UseColorBuffer(colorTarget, 0);
+                builder.UseDepthBuffer(depthTarget, DepthAccess.Read);
+                builder.AllowPassCulling(false);
                 builder.SetRenderFunc((SkyPassData data, RenderGraphContext context) =>
                 {
                     context.cmd.SetViewport(GlobalRenderSettings.screenResolution);
@@ -52,25 +53,26 @@ namespace Insanity
             }
         }
 
-        Atmosphere m_atmosphere = new Atmosphere();
-        Vector3 m_sunDirectionLastFrame;
+        //Atmosphere m_atmosphere = new Atmosphere();
+        //Vector3 m_sunDirectionLastFrame;
 
-        public void Render_PhysicalBaseSky(CameraData cameraData, RenderGraph graph, DepthPrepassData depthData, InsanityPipelineAsset pipelineAsset)
+        public static void Render_PhysicalBaseSky(RenderingData renderingData, TextureHandle colorTarget, TextureHandle depthTarget, InsanityPipelineAsset pipelineAsset)
         {
             SkyboxLUTPassData skyboxLUTPassData = null;
-            if (m_atmosphere == null)
-            {
-                m_atmosphere = new Atmosphere();
-            }
+            //if (m_atmosphere == null)
+            //{
+            //    m_atmosphere = new Atmosphere();
+            //}
+            Atmosphere atmosphere = Atmosphere.Instance;
             AtmosphereResources atmosphereResources = pipelineAsset.AtmosphereResources;
             Texture skyboxLUT;
             if (pipelineAsset.RecalculateSkyLUT)
             {
-                skyboxLUTPassData = m_atmosphere.GenerateSkyboxLUT(graph, asset, atmosphereResources.PrecomputeScattering);
+                skyboxLUTPassData = atmosphere.GenerateSkyboxLUT(renderingData.renderGraph, pipelineAsset, atmosphereResources.PrecomputeScattering);
 
                 if (skyboxLUTPassData.multipleScatteringOrder > 0)
                 {
-                    skyboxLUTPassData = m_atmosphere.PrecomputeMultipleScatteringLUT(graph,
+                    skyboxLUTPassData = atmosphere.PrecomputeMultipleScatteringLUT(renderingData.renderGraph,
                         atmosphereResources.PrecomputeScattering, skyboxLUTPassData.skyboxLUT, atmosphereResources.MultipleScatteringOrder);
                 }
                 skyboxLUT = skyboxLUTPassData.skyboxLUT;
@@ -83,14 +85,14 @@ namespace Insanity
             //Texture3D skyboxLUTAsset = pipelineAsset.AtmosphereResources.SkyboxLUT;
             
 
-            using (var builder = graph.AddRenderPass<PhysicalBaseSkyPassData>("Atmosphere Scattering SkyPass", 
+            using (var builder = renderingData.renderGraph.AddRenderPass<PhysicalBaseSkyPassData>("Atmosphere Scattering SkyPass", 
                 out var passData, new ProfilingSampler("Atmosphere Scattering SkyPass Profiler")))
             {
                 //TextureHandle Depth = builder.ReadTexture(depthData.m_Depth);
                 //TextureHandle Albedo = builder.ReadTexture(depthData.m_Albedo);
                 passData.m_skybox = pipelineAsset.InsanityPipelineResources.materials.PhysicalBaseSky;
-                builder.UseColorBuffer(depthData.m_Albedo, 0);
-                builder.UseDepthBuffer(depthData.m_Depth, DepthAccess.Read);
+                builder.UseColorBuffer(colorTarget, 0);
+                builder.UseDepthBuffer(depthTarget, DepthAccess.Read);
                 passData.m_SkyboxLUT = skyboxLUT;
                 passData.mieG = atmosphereResources.MieG;
                 passData.runderSun = atmosphereResources.RenderSun;
@@ -98,8 +100,8 @@ namespace Insanity
                 Vector4 mieScatteringCoef = atmosphereResources.ScatteringCoefficientMie * 0.00001f * atmosphereResources.ScaleMie;
                 passData.scatteringCoefR = rayleightScatteringCoef;
                 passData.scatteringCoefM = mieScatteringCoef;
-                passData.sunLightColor = asset.SunLightColor;
-
+                passData.sunLightColor = pipelineAsset.SunLightColor;
+                builder.AllowPassCulling(false);
                 builder.SetRenderFunc((PhysicalBaseSkyPassData data, RenderGraphContext context) =>
                 {
                     context.cmd.SetGlobalFloat(AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
@@ -117,17 +119,13 @@ namespace Insanity
             }
         }
 
-        public void ClearSkyPass()
-        {
-            //CoreUtils.Destroy(m_skyMaterial);
-        }
 
-        void BakeAtmosphereSH(ref ScriptableRenderContext context, AtmosphereResources atmosphereResources)
+        public static void BakeAtmosphereSH(ref ScriptableRenderContext context, AtmosphereResources atmosphereResources, Light sunLight)
         {
             //if (m_sunLight.transform.forward != m_sunDirectionLastFrame)
             {
-                m_atmosphere.BakeSkyToSHAmbient(ref context, atmosphereResources, m_sunLight);
-                m_sunDirectionLastFrame = m_sunLight.transform.forward;
+                Atmosphere.Instance.BakeSkyToSHAmbient(ref context, atmosphereResources, sunLight);
+                //m_sunDirectionLastFrame = m_sunLight.transform.forward;
             }
         }
     }

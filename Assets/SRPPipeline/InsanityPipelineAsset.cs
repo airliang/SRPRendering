@@ -71,10 +71,19 @@ namespace Insanity
             UnityEditor.AssetDatabase.CreateAsset(newAsset, pathName);
         }
 #endif
+        RenderPath m_RenderPath = null;
+
+        public RenderPath RenderPath
+        {
+            get { return m_RenderPath; }
+        }
 
         protected override RenderPipeline CreatePipeline()
         {
-            return new InsanityPipeline();
+            DestroyRenderers();
+            var pipeline = new InsanityPipeline();
+            CreateRenderers(pipeline);
+            return pipeline;
         }
 
         #region Rendering
@@ -282,13 +291,48 @@ namespace Insanity
 
         //Pipeline resources
         [SerializeField] InsanityPipelineResources m_PipelineResources;
-
+        [SerializeField] RenderPathData m_RenderPathData;
         
 
         public InsanityPipelineResources InsanityPipelineResources
         {
             get { return m_PipelineResources; }
             set { m_PipelineResources = value; }
+        }
+
+        public RenderPathData RenderPathData 
+        { 
+            get { return m_RenderPathData; }
+            set { m_RenderPathData = value; }
+        }
+
+        protected override void OnValidate()
+        {
+            //DestroyRenderers();
+
+            // This will call RenderPipelineManager.CleanupRenderPipeline that in turn disposes the render pipeline instance and
+            // assign pipeline asset reference to null
+            base.OnValidate();
+        }
+
+        private void CreateRenderers(InsanityPipeline pipeline)
+        {
+            if (m_RenderPath != null)
+            {
+                Debug.LogError($"Creating renderers but previous instance wasn't properly destroyed");
+            }
+
+            m_RenderPath = RenderPathData.Create(pipeline);
+        }
+
+        private void DestroyRenderers()
+        {
+            Debug.Log("Destroy Renderers");
+            if (RenderPath != null)
+            {
+                m_RenderPath.Dispose();
+                m_RenderPath = null;
+            }
         }
     }
 }

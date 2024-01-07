@@ -31,7 +31,7 @@ struct DepthVaryings
     //UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-float3 _ChunkPosition;
+//float3 _ChunkPosition;
 
 void InitializeInputData(VoxelVaryings input, out InputData inputData)
 {
@@ -63,7 +63,7 @@ VoxelVaryings VoxelInstanceVertex(VoxelAttributes input, uint instanceID : SV_In
     VoxelVaryings output;
     //UNITY_SETUP_INSTANCE_ID(input);
 //#if defined(UNITY_PROCEDURAL_INSTANCING_ENABLED)
-    GenerateMatrices(instanceID, _ChunkPosition);
+    GenerateMatrices(instanceID);
 //#endif
     output.positionCS = TransformObjectToHClip(input.positionOS);
     output.positionWS = TransformObjectToWorld(input.positionOS).xyz;
@@ -99,7 +99,7 @@ DepthVaryings DepthOnlyVertex(VoxelAttributes input, uint instanceID : SV_Instan
 {
     DepthVaryings output;
 //#if defined(UNITY_PROCEDURAL_INSTANCING_ENABLED)
-    GenerateMatrices(instanceID, _ChunkPosition);
+    GenerateMatrices(instanceID);
 //#endif
     output.positionCS = TransformObjectToHClip(input.positionOS);
     //UNITY_SETUP_INSTANCE_ID(input);
@@ -144,7 +144,7 @@ DepthVaryings ShadowPassVertex(VoxelAttributes input, uint instanceID : SV_Insta
 {
     DepthVaryings output;
     //#if defined(UNITY_PROCEDURAL_INSTANCING_ENABLED)
-    GenerateMatrices(instanceID, _ChunkPosition);
+    GenerateMatrices(instanceID);
     //#endif
     output.positionCS = GetShadowPositionHClip(input);
     return output;

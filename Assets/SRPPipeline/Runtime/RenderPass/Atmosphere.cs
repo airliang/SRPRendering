@@ -45,6 +45,17 @@ namespace Insanity
         const int SHSampleCount = 128;
         private bool m_bakeCubemap = false;
         public Queue<AsyncGPUReadbackRequest> m_SHBakeReadbacks = new Queue<AsyncGPUReadbackRequest>();
+        Vector3 m_sunDirectionLastFrame;
+
+        private static Atmosphere s_instance = null;
+        public static Atmosphere Instance
+        { get {
+                if (s_instance == null)
+                {
+                    s_instance = new Atmosphere();
+                }
+                return s_instance; } }
+
 
         public bool BakeCubemap
         {
@@ -336,6 +347,7 @@ namespace Insanity
 
         public void InitSHBakeSamples()
         {
+            /*
             int thetaCount = 16;
             int phiCount = 32;
             int totalSample = thetaCount * phiCount;
@@ -357,6 +369,24 @@ namespace Insanity
                     m_bakeSHSamples[index++] = new Vector4(sinTheta * cosPhi, cosTheta, sinTheta * sinPhi, weight);
                 }
             }
+            */
+            //uniform sample sphere
+            
+            m_bakeSHSamples = new Vector4[512];
+            for (int i = 0; i < 512; ++i)
+            {
+                float xi1 = Random.Range(0.0f, 1.0f);
+                float xi2 = Random.Range(0.0f, 1.0f);
+                float thetaAngle = Mathf.Acos(1.0f - xi1 * 2.0f);
+                float phiAngle = Mathf.PI * 2.0f * xi2;
+                float sinTheta = Mathf.Sin(thetaAngle);
+                float sinPhi = Mathf.Sin(phiAngle);
+                float cosPhi = Mathf.Cos(phiAngle);
+                float cosTheta = Mathf.Cos(thetaAngle);
+                float weight = sinTheta;
+                m_bakeSHSamples[i] = new Vector4(sinTheta * cosPhi, cosTheta, sinTheta * sinPhi, weight);
+            }
+            
         }
 
         public class AtmosphereSHSetting

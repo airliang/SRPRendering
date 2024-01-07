@@ -4,19 +4,18 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
-using static Insanity.InsanityPipeline;
 
 namespace Insanity
 {
     public partial class InsanityPipeline
     {
-        LightVariablesGlobal m_LightVariablesGlobalCB = new LightVariablesGlobal();
+        public static LightVariablesGlobal m_LightVariablesGlobalCB = new LightVariablesGlobal();
         Light m_sunLight;
-        ShadowManager m_ShadowMananger;
+        //ShadowManager m_ShadowMananger;
         int m_mainLightIndex = -1;
-        ShadowSettings m_shadowSettings;
+        //ShadowSettings m_shadowSettings;
 
-        static int GetMainLightIndex(NativeArray<VisibleLight> visibleLights)
+        public static int GetMainLightIndex(NativeArray<VisibleLight> visibleLights)
         {
             int totalVisibleLights = visibleLights.Length;
 
@@ -62,7 +61,7 @@ namespace Insanity
 
         void PrepareGPULightData(CommandBuffer cmd, ref CullingResults cullResults, CameraData cameraData)
         {
-            UpdateLightVariablesGlobalCB(cmd);
+            UpdateLightVariablesGlobalCB(cmd, m_sunLight);
 
             bool mainLightCastShadows = false;
             if (asset.shadowDistance > 0)
@@ -72,90 +71,26 @@ namespace Insanity
             }
 
             //Prepare shadow datas
-            if (m_ShadowMananger == null)
-                m_ShadowMananger = new ShadowManager();
 
-            InitShadowSettings(mainLightCastShadows);
+            InitShadowSettings(mainLightCastShadows, ref cullResults, cameraData, m_mainLightIndex);
 
-            Matrix4x4 invViewProjection = Matrix4x4.identity;
-
-            for (int i = 0; i < m_shadowSettings.mainLightShadowCascadesCount; i++)
-            {
-                ShadowRequest shadowRequest = m_ShadowMananger.GetShadowRequest(i);
-                m_ShadowMananger.UpdateDirectionalShadowRequest(shadowRequest, m_shadowSettings, cullResults.visibleLights[m_mainLightIndex],
-                    ref cullResults, i, m_mainLightIndex, cameraData.mainViewConstants.worldSpaceCameraPos, out invViewProjection);
-
-                m_ShadowMananger.SetShadowRequestSetting(shadowRequest, i, cameraData.mainViewConstants.worldSpaceCameraPos, invViewProjection);
-            }
+            
         }
 
-        int GetLightShadowResolution(Light light)
+        void InitShadowSettings(bool mainLightCastShadows, ref CullingResults cullResults, CameraData cameraData, int lightIndex)
         {
-            switch (light.shadowResolution)
-            {
-                case LightShadowResolution.FromQualitySettings:
-                    return 512;
-                case LightShadowResolution.Low:
-                    return 512;
-                case LightShadowResolution.Medium:
-                    return 1024;
-                case LightShadowResolution.High:
-                    return 2048;
-                case LightShadowResolution.VeryHigh:
-                    return 4096;
-                default:
-                    return 512;
-            }
+            ShadowManager.Instance.Setup(mainLightCastShadows, ref cullResults, cameraData, lightIndex);
         }
 
-        void InitShadowSettings(bool mainLightCastShadows)
-        {
-            if (m_shadowSettings == null)
-                m_shadowSettings = new ShadowSettings();
-
-
-            m_shadowSettings.supportsMainLightShadows = SystemInfo.supportsShadows /*&& settings.supportsMainLightShadows*/ && mainLightCastShadows;
-            m_shadowSettings.maxShadowDistance = asset.shadowDistance;
-            m_shadowSettings.supportSoftShadow = asset.supportsSoftShadows;
-            m_shadowSettings.shadowType = asset.ShadowType;
-            m_shadowSettings.shadowPCFFilter = asset.PCFFilter;
-            m_shadowSettings.cascade2Split = asset.cascade2Split;
-            m_shadowSettings.cascade4Split = asset.cascade4Split;
-            m_shadowSettings.adaptiveShadowBias = asset.adaptiveShadowBias;
-            m_shadowSettings.depthBias = asset.shadowDepthBias;
-            m_shadowSettings.normalBias = asset.shadowNormalBias;
-            m_shadowSettings.csmBlendDistance = asset.CSMBlendDistance;
-            m_shadowSettings.csmBlendEnable = asset.enableCSMBlend;
-            m_shadowSettings.pcssSoftness = asset.PCSSSoftness;
-            m_shadowSettings.pcssSoftnessFalloff = asset.PCSSSoftnessFalloff;
-            m_shadowSettings.vsmSatEnable = asset.VSMSATEnable;
-            m_shadowSettings.mainLightResolution = GetLightShadowResolution(m_sunLight);
-            m_shadowSettings.prefilterGaussianRadius = asset.ShadowPrefilterGaussian;
-            m_shadowSettings.exponentialConstants = asset.EVSMExponentConstants;
-            m_shadowSettings.lightBleedingReduction = asset.LightBleedingReduction;
-            if (asset.shadowCascadeOption == ShadowCascadesOption.NoCascades)
-            {
-                m_shadowSettings.mainLightShadowCascadesCount = 1;
-            }
-            else if (asset.shadowCascadeOption == ShadowCascadesOption.TwoCascades)
-            {
-                m_shadowSettings.mainLightShadowCascadesCount = 2;
-            }
-            else
-                m_shadowSettings.mainLightShadowCascadesCount = 4;
-
-            m_ShadowMananger.Setup(m_shadowSettings);
-        }
-
-        void UpdateLightVariablesGlobalCB(CommandBuffer cmd)
+        public static void UpdateLightVariablesGlobalCB(CommandBuffer cmd, Light mainLight)
         {
             m_LightVariablesGlobalCB._MainLightPosition = new Vector4(0, 1, 0, 0);
-            if (m_sunLight != null)
+            if (mainLight != null)
             {
-                Vector4 dir = -m_sunLight.transform.localToWorldMatrix.GetColumn(2);
+                Vector4 dir = -mainLight.transform.localToWorldMatrix.GetColumn(2);
                 m_LightVariablesGlobalCB._MainLightPosition = new Vector4(dir.x, dir.y, dir.z, 0.0f);
-                m_LightVariablesGlobalCB._MainLightColor = m_sunLight.color;
-                m_LightVariablesGlobalCB._MainLightIntensity = m_sunLight.intensity;
+                m_LightVariablesGlobalCB._MainLightColor = mainLight.color;
+                m_LightVariablesGlobalCB._MainLightIntensity = mainLight.intensity;
             }
 
             ConstantBuffer.PushGlobal(cmd, m_LightVariablesGlobalCB, ShaderIDs._LightVariablesGlobal);
@@ -167,7 +102,7 @@ namespace Insanity
             public ShaderVariablesGlobal globalCB;
         }
 
-        void PushGlobalCameraParams(RenderGraph renderGraph, CameraData cameraData)
+        static void PushGlobalCameraParams(RenderGraph renderGraph, CameraData cameraData)
         {
             using (var builder = renderGraph.AddRenderPass<PushGlobalCameraParamPassData>("Push Global Camera Parameters", out var passData))
             {
@@ -185,17 +120,17 @@ namespace Insanity
 
         void ExecuteShadowInitPass(RenderGraph graph)
         {
-            m_ShadowMananger.ExecuteShadowInitPass(graph);
+            ShadowManager.Instance.ExecuteShadowInitPass(graph);
         }
 
-        ShadowPassData RenderShadow(CameraData cameraData, RenderGraph graph, CullingResults cull, ComputeShader scanCS)
+        public static ShadowPassData RenderShadow(CameraData cameraData, RenderGraph graph, CullingResults cull, ComputeShader scanCS)
         {
-            ShadowPassData shadowPassData = m_ShadowMananger.RenderShadowMap(graph, cull, m_ShaderVariablesGlobalCB);
+            ShadowPassData shadowPassData = ShadowManager.Instance.RenderShadowMap(graph, cull, m_ShaderVariablesGlobalCB);
             if (shadowPassData != null && shadowPassData.m_ShadowType == ShadowType.VSM)
             {
-                if (m_shadowSettings.vsmSatEnable)
+                if (ShadowManager.Instance.shadowSettings.vsmSatEnable)
                 {
-                    SATPassData satData = m_ShadowMananger.GenerateVSMSAT(graph, shadowPassData, scanCS);
+                    SATPassData satData = ShadowManager.Instance.GenerateVSMSAT(graph, shadowPassData, scanCS);
                     if (satData != null)
                     {
                         shadowPassData.m_ShadowmapSAT = satData.GetFinalOutputTexture();
@@ -208,12 +143,12 @@ namespace Insanity
 
         ScreenSpaceShadowPassData RenderScreenSpaceShadow(CameraData cameraData, RenderGraph graph, ShadowPassData shadowPassData, DepthPrepassData depthData)
         {
-            return m_ShadowMananger.Render_ScreenSpaceShadow(graph, cameraData.camera, shadowPassData.m_Shadowmap, depthData.m_Depth);
+            return ShadowManager.Instance.Render_ScreenSpaceShadow(graph, cameraData.camera, shadowPassData.m_Shadowmap, depthData.m_Depth);
         }
 
         void ClearScreenSpaceShadowPass()
         {
-            m_ShadowMananger.Clear();
+            ShadowManager.Instance.Clear();
         }
     }
 }

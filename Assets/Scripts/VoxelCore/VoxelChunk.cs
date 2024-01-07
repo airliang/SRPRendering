@@ -85,7 +85,8 @@ public class VoxelChunk
                             {
                                 m_worldBound.Encapsulate(new Bounds(posInChunk + m_worldPosition, VOXEL_SIZE));
                             }
-                            positions.Add(new Vector4(posInChunk.x, posInChunk.y, posInChunk.z, 1));
+                            positions.Add(new Vector4(posInChunk.x + m_worldPosition.x, posInChunk.y + m_worldPosition.y, 
+                                posInChunk.z + m_worldPosition.z, 1) );
                             colors.Add(m_voxels[x, y, z].color);
                             instanceNum++;
                         }
@@ -129,6 +130,14 @@ public class VoxelChunk
     }
 
     public uint[] Colors { get { return m_colors; } }
+
+    public int VoxelsNum
+    {
+        get
+        {
+            return m_positions.Length;
+        }
+    }
 
     public byte CullResult
     { get; set; }

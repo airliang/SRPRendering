@@ -40,3 +40,4 @@ MonoBehaviour:
   m_physicalBasedSky: 1
   m_PipelineResources: {fileID: 11400000, guid: e267fa520b4e57140aaa0481ee785b42,
     type: 2}
+  m_RenderPathData: {fileID: 11400000, guid: d822d564f0cfebf44bf32e1534d8b42e, type: 2}
