@@ -1,0 +1,45 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel TileFrustumCompute
+#pragma enable_d3d11_debug_symbols
+#include "LightCullingInclude.hlsl"
+
+RWStructuredBuffer<TileFrustum> _TileFrustums;
+float4x4 _ViewToScreenTranspose;
+//why use worldtoscreentranspose but not screentoworld? To transform a plane, Any point v=(x,y,z,1) lies on the plane p=(a,b,c,d) if ax+by+cz+d
+//It can be written as dotproduct : p dot v = 0
+//p' is the transformed plane, v' is a transformed point, there is p' dot Mv = 0
+// p dot v = p' dot Mv, we can write this equation as the follow:
+// p^tv = p'^tMv, so p^t = p'^tM, p^tM^(-1) = p't => (M^(-1))^t p = p'
+//https://stackoverflow.com/questions/7685495/transforming-a-3d-plane-using-a-4x4-matrix
+uint2 _TileNumber;
+Texture2D _DepthTexture;
+
+
+[numthreads(16,16,1)]
+void TileFrustumCompute(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
+{
+    if (id.x >= _TileNumber.x || id.y >= _TileNumber.y)
+        return;
+    //get the current tile 
+    uint tileIndex = id.x + _TileNumber.x * id.y;
+    
+    // Steps based on tile sale
+    float2 negativeStep = (2.0 * float2(id.xy)) / _TileNumber;
+    float2 positiveStep = (2.0 * float2(id.xy + 1)) / _TileNumber;
+    
+    TileFrustum frustum;
+    float4 leftPlane = mul(_ViewToScreenTranspose, float4(1, 0, 0, 1.0 - negativeStep.x));
+    leftPlane /= length(leftPlane.xyz);
+    frustum.planes[FRUSTUM_PLANE_LEFT] = leftPlane;
+    float4 rightPlane = mul(_ViewToScreenTranspose, float4(-1, 0, 0, -1.0 + positiveStep.x));
+    rightPlane /= length(rightPlane.xyz);
+    frustum.planes[FRUSTUM_PLANE_RIGHT] = rightPlane;
+    float4 bottomPlane = mul(_ViewToScreenTranspose, float4(0, 1, 0, 1.0 - negativeStep.y));
+    bottomPlane /= length(bottomPlane.xyz);
+    frustum.planes[FRUSTUM_PLANE_BOTTOM] = bottomPlane;
+    float4 topPlane = mul(_ViewToScreenTranspose, float4(0, -1, 0, -1.0 + positiveStep.y));
+    topPlane /= length(topPlane.xyz);
+    frustum.planes[FRUSTUM_PLANE_TOP] = topPlane;
+    _TileFrustums[tileIndex] = frustum;
+
+}

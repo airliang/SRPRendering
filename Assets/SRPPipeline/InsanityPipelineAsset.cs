@@ -51,6 +51,23 @@ namespace Insanity
         _4096 = 4096
     }
 
+    public enum eAdditionalLightCullingFunction
+    {
+        Default,
+        TileBased,
+        ClusterBased
+    }
+
+    public enum DebugViewMode
+    {
+        None,
+        TileBasedVisibleCount,
+        Depth,
+        LinearDepth,
+        Normal,
+        TriangleOverdraw
+    }
+
     [ExecuteInEditMode]
     public class InsanityPipelineAsset : RenderPipelineAsset
     {
@@ -137,6 +154,7 @@ namespace Insanity
         [SerializeField] eGaussianRadius m_ShadowPrefitlerGaussianRadius = eGaussianRadius.eGausian3x3;
         [SerializeField] Vector2 m_EVSMExponents = new Vector2(10, 10);
         [SerializeField] float m_LightBleedingReduction = 0.5f;
+        [SerializeField] DebugViewMode m_DebugViewMode = DebugViewMode.None;
 
         public float shadowDistance
         {
@@ -251,6 +269,22 @@ namespace Insanity
         }
         #endregion
 
+        #region Lighting
+        [SerializeField] bool m_AdditionalLightEnable = true;
+        [SerializeField] eAdditionalLightCullingFunction m_AdditionalLightCulling = eAdditionalLightCullingFunction.Default;
+        public bool AdditionalLightEnable
+        {
+            get { return m_AdditionalLightEnable; }
+            set { m_AdditionalLightEnable = value; }
+        }
+
+        public eAdditionalLightCullingFunction AdditonalLightCullingFunction
+        {
+            set { m_AdditionalLightCulling = value; }
+            get { return m_AdditionalLightCulling; }
+        }
+        #endregion
+
         #region Atmosphere scattring
         [SerializeField] AtmosphereResources m_AtmosphereResources;
 
@@ -287,6 +321,14 @@ namespace Insanity
             }
         }
 
+        #endregion
+
+        #region Debug View
+        public DebugViewMode CurrentDebugMode
+        {
+            get { return m_DebugViewMode; }
+            set { m_DebugViewMode = value; }
+        }
         #endregion
 
         //Pipeline resources

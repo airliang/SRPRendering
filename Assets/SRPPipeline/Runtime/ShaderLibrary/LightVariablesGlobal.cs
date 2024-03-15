@@ -10,7 +10,8 @@ namespace Insanity
         public Vector4 _MainLightPosition;
         public Color _MainLightColor;
         public float _MainLightIntensity;
-        public Vector3 pad;
+        public int _AdditionalLightsCount;
+        public Vector2Int _TileNumber;
     }
 
     unsafe public struct MainLightShadowVariablesGlobal

@@ -34,6 +34,9 @@ MonoBehaviour:
   m_ShadowPrefitlerGaussianRadius: 0
   m_EVSMExponents: {x: 5, y: 5}
   m_LightBleedingReduction: 0.255
+  m_DebugViewMode: 1
+  m_AdditionalLightEnable: 1
+  m_AdditionalLightCulling: 1
   m_AtmosphereResources: {fileID: 11400000, guid: c30c5a287b3154b428069571e2d497fe,
     type: 2}
   m_SunLightColor: {r: 5.562989, g: 5.562989, b: 5.562989, a: 1}

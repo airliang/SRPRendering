@@ -267,6 +267,14 @@ float4x4 ApplyCameraTranslationToInverseMatrix(float4x4 inverseModelMatrix)
 #endif
 }
 
+float3 ApplyCameraTranslationToPosition(float3 position)
+{
+#if (SHADEROPTIONS_CAMERA_RELATIVE_RENDERING != 0)
+    position -= _WorldSpaceCameraPos.xyz;
+#endif
+    return position;
+}
+
 #ifndef DOTS_INSTANCING_ON
 
 //void GetAbsoluteWorldRendererBounds(out float3 minBounds, out float3 maxBounds)

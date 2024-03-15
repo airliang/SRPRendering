@@ -12,6 +12,7 @@ namespace Insanity
         public RenderGraph renderGraph;
         public CullingResults cullingResults;
         public PerObjectData perObjectData;
+        public bool supportAdditionalLights;
     }
 }
 

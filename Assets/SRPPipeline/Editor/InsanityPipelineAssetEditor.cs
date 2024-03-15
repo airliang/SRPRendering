@@ -46,6 +46,11 @@ namespace UnityEditor.Insanity
             public static string[] shadowPCFFilterOptions = { "Hard", "Low", "Medium", "High" };
             public static string[] gaussianFilterRadiusOptions = { "3x3", "5x5", "9x9", "13x13" };
 
+            public static GUIContent lightingSettingsText = EditorGUIUtility.TrTextContent("Lighting");
+            public static GUIContent supportAdditionalLightsText = EditorGUIUtility.TrTextContent("Support additional lights");
+            public static GUIContent additionalLightCullingText = EditorGUIUtility.TrTextContent("Additional Light Culling Function");
+            public static string[] additonalLightCullingOptions = { "Default", "Tile Based", "Cluster Based" };
+
             public static GUIContent atmosphereSettingsText = EditorGUIUtility.TrTextContent("Atmosphere");
             public static GUIContent atmosphereResourcesText = EditorGUIUtility.TrTextContent("Atmosphere setting resources", "Atmosphere setting resources");
             public static GUIContent physicalBasedSkyEnable = EditorGUIUtility.TrTextContent("Physical based sky Enable", "Enable Atmosphere scattering rendering in sky.");
@@ -61,6 +66,11 @@ namespace UnityEditor.Insanity
                     "The pipeline resources asset that contains all the shaders and other resources used by the pipeline.");
             public static GUIContent renderDataText = EditorGUIUtility.TrTextContent("Renderer Data",
                     "Renderer Data defines which render path should be used in the render pipeline.");
+
+
+            public static GUIContent debugViewSettingsText = EditorGUIUtility.TrTextContent("DebugView", "DebugView to display the rendering results in the pipeline");
+            public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "TriangleOverdraw" };
+
         }
         SavedBool m_RenderSettingsFoldout;
         SerializedProperty m_HDRSupportProp;
@@ -92,6 +102,10 @@ namespace UnityEditor.Insanity
         SerializedProperty m_ExponentialConstants;
         SerializedProperty m_LightBleedingReduction;
 
+        SavedBool m_LightingSettingsFoldout;
+        SerializedProperty m_AdditionalLightEnable;
+        SerializedProperty m_AdditionalLightCullingFunction;
+
         SavedBool m_ResourcesSettingsFoldout;
         SerializedProperty m_PipelineResources;
         SerializedProperty m_RendererData;
@@ -104,6 +118,9 @@ namespace UnityEditor.Insanity
         //SerializedProperty m_MieG;
         SerializedProperty m_SunLightColor;
         //SerializedProperty m_MultipleScatteringOrder;
+
+        SavedBool m_DebugViewSettingFoldout;
+        SerializedProperty m_DebugViewSettingsMode;
              
         public override void OnInspectorGUI()
         {
@@ -112,8 +129,9 @@ namespace UnityEditor.Insanity
             DrawPipelineResources();
             DrawRenderSettings();
             DrawShadowSettings();
+            DrawLightingSettings();
             DrawAtmosphereScatteringSettings();
-
+            DrawDebugViewSetting();
             serializedObject.ApplyModifiedProperties();
         }
 
@@ -148,6 +166,10 @@ namespace UnityEditor.Insanity
             m_PipelineResources = serializedObject.FindProperty("m_PipelineResources");
             m_RendererData = serializedObject.FindProperty("m_RenderPathData");
 
+            m_LightingSettingsFoldout = new SavedBool($"{target.GetType()}.LightingSettingsFoldout", false);
+            m_AdditionalLightEnable = serializedObject.FindProperty("m_AdditionalLightEnable");
+            m_AdditionalLightCullingFunction = serializedObject.FindProperty("m_AdditionalLightCulling");
+
             m_AtmosphereSettingsFoldout = new SavedBool($"{target.GetType()}.AtmosphereSettingsFoldout", false);
             m_AtmosphereResources = serializedObject.FindProperty("m_AtmosphereResources");
             m_PhysicalBaseSky = serializedObject.FindProperty("m_physicalBasedSky");
@@ -158,6 +180,9 @@ namespace UnityEditor.Insanity
             //m_MultipleScatteringOrder = serializedObject.FindProperty("m_multipleScatteringOrder");
 
             m_ResourcesSettingsFoldout = new SavedBool($"{target.GetType()}.ResourcesSettingsFoldout", false);
+
+            m_DebugViewSettingFoldout = new SavedBool($"{target.GetType()}.DebugViewSettingFoldout", false);
+            m_DebugViewSettingsMode = serializedObject.FindProperty("m_DebugViewMode");
         }
 
         void DrawRenderSettings()
@@ -247,6 +272,24 @@ namespace UnityEditor.Insanity
             EditorGUILayout.EndFoldoutHeaderGroup();
         }
 
+        void DrawLightingSettings()
+        {
+            m_LightingSettingsFoldout.value = EditorGUILayout.BeginFoldoutHeaderGroup(m_LightingSettingsFoldout.value, Styles.lightingSettingsText);
+            if (m_LightingSettingsFoldout.value)
+            {
+                EditorGUI.indentLevel++;
+                m_AdditionalLightEnable.boolValue = EditorGUILayout.Toggle(Styles.supportAdditionalLightsText, m_AdditionalLightEnable.boolValue);
+                if (m_AdditionalLightEnable.boolValue)
+                {
+                    CoreEditorUtils.DrawPopup(Styles.additionalLightCullingText, m_AdditionalLightCullingFunction, Styles.additonalLightCullingOptions);
+                }
+                EditorGUI.indentLevel--;
+                EditorGUILayout.Space();
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
+        }
+
         void DrawAtmosphereScatteringSettings()
         {
             m_AtmosphereSettingsFoldout.value = EditorGUILayout.BeginFoldoutHeaderGroup(m_AtmosphereSettingsFoldout.value, Styles.atmosphereSettingsText);
@@ -266,6 +309,21 @@ namespace UnityEditor.Insanity
                     //m_MultipleScatteringOrder.intValue = EditorGUILayout.IntSlider(Styles.multipleScatteringOrderText, m_MultipleScatteringOrder.intValue, 0, 50);
                 }
                 EditorGUI.indentLevel--;
+                EditorGUILayout.Space();
+                EditorGUILayout.Space();
+            }
+            EditorGUILayout.EndFoldoutHeaderGroup();
+        }
+
+        void DrawDebugViewSetting()
+        {
+            m_DebugViewSettingFoldout.value = EditorGUILayout.BeginFoldoutHeaderGroup(m_DebugViewSettingFoldout.value, Styles.debugViewSettingsText);
+            if (m_DebugViewSettingFoldout.value)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUI.indentLevel--;
+                CoreEditorUtils.DrawPopup(Styles.debugViewSettingsText, m_DebugViewSettingsMode, Styles.debugViewTypeOptions);
+                DebugViewMode debugMode = (DebugViewMode)m_DebugViewSettingsMode.intValue;
                 EditorGUILayout.Space();
                 EditorGUILayout.Space();
             }

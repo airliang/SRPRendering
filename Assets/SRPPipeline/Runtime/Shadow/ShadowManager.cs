@@ -457,7 +457,7 @@ namespace Insanity
             using (var builder = renderGraph.AddRenderPass<ShadowInitPassData>("Init Shadow", out var passData, new ProfilingSampler("Init Shadow Profiler")))
             {
                 passData.m_supportMainLightShadow = shadowSettings.supportsMainLightShadows;
-
+                builder.AllowPassCulling(false);
                 builder.SetRenderFunc(
                     (ShadowInitPassData data, RenderGraphContext ctx) =>
                     {

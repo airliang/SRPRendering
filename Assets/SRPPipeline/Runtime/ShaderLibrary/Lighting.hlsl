@@ -6,6 +6,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl"
 #include "PipelineCore.hlsl"
 #include "Shadow/Shadows.hlsl"
+#include "RealtimeLights.hlsl"
 
 struct Light
 {
@@ -60,68 +61,6 @@ struct LightingData
 //                        Attenuation Functions                               /
 ///////////////////////////////////////////////////////////////////////////////
 
-// Matches Unity Vanila attenuation
-// Attenuation smoothly decreases to light range.
-float DistanceAttenuation(float distanceSqr, half2 distanceAttenuation)
-{
-    // We use a shared distance attenuation for additional directional and puctual lights
-    // for directional lights attenuation will be 1
-    float lightAtten = rcp(distanceSqr);
-
-#if SHADER_HINT_NICE_QUALITY
-    // Use the smoothing factor also used in the Unity lightmapper.
-    half factor = distanceSqr * distanceAttenuation.x;
-    half smoothFactor = saturate(1.0h - factor * factor);
-    smoothFactor = smoothFactor * smoothFactor;
-#else
-    // We need to smoothly fade attenuation to light range. We start fading linearly at 80% of light range
-    // Therefore:
-    // fadeDistance = (0.8 * 0.8 * lightRangeSq)
-    // smoothFactor = (lightRangeSqr - distanceSqr) / (lightRangeSqr - fadeDistance)
-    // We can rewrite that to fit a MAD by doing
-    // distanceSqr * (1.0 / (fadeDistanceSqr - lightRangeSqr)) + (-lightRangeSqr / (fadeDistanceSqr - lightRangeSqr)
-    // distanceSqr *        distanceAttenuation.y            +             distanceAttenuation.z
-    half smoothFactor = saturate(distanceSqr * distanceAttenuation.x + distanceAttenuation.y);
-#endif
-
-    return lightAtten * smoothFactor;
-}
-
-// UE4 light attenuation curve
-/**
- * Returns a radial attenuation factor for a point light.
- * WorldLightVector is the vector from the position being shaded to the light, divided by the radius of the light.
- */
-float RadialAttenuationMask(float3 WorldLightVector)
-{
-	float NormalizeDistanceSquared = dot(WorldLightVector, WorldLightVector);
-	return 1.0f - clamp(NormalizeDistanceSquared, 0, 0.9999);
-}
-float RadialAttenuation(float3 WorldLightVector, half FalloffExponent)
-{
-	// UE3 (fast, but now we not use the default of 2 which looks quite bad):
-	return pow(RadialAttenuationMask(WorldLightVector), FalloffExponent);
-}
-
-float InverseSquareAttenuation(float distance)
-{
-    return 1.0 / (distance * distance);
-}
-
-half AngleAttenuation(half3 spotDirection, half3 lightDirection, half2 spotAttenuation)
-{
-    // Spot Attenuation with a linear falloff can be defined as
-    // (SdotL - cosOuterAngle) / (cosInnerAngle - cosOuterAngle)
-    // This can be rewritten as
-    // invAngleRange = 1.0 / (cosInnerAngle - cosOuterAngle)
-    // SdotL * invAngleRange + (-cosOuterAngle * invAngleRange)
-    // SdotL * spotAttenuation.x + spotAttenuation.y
-
-    // If we precompute the terms in a MAD instruction
-    half SdotL = dot(spotDirection, lightDirection);
-    half atten = saturate(SdotL * spotAttenuation.x + spotAttenuation.y);
-    return atten * atten;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 //                      Light Abstraction                                    //
@@ -152,6 +91,36 @@ Light GetMainLight(ShadowSampleCoords shadowSampleCoords)
 {
     Light light = GetMainLight();
     light.shadowAttenuation = MainLightRealtimeShadow(shadowSampleCoords);   //this is the shadow visibility
+
+    return light;
+}
+
+Light GetAdditionalLight(int lightIndex, float3 positionWS)
+{
+    // Abstraction over Light input constants
+    GPULight gpuLight = _GPUAdditionalLights[lightIndex];
+
+    // Directional lights store direction in lightPosition.xyz and have .w set to 0.0.
+    // This way the following code will work for both directional and punctual lights.
+    float intensity = gpuLight.color.a;
+    float range = gpuLight.position.w;
+    float3 lightPos = ApplyCameraTranslationToPosition(gpuLight.position.xyz);
+    float3 lightVector = lightPos - positionWS;
+    float distance = length(lightVector);
+    
+    float distanceSqr = max(dot(lightVector, lightVector), HALF_MIN);
+    float spotRadian = gpuLight.direction.w;
+    lightVector = normalize(lightVector);
+
+    //half3 lightDirection = half3(lightVector * rsqrt(distanceSqr));
+    // full-float precision required on some platforms
+    float attenuation = DoAttenuation(range * range, distance * distance) * (spotRadian > 0 ? DoSpotCone(spotRadian, gpuLight.direction.xyz, lightVector) : 1);
+    attenuation *= intensity;
+    Light light;
+    light.direction = lightVector;
+    light.distanceAttenuation = attenuation;
+    light.shadowAttenuation = 1.0; // This value can later be overridden in GetAdditionalLight(uint i, float3 positionWS, half4 shadowMask)
+    light.color = gpuLight.color.xyz;
 
     return light;
 }
@@ -527,12 +496,12 @@ half3 LightingLambert(half3 lightColor, half3 lightDir, half3 normal)
     return lightColor * NdotL;
 }
 
-half3 LightingSpecular(half3 lightColor, half3 lightDir, half3 normal, half3 viewDir, half4 specular, half smoothness)
+half3 LightingSpecular(half3 lightColor, half3 lightDir, half3 normal, half3 viewDir, half smoothness)
 {
     float3 halfVec = SafeNormalize(float3(lightDir) + float3(viewDir));
     half NdotH = saturate(dot(normal, halfVec));
     half modifier = pow(NdotH, smoothness);
-    half3 specularReflection = specular.rgb * modifier;
+    half3 specularReflection = modifier;
     return lightColor * specularReflection;
 }
 
@@ -575,6 +544,27 @@ half3 AdditionalLightingPhysicallyBased(BRDFData brdfData, Light light, half3 no
     return LightingPhysicallyBased(brdfData, light.color, light.direction, light.distanceAttenuation * light.shadowAttenuation, light.specularIntensity, normalWS, viewDirectionWS);
 }
 
+#ifdef _TILEBASED_LIGHT_CULLING
+#include "LightCullingInclude.hlsl"
+StructuredBuffer<int> _LightVisibilityIndexBuffer;
+void TileBasedAdditionalLightingFragment(float3 positionWS, float3 normalWS, float3 viewDirWS, float2 screenPos, 
+    half smoothness, out half3 diffuse, out half3 specular)
+{
+    diffuse = 0;
+    specular = 0;
+    uint2 tileId = screenPos * _TileNumber;
+    uint  lightIndexOffset = (tileId.y * _TileNumber.x + tileId.x) * MAX_LIGHT_NUM_PER_TILE;
+    int lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset];
+    for (int i = 0; i < MAX_LIGHT_NUM_PER_TILE && lightIndex >= 0; ++i)
+    {
+        Light light = GetAdditionalLight(lightIndex, positionWS);
+        diffuse += LightingLambert(light.color * light.distanceAttenuation, light.direction, normalWS);
+        specular += LightingSpecular(light.color * light.distanceAttenuation, light.direction, normalWS, viewDirWS, smoothness);
+        lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset + i + 1];
+    }
+}
+#endif
+
 half3 VertexLighting(float3 positionWS, half3 normalWS)
 {
     half3 vertexLightColor = half3(0.0, 0.0, 0.0);
@@ -609,12 +599,32 @@ half4 FragmentBlinnPhong(InputData inputData, half3 diffuse, half4 specularGloss
 
     half3 attenuatedLightColor = mainLight.color * (mainLight.distanceAttenuation * mainLight.shadowAttenuation);
     half3 diffuseColor = inputData.bakedGI + LightingLambert(attenuatedLightColor, mainLight.direction, inputData.normalWS);
-    half3 specularColor = LightingSpecular(attenuatedLightColor, mainLight.direction, inputData.normalWS, inputData.viewDirectionWS, specularGloss, smoothness);
+    half3 specularColor = LightingSpecular(attenuatedLightColor, mainLight.direction, inputData.normalWS, inputData.viewDirectionWS, smoothness);
+    
+#if defined(_ADDITIONAL_LIGHTS)
+    #ifdef _TILEBASED_LIGHT_CULLING
+    half3 diffuseAdditonal = 0;
+    half3 specularAdditional = 0;
+    TileBasedAdditionalLightingFragment(inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS, inputData.positionSS, smoothness, diffuseAdditonal, specularAdditional);
+    specularColor += specularAdditional;
+    diffuseColor += diffuseAdditonal;
+    #else
+    uint pixelLightCount = GetAdditionalLightsCount();
+
+    for (uint lightIndex = 0; lightIndex < min(pixelLightCount, MAX_VISIBLE_LIGHTS); lightIndex++)
+    {
+        //FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
+
+        Light light = GetAdditionalLight(lightIndex, inputData.positionWS);
+        diffuseColor += LightingLambert(light.color * light.distanceAttenuation, light.direction, inputData.normalWS);
+    }
+    #endif
+#endif
 
     half3 finalColor = diffuseColor * diffuse + emission;
-#if defined(_SPECGLOSSMAP) || defined(_SPECULAR_COLOR)
-    finalColor += specularColor;
-#endif
+//#if defined(_SPECGLOSSMAP) || defined(_SPECULAR_COLOR)
+    finalColor += specularColor * specularGloss.rgb;
+//#endif
 
     return half4(finalColor, alpha);
 }

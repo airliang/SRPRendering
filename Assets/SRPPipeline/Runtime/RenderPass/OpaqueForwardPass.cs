@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
+using static Unity.Burst.Intrinsics.X86.Avx;
 
 namespace Insanity
 {
@@ -14,6 +15,9 @@ namespace Insanity
         public RendererListHandle m_renderList_transparent;
         public TextureHandle m_Albedo;
         public TextureHandle m_ShadowMap;
+        public bool m_AdditionalLightsEnable;
+        public eAdditionalLightCullingFunction m_AdditionalLightCullingFunction;
+        public ComputeBuffer m_LightVisibilityIndexBuffer;
     }
 
     public partial class RenderPasses
@@ -41,6 +45,12 @@ namespace Insanity
                 rendererDesc_base_Opaque.renderQueueRange = RenderQueueRange.opaque;
                 RendererListHandle rHandle_base_Opaque = renderingData.renderGraph.CreateRendererList(rendererDesc_base_Opaque);
                 passData.m_renderList_opaque = builder.UseRendererList(rHandle_base_Opaque);
+                passData.m_AdditionalLightsEnable = renderingData.supportAdditionalLights;
+                passData.m_AdditionalLightCullingFunction = InsanityPipeline.asset.AdditonalLightCullingFunction;
+                if (passData.m_AdditionalLightsEnable && passData.m_AdditionalLightCullingFunction == eAdditionalLightCullingFunction.TileBased)
+                {
+                    passData.m_LightVisibilityIndexBuffer = LightCulling.Instance.LightsVisibilityIndexBuffer;
+                }
 
                 UnityEngine.Rendering.RendererUtils.RendererListDesc rendererDesc_base_Transparent =
                     new UnityEngine.Rendering.RendererUtils.RendererListDesc(m_ForwardPass, renderingData.cullingResults, renderingData.cameraData.camera);
@@ -50,6 +60,15 @@ namespace Insanity
                 {
                     if (data.m_ShadowMap.IsValid())
                         context.cmd.SetGlobalTexture("_ShadowMap", data.m_ShadowMap);
+                    CoreUtils.SetKeyword(context.cmd, "_ADDITIONAL_LIGHTS", data.m_AdditionalLightsEnable);
+                    if (data.m_AdditionalLightsEnable)
+                    {
+                        CoreUtils.SetKeyword(context.cmd, "_TILEBASED_LIGHT_CULLING", data.m_AdditionalLightCullingFunction == eAdditionalLightCullingFunction.TileBased);
+                        if (data.m_AdditionalLightCullingFunction == eAdditionalLightCullingFunction.TileBased)
+                        {
+                            context.cmd.SetGlobalBuffer(LightCulling.LightCullingShaderParams._LightVisibilityIndexBuffer, data.m_LightVisibilityIndexBuffer);
+                        }
+                    }
                     CoreUtils.DrawRendererList(context.renderContext, context.cmd, data.m_renderList_opaque);
                     RenderingEventManager.InvokeEvent(RenderingEvents.OpaqueForwardPassEvent, context.renderContext, context.cmd);
                 });

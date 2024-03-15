@@ -17,6 +17,8 @@ namespace Insanity
             public Shader HDRISky;
             [Reload("Runtime/ShaderLibrary/ParallelScan.compute")]
             public ComputeShader ParallelScan;
+            public ComputeShader TileBasedLightCulling;
+            public ComputeShader TileFrustumCompute;
         }
 
         [Serializable, ReloadGroup]

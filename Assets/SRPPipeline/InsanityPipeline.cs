@@ -15,6 +15,8 @@ namespace Insanity
             public static readonly int _ShaderVariablesGlobal = Shader.PropertyToID("ShaderVariablesGlobal");
             public static readonly int _LightVariablesGlobal = Shader.PropertyToID("LightVariablesGlobal");
             public static readonly int _MainlightShadowVariablesGlobal = Shader.PropertyToID("MainlightShadowVariablesGlobal");
+            public static readonly int _GPUAdditionalLights = Shader.PropertyToID("_GPUAdditionalLights");
+            public static readonly int _DebugViewVariables = Shader.PropertyToID("DebugViewVariables");
         }
 
         public static InsanityPipelineAsset asset
@@ -69,7 +71,7 @@ namespace Insanity
                 cullingParams.shadowDistance = Mathf.Min(asset.shadowDistance, camera.farClipPlane);
                 //cullingParams.shadowNearPlaneOffset = QualitySettings.shadowNearPlaneOffset;
                 CullingResults cull = context.Cull(ref cullingParams);
-
+                Plane[] planes = GeometryUtility.CalculateFrustumPlanes(camera);
                 //Camera setup some builtin variables e.g. camera projection matrices etc
                 context.SetupCameraProperties(camera);
 
@@ -79,6 +81,8 @@ namespace Insanity
                 m_RenderingData.cameraData = cameraData;
                 m_RenderingData.renderGraph = m_RenderGraph;
                 m_RenderingData.cullingResults = cull;
+                m_RenderingData.supportAdditionalLights = asset.AdditionalLightEnable;
+                DebugView.debugViewType = (DebugView.DebugViewType)asset.CurrentDebugMode;
 
                 if (m_CurrentRenderer != null)
                 {
@@ -86,6 +90,7 @@ namespace Insanity
                 }
                 else
                 {
+                    /*
                     //Execute graph 
                     CommandBuffer cmdRG = CommandBufferPool.Get("ExecuteRenderGraph");
 
@@ -160,6 +165,7 @@ namespace Insanity
 
                     //Submit camera rendering
                     context.Submit();
+                    */
                 }
                 
                 EndCameraRendering(context, camera);
@@ -188,7 +194,7 @@ namespace Insanity
             //ClearSkyPass();
             Graphics.ClearRandomWriteTargets();
             Graphics.SetRenderTarget(null);
-
+            LightCulling.Instance.Dispose();
             CleanupRenderGraph();
             ConstantBuffer.ReleaseAll();
 

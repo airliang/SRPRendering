@@ -347,29 +347,6 @@ namespace Insanity
 
         public void InitSHBakeSamples()
         {
-            /*
-            int thetaCount = 16;
-            int phiCount = 32;
-            int totalSample = thetaCount * phiCount;
-            m_bakeSHSamples = new Vector4[totalSample];
-            int index = 0;
-            for (int phi = 0; phi < phiCount; ++phi)
-            {
-                for (int theta = 0; theta < thetaCount; ++theta)
-                {
-                    float randomU = Random.Range(0.0f, 1.0f);
-                    float randomV = Random.Range(0.0f, 1.0f);
-                    float thetaAngle = ((float)theta + randomU) / thetaCount * Mathf.PI;
-                    float phiAngle = ((float)phi + randomV) / phiCount * Mathf.PI * 2.0f;
-                    float sinTheta = Mathf.Sin(thetaAngle);
-                    float sinPhi = Mathf.Sin(phiAngle);
-                    float cosPhi = Mathf.Cos(phiAngle);
-                    float cosTheta = Mathf.Cos(thetaAngle);
-                    float weight = sinTheta;
-                    m_bakeSHSamples[index++] = new Vector4(sinTheta * cosPhi, cosTheta, sinTheta * sinPhi, weight);
-                }
-            }
-            */
             //uniform sample sphere
             
             m_bakeSHSamples = new Vector4[512];

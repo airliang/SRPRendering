@@ -57,24 +57,7 @@ namespace Insanity
                 m_sunLight = cullResults.visibleLights[m_mainLightIndex].light;
             //update light to shader constants
 
-        }
-
-        void PrepareGPULightData(CommandBuffer cmd, ref CullingResults cullResults, CameraData cameraData)
-        {
-            UpdateLightVariablesGlobalCB(cmd, m_sunLight);
-
-            bool mainLightCastShadows = false;
-            if (asset.shadowDistance > 0)
-            {
-                mainLightCastShadows = (m_mainLightIndex != -1 && m_sunLight != null &&
-                                        m_sunLight.shadows != LightShadows.None);
-            }
-
-            //Prepare shadow datas
-
-            InitShadowSettings(mainLightCastShadows, ref cullResults, cameraData, m_mainLightIndex);
-
-            
+            m_LightVariablesGlobalCB._AdditionalLightsCount = cullResults.visibleLights.Length - 1;
         }
 
         void InitShadowSettings(bool mainLightCastShadows, ref CullingResults cullResults, CameraData cameraData, int lightIndex)
@@ -82,7 +65,14 @@ namespace Insanity
             ShadowManager.Instance.Setup(mainLightCastShadows, ref cullResults, cameraData, lightIndex);
         }
 
-        public static void UpdateLightVariablesGlobalCB(CommandBuffer cmd, Light mainLight)
+        class UpdateLightCBPassData
+        {
+            //public Light mainlight;
+            public LightVariablesGlobal lightVariables;
+            public ComputeBuffer additionalLightsBuffer;
+        }
+
+        public static void UpdateLightVariablesGlobalCB(RenderGraph renderGraph, Light mainLight, LightCulling lightCulling)
         {
             m_LightVariablesGlobalCB._MainLightPosition = new Vector4(0, 1, 0, 0);
             if (mainLight != null)
@@ -92,8 +82,22 @@ namespace Insanity
                 m_LightVariablesGlobalCB._MainLightColor = mainLight.color;
                 m_LightVariablesGlobalCB._MainLightIntensity = mainLight.intensity;
             }
+            m_LightVariablesGlobalCB._AdditionalLightsCount = lightCulling.ValidAdditionalLightsCount;
+            m_LightVariablesGlobalCB._TileNumber = lightCulling.CurrentTileNumber;
+            //ConstantBuffer.PushGlobal(cmd, m_LightVariablesGlobalCB, ShaderIDs._LightVariablesGlobal);
 
-            ConstantBuffer.PushGlobal(cmd, m_LightVariablesGlobalCB, ShaderIDs._LightVariablesGlobal);
+            using (var builder = renderGraph.AddRenderPass<UpdateLightCBPassData>("Update Light Global Parameters", out var passData))
+            {
+                passData.additionalLightsBuffer = lightCulling.AdditionalLightsBuffer;
+                passData.lightVariables = m_LightVariablesGlobalCB;
+                builder.AllowPassCulling(false);
+                builder.SetRenderFunc(
+                    (UpdateLightCBPassData data, RenderGraphContext context) =>
+                    {
+                        ConstantBuffer.PushGlobal(context.cmd, passData.lightVariables, ShaderIDs._LightVariablesGlobal);
+                        context.cmd.SetGlobalBuffer(ShaderIDs._GPUAdditionalLights, data.additionalLightsBuffer);
+                    });
+            }
         }
 
         class PushGlobalCameraParamPassData
@@ -108,7 +112,7 @@ namespace Insanity
             {
                 passData.cameraData = cameraData;
                 passData.globalCB = m_ShaderVariablesGlobalCB;
-
+                builder.AllowPassCulling(false);
                 builder.SetRenderFunc(
                     (PushGlobalCameraParamPassData data, RenderGraphContext context) =>
                     {

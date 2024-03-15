@@ -11,21 +11,23 @@ namespace Insanity
     public class ForwardRenderPath : RenderPath
     {
         private Material m_finalBlitMaterial;
+        private Material m_debugViewBlitMaterial = null;
         private ComputeShader m_parallelScan;
         Light m_sunLight;
         //ShadowManager m_ShadowMananger;
         int m_mainLightIndex = -1;
+        ForwardRendererData m_forwardRenderData;
 
         public ForwardRenderPath(ForwardRendererData data, InsanityPipeline pipeline)
         {
             this.currentPipeline = pipeline;
+            m_forwardRenderData = data;
             m_finalBlitMaterial = CoreUtils.CreateEngineMaterial(data.ForwardPathResources.shaders.Blit);
+            m_debugViewBlitMaterial = CoreUtils.CreateEngineMaterial("Insanity/DebugViewBlit");
         }
         public override void RenderFrame(ScriptableRenderContext context, RenderingData renderingData, ref CullingResults cull)
         {
             InsanityPipelineAsset asset = InsanityPipeline.asset;
-
-            
 
             CommandBuffer cmdRG = CommandBufferPool.Get("ExecuteRenderGraph");
 
@@ -33,7 +35,7 @@ namespace Insanity
             if (cull.visibleLights.Length > 0)
             {
                 ProcessVisibleLights(ref cull);
-                PrepareGPULightData(cmdRG, ref cull, renderingData.cameraData);
+                PrepareGPULightData(ref cull, renderingData);
             }
             //m_RenderingData.sunLight = m_sunLight;
 
@@ -48,64 +50,80 @@ namespace Insanity
             RenderingEventManager.BeforeExecuteRenderGraph(renderingData.renderGraph, renderingData.cameraData.camera);
             using (renderingData.renderGraph.RecordAndExecute(rgParams))
             {
+                InsanityPipeline.UpdateLightVariablesGlobalCB(renderingData.renderGraph, m_sunLight, LightCulling.Instance);
                 DepthPrepassData depthPassData = RenderPasses.Render_DepthPrePass(renderingData);
-
-                ShadowManager.Instance.ExecuteShadowInitPass(renderingData.renderGraph);
-                ShadowPassData shadowPassData = null;
-                TextureHandle shadowmap = TextureHandle.nullHandle;
-                if (ShadowManager.Instance.shadowSettings.supportsMainLightShadows)
+                LightCulling.TileBasedLightCullingData lightCullingData = null;
+                if (renderingData.supportAdditionalLights && LightCulling.Instance.ValidAdditionalLightsCount > 0)
                 {
-                    shadowPassData = InsanityPipeline.RenderShadow(renderingData.cameraData, renderingData.renderGraph, renderingData.cullingResults,
-                        /*asset.InsanityPipelineResources.shaders.ParallelScan*/m_parallelScan);
+                    //LightCulling.Instance.ExecuteTileFrustumCompute(renderingData, m_forwardRenderData.ForwardPathResources.shaders.TileFrustumCompute);
+                    lightCullingData = LightCulling.Instance.ExecuteTilebasedLightCulling(renderingData, depthPassData.m_Depth, 
+                        m_forwardRenderData.ForwardPathResources.shaders.TileBasedLightCulling);
+                }
 
-                    if (shadowPassData != null)
+                if (DebugView.NeedDebugView())
+                {
+                    DebugView.DebugViewForwardPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth);
+                    //DebugView.DebugViewTextures textures = new DebugView.DebugViewTextures();
+                    //textures.m_Depth = depthPassData.m_Depth;
+                    //textures.m_TileVisibleLightCount = lightCullingData.tileVisibleLightCounts;
+                    //DebugView.ShowDebugPass(renderingData, ref textures, m_debugViewBlitMaterial);
+                }
+                //else
+                {
+                    ShadowManager.Instance.ExecuteShadowInitPass(renderingData.renderGraph);
+                    ShadowPassData shadowPassData = null;
+                    TextureHandle shadowmap = TextureHandle.nullHandle;
+                    if (ShadowManager.Instance.shadowSettings.supportsMainLightShadows)
                     {
+                        shadowPassData = InsanityPipeline.RenderShadow(renderingData.cameraData, renderingData.renderGraph, renderingData.cullingResults,
+                            /*asset.InsanityPipelineResources.shaders.ParallelScan*/m_parallelScan);
 
-                        shadowmap = shadowPassData.m_Shadowmap;
-                        if (ShadowManager.Instance.NeedPrefilterShadowmap(shadowPassData))
+                        if (shadowPassData != null)
                         {
-                            PrefilterShadowPassData prefilterPassData = ShadowManager.Instance.PrefilterShadowPass(
-                                renderingData.renderGraph, shadowPassData);
-                            //shadowPassData.m_Shadowmap = prefilterPassData.m_BlurShadowmap;
-                            if (prefilterPassData.m_filterRadius != eGaussianRadius.eGausian3x3)
-                                shadowmap = prefilterPassData.m_Shadowmap;
-                            else
-                                shadowmap = prefilterPassData.m_BlurShadowmap;
+
+                            shadowmap = shadowPassData.m_Shadowmap;
+                            if (ShadowManager.Instance.NeedPrefilterShadowmap(shadowPassData))
+                            {
+                                PrefilterShadowPassData prefilterPassData = ShadowManager.Instance.PrefilterShadowPass(
+                                    renderingData.renderGraph, shadowPassData);
+                                //shadowPassData.m_Shadowmap = prefilterPassData.m_BlurShadowmap;
+                                if (prefilterPassData.m_filterRadius != eGaussianRadius.eGausian3x3)
+                                    shadowmap = prefilterPassData.m_Shadowmap;
+                                else
+                                    shadowmap = prefilterPassData.m_BlurShadowmap;
+                            }
                         }
+
+                        //if (shadowPassData != null)
+                        //    RenderScreenSpaceShadow(cameraData, m_RenderGraph, shadowPassData, depthPassData);
                     }
 
-                    //if (shadowPassData != null)
-                    //    RenderScreenSpaceShadow(cameraData, m_RenderGraph, shadowPassData, depthPassData);
-                }
+                    ForwardPassData forwardPassData = RenderPasses.Render_OpaqueFowardPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, shadowmap);
+                    Atmosphere atmosphere = Atmosphere.Instance;
+                    if (asset.PhysicalBasedSky)
+                    {
+                        //BakeAtmosphereSH(ref context, asset.AtmosphereResources);
+                        Atmosphere.Instance.BakeSkyToSHAmbient(ref context, asset.AtmosphereResources, m_sunLight);
+                        atmosphere.Update();
+                        RenderPasses.Render_PhysicalBaseSky(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, asset);
+                    }
+                    else
+                    {
+                        Cubemap cubemap = asset.InsanityPipelineResources.materials.Skybox.GetTexture("_Cubemap") as Cubemap;
+                        atmosphere.BakeCubemapToSHAmbient(ref context, asset.AtmosphereResources, cubemap);
+                        atmosphere.Update();
+                        RenderPasses.Render_SkyPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, asset.InsanityPipelineResources.materials.Skybox);
+                    }
 
-                ForwardPassData forwardPassData = RenderPasses.Render_OpaqueFowardPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, shadowmap);
-                Atmosphere atmosphere = Atmosphere.Instance;
-                if (asset.PhysicalBasedSky)
-                {
-                    //BakeAtmosphereSH(ref context, asset.AtmosphereResources);
-                    Atmosphere.Instance.BakeSkyToSHAmbient(ref context, asset.AtmosphereResources, m_sunLight);
-                    atmosphere.Update();
-                    RenderPasses.Render_PhysicalBaseSky(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, asset);
+                    RenderPasses.FinalBlitPass(renderingData, forwardPassData.m_Albedo, m_finalBlitMaterial);
+                    if (DebugView.NeedDebugView())
+                    {
+                        DebugView.DebugViewGPUResources textures = new DebugView.DebugViewGPUResources();
+                        textures.m_Depth = depthPassData.m_Depth;
+                        textures.m_LightVisibilityIndexBuffer = lightCullingData != null ? lightCullingData.lightVisibilityIndexBuffer : LightCulling.Instance.LightsVisibilityIndexBuffer;
+                        DebugView.ShowDebugPass(renderingData, ref textures, m_debugViewBlitMaterial);
+                    }
                 }
-                else
-                {
-                    Cubemap cubemap = asset.InsanityPipelineResources.materials.Skybox.GetTexture("_Cubemap") as Cubemap;
-                    atmosphere.BakeCubemapToSHAmbient(ref context, asset.AtmosphereResources, cubemap);
-                    atmosphere.Update();
-                    RenderPasses.Render_SkyPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, asset.InsanityPipelineResources.materials.Skybox);
-                }
-                //SATPassData satData = m_satRenderer.TestParallelScan(m_RenderGraph, asset.InsanityPipelineResources.shaders.ParallelScan);
-                //if (satData != null)
-                //{
-                //    forwardPassData.m_Albedo = satData.GetFinalOutputTexture();
-                //}
-                //if (asset.PCSSSATEnable && shadowPassData != null)
-                //{
-                //    forwardPassData.m_Albedo = shadowPassData.m_ShadowmapSAT;
-                //}
-                RenderPasses.FinalBlitPass(renderingData, forwardPassData.m_Albedo, m_finalBlitMaterial);
-
-
             }
 
             context.ExecuteCommandBuffer(cmdRG);
@@ -128,12 +146,18 @@ namespace Insanity
             if (m_mainLightIndex >= 0)
                 m_sunLight = cullResults.visibleLights[m_mainLightIndex].light;
             //update light to shader constants
-
+            InsanityPipeline.m_LightVariablesGlobalCB._AdditionalLightsCount = cullResults.visibleLights.Length - 1;
         }
 
-        void PrepareGPULightData(CommandBuffer cmd, ref CullingResults cullResults, CameraData cameraData)
+        void PrepareGPULightData(ref CullingResults cullResults, RenderingData renderingData)
         {
-            InsanityPipeline.UpdateLightVariablesGlobalCB(cmd, m_sunLight);
+            if (renderingData.supportAdditionalLights) 
+            {
+                LightCulling.Instance.SetupAdditionalLights(cullResults.visibleLights, renderingData.cameraData);
+                LightCulling.Instance.SetupTiles((int)GlobalRenderSettings.screenResolution.width, (int)GlobalRenderSettings.screenResolution.height,
+                    m_forwardRenderData.TileSize);
+            }
+            
 
             bool mainLightCastShadows = false;
             if (InsanityPipeline.asset.shadowDistance > 0)
@@ -144,7 +168,7 @@ namespace Insanity
 
             //Prepare shadow datas
 
-            InitShadowSettings(mainLightCastShadows, ref cullResults, cameraData, m_mainLightIndex);
+            InitShadowSettings(mainLightCastShadows, ref cullResults, renderingData.cameraData, m_mainLightIndex);
 
 
         }

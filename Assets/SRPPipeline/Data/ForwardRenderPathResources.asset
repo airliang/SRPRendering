@@ -16,5 +16,9 @@ MonoBehaviour:
     Blit: {fileID: 4800000, guid: 7c0b0718aa2f5834ea739d5009bbbc0d, type: 3}
     HDRISky: {fileID: 4800000, guid: 06c01dc3845ea1245802e318cacb5273, type: 3}
     ParallelScan: {fileID: 7200000, guid: 8a4fde720a0fdb34b99ff02187040f19, type: 3}
+    TileBasedLightCulling: {fileID: 7200000, guid: 78d0310695d287c439af699535039abd,
+      type: 3}
+    TileFrustumCompute: {fileID: 7200000, guid: 45aac337c068a2a4eb0c7fc2e8de692a,
+      type: 3}
   materials:
     Blit: {fileID: 0}

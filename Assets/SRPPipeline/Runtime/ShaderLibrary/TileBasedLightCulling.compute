@@ -1,0 +1,128 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel LightCulling
+#pragma enable_d3d11_debug_symbols
+#include "LightCullingInclude.hlsl"
+
+
+StructuredBuffer<LightData> _LightBuffer;
+RWStructuredBuffer<int> _LightVisibilityIndexBuffer; //tile nums * MAX_LIGHT_NUM_PER_TILE
+StructuredBuffer<TileFrustum> _TileFrustums;
+Texture2D _DepthTexture;
+float4x4 _ViewMatrix;
+float4x4 _ProjInverse;
+uint2 _ScreenSize;
+uint2 _TileNumber;
+uint _TotalLightNum;
+
+RWTexture2D<uint> _TileVisibleLightCounts;
+
+groupshared uint _MinDepth;
+groupshared uint _MaxDepth;
+groupshared TileFrustum _LightGridFrustum;
+groupshared TileAABB _AABBInView;
+groupshared uint _TileLightCount;
+groupshared int _LightList[MAX_LIGHT_NUM_PER_TILE];
+//groupshared uint _TileIndex;
+//groupshared uint _VisibleLightStartOffset;
+
+
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
+void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+{
+    //first step, get the tile by groupid
+    //uint2 tileId = groupId.xy;
+    int groupIndex = GTid.x + GTid.y * TILE_SIZE;
+    //Get the tile frustum info
+    //_TileIndex = 0;
+    int tileIndex = _TileNumber.x * groupId.y + groupId.x;
+    if (groupIndex == 0)
+    {
+        _MinDepth = 0xffffffff;
+        _MaxDepth = 0;
+        _TileLightCount = 0;
+        //_TileIndex = _TileNumber.x * groupId.y + groupId.x;
+        _LightGridFrustum = _TileFrustums[tileIndex];
+
+    }
+    GroupMemoryBarrierWithGroupSync();
+    //compute the min max depth of a tile
+    float depth = _DepthTexture.Load(int3(DTid.xy, 0));
+    depth = 1.0 - depth;
+    //float3 clipSpacePos = float3(((float2)DTid.xy / _ScreenSize), depth) * 2.0 - 1.0;
+    //float4 viewSpacePos = mul(_ProjInverse, float4(clipSpacePos, 1));
+    //float depthView = viewSpacePos.z / viewSpacePos.w;
+    //InterlockedMax(_MaxDepth, asuint(depthView));
+    //InterlockedMin(_MinDepth, asuint(depthView));
+    InterlockedMax(_MaxDepth, asuint(depth * 2.0 - 1.0));
+    InterlockedMin(_MinDepth, asuint(depth * 2.0 - 1.0));
+    GroupMemoryBarrierWithGroupSync();
+    
+    
+    if (groupIndex == 0)
+    {
+        float maxDepth = asfloat(_MaxDepth);
+        float minDepth = asfloat(_MinDepth);
+        float2 minInClip = float2(groupId.xy) / _TileNumber * 2.0 - 1.0;
+        float2 maxInClip = (float2(groupId.xy) + 1) / _TileNumber * 2.0 - 1.0;
+        float4 minInView = mul(_ProjInverse, float4(minInClip, minDepth, 1));
+        minInView /= minInView.w;
+        float4 maxInView = mul(_ProjInverse, float4(maxInClip, maxDepth, 1));
+        maxInView /= maxInView.w;
+    
+        _AABBInView.center = (minInView.xyz + maxInView.xyz) * 0.5;
+        _AABBInView.extents = (maxInView.xyz - minInView.xyz) * 0.5;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    
+    for (int i = groupIndex; i < _TotalLightNum; i += TILE_SIZE * TILE_SIZE)
+    {
+        LightData light = _LightBuffer[i];
+        float4 lightPosInView = mul(_ViewMatrix, float4(light.position.xyz, 1));
+        lightPosInView /= lightPosInView.w;
+        bool intersect = false;
+        //if (SphereInsideFrustum(float4(lightPosInView.xyz, light.position.w), _LightGridFrustum, minDepth, maxDepth))
+        if (light.direction.w == 0)   //point light
+        {
+            if (SphereIntersectsAABB(float4(lightPosInView.xyz, light.position.w), _AABBInView))
+            {
+                intersect = true;
+                //uint index = 0; // Index into the visible lights array.
+                //InterlockedAdd(_TileLightCount, 1, index);
+                //if (index < MAX_LIGHT_NUM_PER_TILE)
+                //{
+                //    _LightList[index] = i;
+                //}
+            }
+        }
+        else   //spot light
+        {
+            float3 directionView = mul(_ViewMatrix, float4(light.direction.xyz, 0));
+
+            directionView = normalize(directionView);
+            if (SpotlightVsAABB(lightPosInView.xyz, directionView, light.position.w, light.direction.w, _AABBInView))
+            {
+                intersect = true;
+            }
+        }
+        if (intersect)
+        {
+            uint index = 0; // Index into the visible lights array.
+            InterlockedAdd(_TileLightCount, 1, index);
+            if (index < MAX_LIGHT_NUM_PER_TILE)
+            {
+                _LightList[index] = i;
+            }
+        }
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+    
+    int offset = tileIndex * MAX_LIGHT_NUM_PER_TILE;
+    if (groupIndex == 0)
+    {
+        _TileVisibleLightCounts[groupId.xy] = _TileLightCount;
+    }
+    
+    _LightVisibilityIndexBuffer[offset + groupIndex] = groupIndex < _TileLightCount ? _LightList[groupIndex] : -1;
+    
+}

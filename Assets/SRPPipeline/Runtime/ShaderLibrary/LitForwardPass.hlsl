@@ -55,10 +55,10 @@ float3 computeTangentFromNormal(float3 normal) {
 void InitializeInputData(Varyings input, out InputData inputData)
 {
     inputData = (InputData)0;
+    PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenSize.zw, uint2(input.positionCS.xy));
 
-//#if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
     inputData.positionWS = input.positionWS;
-//#endif
+    inputData.positionSS = posInput.positionNDC.xy;
 
     half3 viewDirWS = SafeNormalize(input.viewDirWS);
 
@@ -131,10 +131,10 @@ half4 LitPassFragment(Varyings input) : SV_Target
     UNITY_SETUP_INSTANCE_ID(input);
     //UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
     //this function GetPositionInput here will not generate positionWS
-    PositionInputs posInput = GetPositionInput(input.positionCS.xy, 1.0/* / _ScaledScreenParams.xy*/, uint2(input.positionCS.xy));
+    //PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenSize.zw, uint2(input.positionCS.xy));
 
-    float2 uv = posInput.positionNDC.xy;
-    uint2 screenCoord = posInput.positionSS;
+    //float2 uv = posInput.positionNDC.xy;
+    //uint2 screenCoord = posInput.positionSS;
 
     SurfaceData surfaceData;
     InitializeLitSurfaceData(input.uv, surfaceData);
@@ -142,7 +142,8 @@ half4 LitPassFragment(Varyings input) : SV_Target
     InputData inputData;
 
     InitializeInputData(input, inputData);
-    ShadowSampleCoords shadowSample = GetShadowSampleData(input.positionWS, posInput.positionSS.xy);
+
+    ShadowSampleCoords shadowSample = GetShadowSampleData(inputData.positionWS, inputData.positionSS);
     half4 color = FragmentBlinnPhong(inputData, surfaceData.albedo, 0, 0, 0, surfaceData.alpha, shadowSample);//half4(surfaceData.albedo, surfaceData.alpha);
     return color;
 }

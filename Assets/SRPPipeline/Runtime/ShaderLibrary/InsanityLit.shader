@@ -96,12 +96,37 @@
             #pragma multi_compile _ _VSM_SAT_FILTER
             #pragma multi_compile _ _SHADOW_VSM
             #pragma multi_compile _ _SHADOW_EVSM
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _TILEBASED_LIGHT_CULLING
 			
 			#include "LitInput.hlsl"
 			#include "LitForwardPass.hlsl"
 
 			ENDHLSL			
 		}
+
+        Pass 
+        {
+            Tags { "LightMode" = "DebugView" }
+            ZWrite Off
+            ZTest Equal
+            Cull[_Cull]
+
+            HLSLPROGRAM
+            //#pragma shader_feature_local _ALPHATEST_ON
+			#pragma enable_d3d11_debug_symbols
+			#pragma vertex DebugViewPassVertex
+			#pragma fragment DebugViewPassFragment
+            #pragma multi_compile_instancing
+            //#pragma shader_feature_local _ALPHATEST_ON
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _DEBUGVIEW
+			
+#include "LitInput.hlsl"
+#include "DebugViewPass.hlsl"
+
+			ENDHLSL
+        }
 	}
 
             CustomEditor "UnityEditor.Insanity.InsanityLitShaderGUI"
