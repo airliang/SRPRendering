@@ -54,7 +54,7 @@
             //#pragma shader_feature_local _ALPHATEST_ON
 			#pragma multi_compile _ _MAIN_LIGHT_SHADOWS
 			#pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
-			#pragma multi_compile _ _SHADOWS_SOFT
+			//#pragma multi_compile _ _SHADOWS_SOFT
 			#pragma multi_compile _ _SHADOW_PCSS
             #pragma multi_compile _ _VSM_SAT_FILTER
             #pragma multi_compile _ _SHADOW_VSM
@@ -77,7 +77,7 @@
                 //InitializeLitSurfaceData(input.uv, surfaceData);
 
                 InputData inputData;
-                InitializeInputData(input, inputData);
+                InitializeInputData(input, float3(0, 0, 1), inputData);
                 half3 ambient = max(ShadeSH9(half4(inputData.normalWS, 1.0)), 0);
                 half4 color = half4(ambient, 1.0);
                 return color;

@@ -68,6 +68,7 @@ ShadowSamplingData GetMainLightShadowSamplingData()
     shadowSamplingData.shadowOffset2 = _MainLightShadowOffset2;
     shadowSamplingData.shadowOffset3 = _MainLightShadowOffset3;
     shadowSamplingData.shadowmapSize = _MainLightShadowmapSize;
+    shadowSamplingData.softShadowQuality = _MainLightShadowParams.y;
 
     return shadowSamplingData;
 }
@@ -121,12 +122,12 @@ real SampleShadowmap(TEXTURE2D_SHADOW_PARAM(ShadowMap, sampler_ShadowMap), float
     attenuation = SampleExponentialVarianceShadowmap(_ShadowMap, s_linear_clamp_sampler, shadowCoord, _ShadowExponents, _LightBleedingReduction);
 #else
     // TODO: We could branch on if this light has soft shadows (shadowParams.y) to save perf on some platforms.
-#ifdef _SHADOWS_SOFT
+//#ifdef _SHADOWS_SOFT
     attenuation = SampleShadowmapFiltered(TEXTURE2D_SHADOW_ARGS(ShadowMap, sampler_ShadowMap), shadowCoord, samplingData);
-#else
+//#else
     // 1-tap hardware comparison
-    attenuation = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, shadowCoord.xyz);
-#endif
+    //attenuation = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, shadowCoord.xyz);
+//#endif
 #endif
 
     attenuation = LerpWhiteTo(attenuation, shadowStrength);

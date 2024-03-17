@@ -22,7 +22,7 @@ struct Varyings
 //#endif
     float3 normalWS : TEXCOORD2;
 
-#if defined(_NORMAL_MAP)
+#if defined(_NORMALMAP)
     float4 tangentWS                : TEXCOORD3;    // xyz: tangent, w: sign
 #endif
     float3 viewDirWS : TEXCOORD4;
@@ -96,7 +96,7 @@ struct Varyings
         output.normalWS = normalInput.normalWS;
         output.viewDirWS = viewDirWS;
 
-#ifdef _NORMAL_MAP
+#ifdef _NORMALMAP
     real sign = input.tangentOS.w * GetOddNegativeScale();
     output.tangentWS = half4(normalInput.tangentWS.xyz, sign);
 #endif

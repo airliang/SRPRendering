@@ -177,8 +177,8 @@ namespace Insanity
             if (shadowSetting.adaptiveShadowBias)
             {
                 float R = 1.0f;
-                if (shadowSetting.supportSoftShadow)
-                    R = 3.0f;
+                //if (shadowSetting.supportSoftShadow)
+                //    R = 3.0f;
                 biasScale *= R * 0.5f * texelSize;
                 //return new Vector4(biasScale, 0.0f, 0.0f, 0.0f);
                 depthBias = shadowSetting.depthBias;
@@ -191,7 +191,7 @@ namespace Insanity
             }
             
 
-            if (shadowSetting.supportSoftShadow)
+            //if (shadowSetting.supportSoftShadow)
             {
                 // TODO: depth and normal bias assume sample is no more than 1 texel away from shadowmap
                 // This is not true with PCF. Ideally we need to do either

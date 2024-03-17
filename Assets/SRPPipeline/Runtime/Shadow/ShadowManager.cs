@@ -27,11 +27,11 @@ namespace Insanity
         public Vector4[] m_ShadowBias;
         public ShaderVariablesGlobal globalCB;
         public Vector3 m_ShadowLightDirection;
-        public bool m_SoftShadows = false;
+        //public bool m_SoftShadows = false;
         public bool m_AdaptiveShadowBias = false;
         //public float m_CSMBlendDistance = 0;
-        public ShadowType m_ShadowType = ShadowType.PCF;
-        public ShadowPCFFilter m_ShadowPCFFilter = ShadowPCFFilter.PCF_5x5;
+        public eShadowType m_ShadowType = eShadowType.PCF;
+        public eShadowPCFFilter m_ShadowPCFFilter = eShadowPCFFilter.PCF_5x5;
         public float m_PCSSSoftness = 1.0f;
         public float m_PCSSFilterSamples = 64;
         public float m_PCSSSoftnessFalloff = 2.0f;
@@ -120,7 +120,7 @@ namespace Insanity
         Vector4[] m_CascadeSplitSpheres;
         Vector4[] m_ShadowBias;
         Material m_ScreenSpaceShadowsMaterial;
-        bool m_supportSoftShadow = true;
+        //bool m_supportSoftShadow = true;
         ShadowSettings m_shadowSettings = new ShadowSettings();
 
         PrefilterShadowPass m_prefilterPass;
@@ -244,7 +244,7 @@ namespace Insanity
         public void UpdateDirectionalShadowRequest(ShadowRequest shadowRequest, ShadowSettings shadowSettings, VisibleLight visibleLight, ref CullingResults cullResults, 
             int requestIndex, int lightIndex, Vector3 cameraPos, out Matrix4x4 invViewProjection)
         {
-            m_supportSoftShadow = shadowSettings.supportSoftShadow;
+            //m_supportSoftShadow = shadowSettings.supportSoftShadow;
             Vector4 cullingSphere;
             
             m_mainLightShadowIndex = lightIndex;
@@ -300,7 +300,7 @@ namespace Insanity
             VisibleLight mainLight = cullResults.visibleLights[mainLightIndex];
             m_shadowSettings.supportsMainLightShadows = SystemInfo.supportsShadows && mainLightCastShadows;
             m_shadowSettings.maxShadowDistance = asset.shadowDistance;
-            m_shadowSettings.supportSoftShadow = asset.supportsSoftShadows;
+            //m_shadowSettings.supportSoftShadow = asset.supportsSoftShadows;
             m_shadowSettings.shadowType = asset.ShadowType;
             m_shadowSettings.shadowPCFFilter = asset.PCFFilter;
             m_shadowSettings.cascade2Split = asset.cascade2Split;
@@ -317,11 +317,11 @@ namespace Insanity
             m_shadowSettings.prefilterGaussianRadius = asset.ShadowPrefilterGaussian;
             m_shadowSettings.exponentialConstants = asset.EVSMExponentConstants;
             m_shadowSettings.lightBleedingReduction = asset.LightBleedingReduction;
-            if (asset.shadowCascadeOption == ShadowCascadesOption.NoCascades)
+            if (asset.shadowCascadeOption == eShadowCascadesOption.NoCascades)
             {
                 m_shadowSettings.mainLightShadowCascadesCount = 1;
             }
-            else if (asset.shadowCascadeOption == ShadowCascadesOption.TwoCascades)
+            else if (asset.shadowCascadeOption == eShadowCascadesOption.TwoCascades)
             {
                 m_shadowSettings.mainLightShadowCascadesCount = 2;
             }
@@ -378,9 +378,9 @@ namespace Insanity
                 cascadeIndex, m_ShadowmapWidth, m_ShadowmapHeight, shadowRequest.resolution, shadowRequest.offsetX, shadowRequest.offsetY);//invViewProjection;
         }
 
-        public TextureDesc GetShadowMapTextureDesc(ShadowType shadowType)
+        public TextureDesc GetShadowMapTextureDesc(eShadowType shadowType)
         {
-            if (shadowType == ShadowType.VSM || shadowType == ShadowType.EVSM)
+            if (shadowType == eShadowType.VSM || shadowType == eShadowType.EVSM)
             {
                 return new TextureDesc(m_ShadowmapWidth, m_ShadowmapHeight)
                 {
@@ -390,7 +390,7 @@ namespace Insanity
                     name = m_Name,
                     wrapMode = TextureWrapMode.Clamp,
                     colorFormat = ShadowSettings.GetShadowmapFormat(shadowType),
-                    clearColor = shadowType == ShadowType.VSM ? Color.white : new Color(65504.0f, 65504.0f, 0, 0),
+                    clearColor = shadowType == eShadowType.VSM ? Color.white : new Color(65504.0f, 65504.0f, 0, 0),
                     autoGenerateMips = false,
                     useMipMap = false,
                     clearBuffer = true
@@ -421,7 +421,7 @@ namespace Insanity
             return ssShadowmapDesc;
         }
 
-        TextureHandle GetShadowMap(RenderGraph renderGraph, ShadowType shadowType)
+        TextureHandle GetShadowMap(RenderGraph renderGraph, eShadowType shadowType)
         {
             //return renderGraph.CreateTexture(GetShadowMapTextureDesc());
             renderGraph.CreateTextureIfInvalid(GetShadowMapTextureDesc(shadowType), ref m_ShadowMap);
@@ -464,7 +464,7 @@ namespace Insanity
                         if (!data.m_supportMainLightShadow)
                         {
                             Shader.DisableKeyword("_MAIN_LIGHT_SHADOWS");
-                            Shader.DisableKeyword("_SHADOWS_SOFT");
+                            //Shader.DisableKeyword("_SHADOWS_SOFT");
                         }
                     });
              }
@@ -473,26 +473,26 @@ namespace Insanity
         private void SetShadowCasterPassKeywords(CommandBuffer cmd, ShadowPassData passData)
         {
             CoreUtils.SetKeyword(cmd, "_ADAPTIVE_SHADOW_BIAS", passData.m_AdaptiveShadowBias);
-            CoreUtils.SetKeyword(cmd, "_SHADOW_VSM", passData.m_ShadowType == ShadowType.VSM);
-            CoreUtils.SetKeyword(cmd, "_SHADOW_EVSM", passData.m_ShadowType == ShadowType.EVSM);
+            CoreUtils.SetKeyword(cmd, "_SHADOW_VSM", passData.m_ShadowType == eShadowType.VSM);
+            CoreUtils.SetKeyword(cmd, "_SHADOW_EVSM", passData.m_ShadowType == eShadowType.EVSM);
         }
 
         private void SetReceiverShadowKeywords(CommandBuffer cmd, ShadowPassData passData)
         {
             CoreUtils.SetKeyword(cmd, "_MAIN_LIGHT_SHADOWS", true);
-            CoreUtils.SetKeyword(cmd, "_SHADOWS_SOFT", passData.m_SoftShadows);
+            //CoreUtils.SetKeyword(cmd, "_SHADOWS_SOFT", passData.m_SoftShadows);
             CoreUtils.SetKeyword(cmd, "_MAIN_LIGHT_SHADOWS_CASCADE", passData.cascadeCount > 1);
-            CoreUtils.SetKeyword(cmd, "_SHADOW_PCSS", passData.m_ShadowType == ShadowType.PCSS);
-            CoreUtils.SetKeyword(cmd, "_VSM_SAT_FILTER", passData.m_ShadowType == ShadowType.PCSS && passData.m_VSMSATEnable);
-            CoreUtils.SetKeyword(cmd, "_SHADOW_VSM", passData.m_ShadowType == ShadowType.VSM);
-            CoreUtils.SetKeyword(cmd, "_SHADOW_EVSM", passData.m_ShadowType == ShadowType.EVSM);
+            CoreUtils.SetKeyword(cmd, "_SHADOW_PCSS", passData.m_ShadowType == eShadowType.PCSS);
+            CoreUtils.SetKeyword(cmd, "_VSM_SAT_FILTER", passData.m_ShadowType == eShadowType.PCSS && passData.m_VSMSATEnable);
+            CoreUtils.SetKeyword(cmd, "_SHADOW_VSM", passData.m_ShadowType == eShadowType.VSM);
+            CoreUtils.SetKeyword(cmd, "_SHADOW_EVSM", passData.m_ShadowType == eShadowType.EVSM);
         }
 
         public bool NeedPrefilterShadowmap(ShadowPassData passData)
         {
-            return passData.m_ShadowType == ShadowType.VSM || 
-                passData.m_ShadowType == ShadowType.EVSM || 
-                passData.m_ShadowType == ShadowType.MSM;
+            return passData.m_ShadowType == eShadowType.VSM || 
+                passData.m_ShadowType == eShadowType.EVSM || 
+                passData.m_ShadowType == eShadowType.MSM;
         }
 
         public ShadowPassData RenderShadowMap(RenderGraph renderGraph, CullingResults cullResults, ShaderVariablesGlobal globalCB)
@@ -502,7 +502,7 @@ namespace Insanity
             if (!doShadow)
             {
                 Shader.DisableKeyword("_MAIN_LIGHT_SHADOWS");
-                Shader.DisableKeyword("_SHADOWS_SOFT");
+                //Shader.DisableKeyword("_SHADOWS_SOFT");
                 return null;
             }
 
@@ -521,7 +521,7 @@ namespace Insanity
                 }
 
                 TextureHandle shadowmap = GetShadowMap(renderGraph, shadowSettings.shadowType);
-                if (shadowSettings.shadowType == ShadowType.VSM || shadowSettings.shadowType == ShadowType.EVSM)
+                if (shadowSettings.shadowType == eShadowType.VSM || shadowSettings.shadowType == eShadowType.EVSM)
                 {
                     builder.UseDepthBuffer(GetShadowMapDepthBuffer(renderGraph), DepthAccess.ReadWrite);
                     passData.m_Shadowmap = builder.UseColorBuffer(shadowmap, 0);
@@ -537,14 +537,14 @@ namespace Insanity
                 passData.m_ShadowmapWidth = m_ShadowmapWidth;
                 passData.m_ShadowmapHeight = m_ShadowmapHeight;
 
-                bool softShadows = m_MainLight.shadows == LightShadows.Soft && m_supportSoftShadow;
-                passData.m_SoftShadows = softShadows;
+                //bool softShadows = m_MainLight.shadows == LightShadows.Soft && m_supportSoftShadow;
+                //passData.m_SoftShadows = softShadows;
 
                 float invShadowAtlasWidth = 1.0f / m_ShadowmapWidth;
                 float invShadowAtlasHeight = 1.0f / m_ShadowmapHeight;
                 float invHalfShadowAtlasWidth = 0.5f * invShadowAtlasWidth;
                 float invHalfShadowAtlasHeight = 0.5f * invShadowAtlasHeight;
-                float softShadowsProp = softShadows ? 1.0f : 0.0f;
+                float softShadowsProp = (float)m_shadowSettings.shadowPCFFilter; //softShadows ? 1.0f : 0.0f;
                 passData.m_ShadowParams = new Vector4(m_MainLight.shadowStrength, softShadowsProp, shadowSettings.csmBlendEnable ? shadowSettings.csmBlendDistance : 0, (float)passData.cascadeCount);
                 passData.m_ShadowmapSize = new Vector4(invShadowAtlasWidth,
                                 invShadowAtlasHeight,
@@ -566,7 +566,7 @@ namespace Insanity
                 builder.SetRenderFunc(
                     (ShadowPassData data, RenderGraphContext ctx) =>
                     {
-                        if (data.m_ShadowType != ShadowType.VSM && data.m_ShadowType != ShadowType.EVSM)
+                        if (data.m_ShadowType != eShadowType.VSM && data.m_ShadowType != eShadowType.EVSM)
                         {
                             ctx.cmd.SetRenderTarget(data.m_Shadowmap, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
                             ctx.cmd.ClearRenderTarget(true, true, Color.black);
@@ -575,7 +575,7 @@ namespace Insanity
                         //ConstantBuffer.PushGlobal(ctx.cmd, m_MainLightShadowVariablesGlobal, ShaderIDs._MainlightShadowVariablesGlobal);
                         //CoreUtils.SetKeyword(ctx.cmd, "_ADAPTIVE_SHADOW_BIAS", data.m_AdaptiveShadowBias);
                         SetShadowCasterPassKeywords(ctx.cmd, data);
-                        if (data.m_ShadowType == ShadowType.EVSM || data.m_ShadowType == ShadowType.VSM)
+                        if (data.m_ShadowType == eShadowType.EVSM || data.m_ShadowType == eShadowType.VSM)
                         {
                             ctx.cmd.SetGlobalVector(VSMConstantBuffer._ExponentConstants, data.m_ShadowExponents);
                             ctx.cmd.SetGlobalFloat(VSMConstantBuffer._LightBleedingReduction, data.m_LightBleedingReduction);
@@ -706,7 +706,7 @@ namespace Insanity
                     data.m_CascadeSplitSpheres[3].w * data.m_CascadeSplitSpheres[3].w));
             }
 
-            if (data.m_ShadowType == ShadowType.PCSS)
+            if (data.m_ShadowType == eShadowType.PCSS)
             {
                 cmd.SetGlobalFloat(PCSSConstantBuffer._PCSSSoftness, data.m_PCSSSoftness);
                 cmd.SetGlobalFloat(PCSSConstantBuffer._PCF_Samples, data.m_PCSSFilterSamples);

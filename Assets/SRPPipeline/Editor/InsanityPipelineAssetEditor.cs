@@ -29,11 +29,12 @@ namespace UnityEditor.Insanity
             public static GUIContent shadowCascadesText = EditorGUIUtility.TrTextContent("Cascades", "Number of cascade splits used in for directional shadows");
             public static GUIContent shadowDepthBias = EditorGUIUtility.TrTextContent("Depth Bias", "Controls the distance at which the shadows will be pushed away from the light. Useful for avoiding false self-shadowing artifacts.");
             public static GUIContent shadowNormalBias = EditorGUIUtility.TrTextContent("Normal Bias", "Controls distance at which the shadow casting surfaces will be shrunk along the surface normal. Useful for avoiding false self-shadowing artifacts.");
-            public static GUIContent supportsSoftShadows = EditorGUIUtility.TrTextContent("Soft Shadows", "If enabled pipeline will perform shadow filtering. Otherwise all lights that cast shadows will fallback to perform a single shadow sample.");
+            //public static GUIContent supportsSoftShadows = EditorGUIUtility.TrTextContent("Soft Shadows", "If enabled pipeline will perform shadow filtering. Otherwise all lights that cast shadows will fallback to perform a single shadow sample.");
             public static GUIContent adaptiveShadowBias = EditorGUIUtility.TrTextContent("Adaptive Shadow Bias", "If enabled pipeline will enable adaptive shadow bias.");
             public static GUIContent enableCSMBlend = EditorGUIUtility.TrTextContent("Enable CSM Blend", "Blend the shaodow between 2 cascades.");
             public static GUIContent csmBlendDistance = EditorGUIUtility.TrTextContent("CSM Blend Distance", "Blend distance between 2 cascades.");
             public static GUIContent shadowType = EditorGUIUtility.TrTextContent("Shadow Type", "Shadow Mapping algothrithm options.");
+            public static GUIContent shadowResolution = EditorGUIUtility.TrTextContent("Shadow Resolution", "Shadow Resolution options.");
             public static GUIContent shadowPCFFilter = EditorGUIUtility.TrTextContent("Shadow PCF Filter", "Shadow Mapping PCF Filter options.");
             public static GUIContent pcssSoftness = EditorGUIUtility.TrTextContent("PCSS Softness", "Simulate the direction light size in PCSS algorithrm");
             public static GUIContent pcssSoftnessFalloff = EditorGUIUtility.TrTextContent("PCSS Softness Falloff", "Softness falloff parameter use by a pow formular.");
@@ -42,6 +43,7 @@ namespace UnityEditor.Insanity
             public static GUIContent exponentialConstants = EditorGUIUtility.TrTextContent("Exponential Variance Shadow Constants", "Setting the exponential constants of EVSM");
             public static GUIContent lightBleedingReduction = EditorGUIUtility.TrTextContent("LightBleeding Reduction Value", "Clamp the [pMax, 1] to the [lightBleeding, 1]");
             public static string[] shadowCascadeOptions = { "No Cascades", "Two Cascades", "Four Cascades" };
+            public static string[] shadowResolutionOptions = { "256", "512", "1024", "2048" };
             public static string[] shadowTypeOptions = { "PCF", "PCSS", "VSM", "EVSM", "MSM" };
             public static string[] shadowPCFFilterOptions = { "Hard", "Low", "Medium", "High" };
             public static string[] gaussianFilterRadiusOptions = { "3x3", "5x5", "9x9", "13x13" };
@@ -87,12 +89,13 @@ namespace UnityEditor.Insanity
         SerializedProperty m_ShadowDepthBiasProp;
         SerializedProperty m_ShadowNormalBiasProp;
 
-        SerializedProperty m_SoftShadowsSupportedProp;
+        //SerializedProperty m_SoftShadowsSupportedProp;
         SerializedProperty m_AdaptiveShadowBias;
         SerializedProperty m_EnableCSMBlend;
         SerializedProperty m_CSMBlendDistance;
 
         SerializedProperty m_ShadowType;
+        SerializedProperty m_ShadowResolution;
         SerializedProperty m_ShadowPCFFilter;
 
         SerializedProperty m_PCSSSoftnessProp;
@@ -151,11 +154,12 @@ namespace UnityEditor.Insanity
             m_ShadowCascade4SplitProp = serializedObject.FindProperty("m_Cascade4Split");
             m_ShadowDepthBiasProp = serializedObject.FindProperty("m_ShadowDepthBias");
             m_ShadowNormalBiasProp = serializedObject.FindProperty("m_ShadowNormalBias");
-            m_SoftShadowsSupportedProp = serializedObject.FindProperty("m_SoftShadowsSupported");
+            //m_SoftShadowsSupportedProp = serializedObject.FindProperty("m_SoftShadowsSupported");
             m_AdaptiveShadowBias = serializedObject.FindProperty("m_AdaptiveShadowBias");
             m_EnableCSMBlend = serializedObject.FindProperty("m_EnableCSMBlend");
             m_CSMBlendDistance = serializedObject.FindProperty("m_CSMBlendDistance");
             m_ShadowType = serializedObject.FindProperty("m_ShadowType");
+            m_ShadowResolution = serializedObject.FindProperty("m_ShadowResolution");
             m_ShadowPCFFilter = serializedObject.FindProperty("m_ShadowPCFFilter");
             m_PCSSSoftnessProp = serializedObject.FindProperty("m_PCSSSoftness");
             m_PCSSSoftnessFalloff = serializedObject.FindProperty("m_PCSSSoftnessFalloff");
@@ -164,7 +168,7 @@ namespace UnityEditor.Insanity
             m_ExponentialConstants = serializedObject.FindProperty("m_EVSMExponents");
             m_LightBleedingReduction = serializedObject.FindProperty("m_LightBleedingReduction");
             m_PipelineResources = serializedObject.FindProperty("m_PipelineResources");
-            m_RendererData = serializedObject.FindProperty("m_RenderPathData");
+            m_RendererData = serializedObject.FindProperty("m_RendererData");
 
             m_LightingSettingsFoldout = new SavedBool($"{target.GetType()}.LightingSettingsFoldout", false);
             m_AdditionalLightEnable = serializedObject.FindProperty("m_AdditionalLightEnable");
@@ -214,10 +218,10 @@ namespace UnityEditor.Insanity
                 m_ShadowDistanceProp.floatValue = Mathf.Max(0.0f, EditorGUILayout.FloatField(Styles.shadowDistanceText, m_ShadowDistanceProp.floatValue));
                 CoreEditorUtils.DrawPopup(Styles.shadowCascadesText, m_ShadowCascadesProp, Styles.shadowCascadeOptions);
 
-                ShadowCascadesOption cascades = (ShadowCascadesOption)m_ShadowCascadesProp.intValue;
-                if (cascades == ShadowCascadesOption.FourCascades)
+                eShadowCascadesOption cascades = (eShadowCascadesOption)m_ShadowCascadesProp.intValue;
+                if (cascades == eShadowCascadesOption.FourCascades)
                     EditorUtils.DrawCascadeSplitGUI<Vector3>(ref m_ShadowCascade4SplitProp);
-                else if (cascades == ShadowCascadesOption.TwoCascades)
+                else if (cascades == eShadowCascadesOption.TwoCascades)
                     EditorUtils.DrawCascadeSplitGUI<float>(ref m_ShadowCascade2SplitProp);
                 if (m_ShadowCascadesProp.intValue > 0)
                 {
@@ -228,28 +232,30 @@ namespace UnityEditor.Insanity
                     }
                 }
 
+                CoreEditorUtils.DrawPopup(Styles.shadowResolution, m_ShadowResolution, Styles.shadowResolutionOptions);
+
                 m_ShadowDepthBiasProp.floatValue = EditorGUILayout.Slider(Styles.shadowDepthBias, m_ShadowDepthBiasProp.floatValue, 
                     0.0f, InsanityPipeline.maxShadowBias);
                 m_ShadowNormalBiasProp.floatValue = EditorGUILayout.Slider(Styles.shadowNormalBias, m_ShadowNormalBiasProp.floatValue, 
                     0.0f, InsanityPipeline.maxShadowBias);
 
                 CoreEditorUtils.DrawPopup(Styles.shadowType, m_ShadowType, Styles.shadowTypeOptions);
-                ShadowType shadowType = (ShadowType)m_ShadowType.intValue;
-                if (shadowType == ShadowType.PCF)
+                eShadowType shadowType = (eShadowType)m_ShadowType.intValue;
+                if (shadowType == eShadowType.PCF)
                 {
                     CoreEditorUtils.DrawPopup(Styles.shadowPCFFilter, m_ShadowPCFFilter, Styles.shadowPCFFilterOptions);
-                    EditorGUILayout.PropertyField(m_SoftShadowsSupportedProp, Styles.supportsSoftShadows);
+                    //EditorGUILayout.PropertyField(m_SoftShadowsSupportedProp, Styles.supportsSoftShadows);
                 }
-                else if (shadowType == ShadowType.PCSS)
+                else if (shadowType == eShadowType.PCSS)
                 {
                     m_PCSSSoftnessProp.floatValue = EditorGUILayout.Slider(Styles.pcssSoftness, m_PCSSSoftnessProp.floatValue, 0.01f, 2.0f);
                     m_PCSSSoftnessFalloff.floatValue = EditorGUILayout.Slider(Styles.pcssSoftnessFalloff, m_PCSSSoftnessFalloff.floatValue, 0.0f, 8.0f);
                     
                 }
-                else if (shadowType == ShadowType.VSM || shadowType == ShadowType.EVSM)
+                else if (shadowType == eShadowType.VSM || shadowType == eShadowType.EVSM)
                 {
                     CoreEditorUtils.DrawPopup(Styles.gaussianFilterRadius, m_ShadowPrefilterGaussians, Styles.gaussianFilterRadiusOptions);
-                    if (shadowType == ShadowType.EVSM)
+                    if (shadowType == eShadowType.EVSM)
                     {
                         EditorGUILayout.PropertyField(m_ExponentialConstants, Styles.exponentialConstants);
                     }
@@ -340,7 +346,7 @@ namespace UnityEditor.Insanity
                 m_PipelineResources.objectReferenceValue, typeof(InsanityPipelineResources), false);
 
                 m_RendererData.objectReferenceValue = EditorGUILayout.ObjectField(Styles.renderDataText,
-                m_RendererData.objectReferenceValue, typeof(RenderPathData), false);
+                m_RendererData.objectReferenceValue, typeof(RendererData), false);
 
                 EditorGUI.indentLevel--;
                 EditorGUILayout.Space();

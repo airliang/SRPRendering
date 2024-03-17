@@ -91,13 +91,14 @@
             //#pragma shader_feature_local _ALPHATEST_ON
 			#pragma multi_compile _ _MAIN_LIGHT_SHADOWS
 			#pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
-			#pragma multi_compile _ _SHADOWS_SOFT
+			//#pragma multi_compile _ _SHADOWS_SOFT
 			#pragma multi_compile _ _SHADOW_PCSS
             #pragma multi_compile _ _VSM_SAT_FILTER
             #pragma multi_compile _ _SHADOW_VSM
             #pragma multi_compile _ _SHADOW_EVSM
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _TILEBASED_LIGHT_CULLING
+            #pragma shader_feature_local _NORMALMAP
 			
 			#include "LitInput.hlsl"
 			#include "LitForwardPass.hlsl"

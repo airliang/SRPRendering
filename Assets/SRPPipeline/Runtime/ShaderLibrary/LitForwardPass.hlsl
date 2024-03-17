@@ -25,7 +25,7 @@ struct Varyings
 
     float3 normalWS                 : TEXCOORD2;
 
-#if defined(_NORMAL_MAP)
+#if defined(_NORMALMAP)
     float4 tangentWS                : TEXCOORD3;    // xyz: tangent, w: sign
 #endif
 
@@ -52,7 +52,7 @@ float3 computeTangentFromNormal(float3 normal) {
     return normalize(tangent);
 }
 
-void InitializeInputData(Varyings input, out InputData inputData)
+void InitializeInputData(Varyings input, float3 normalTS, out InputData inputData)
 {
     inputData = (InputData)0;
     PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenSize.zw, uint2(input.positionCS.xy));
@@ -62,7 +62,14 @@ void InitializeInputData(Varyings input, out InputData inputData)
 
     half3 viewDirWS = SafeNormalize(input.viewDirWS);
 
+#ifdef _NORMAL_MAP
+    float sgn = input.tangentWS.w;      // should be either +1 or -1
+    float3 bitangent = sgn * cross(input.normalWS.xyz, input.tangentWS.xyz);
+    inputData.normalWS = TransformTangentToWorld(normalTS, half3x3(input.tangentWS.xyz, bitangent.xyz, input.normalWS.xyz));
+    inputData.normalWS = SafeNormalize(inputData.normalWS);
+#else
     inputData.normalWS = normalize(input.normalWS.xyz);
+#endif
 
     inputData.viewDirectionWS = viewDirWS;
 
@@ -105,7 +112,7 @@ Varyings LitPassVertex(Attributes input)
     output.normalWS = normalInput.normalWS;
     output.viewDirWS = viewDirWS;
 
-#ifdef _NORMAL_MAP
+#ifdef _NORMALMAP
     real sign = input.tangentOS.w * GetOddNegativeScale();
     output.tangentWS = half4(normalInput.tangentWS.xyz, sign);
 #endif
@@ -141,7 +148,7 @@ half4 LitPassFragment(Varyings input) : SV_Target
 
     InputData inputData;
 
-    InitializeInputData(input, inputData);
+    InitializeInputData(input, surfaceData.normalTS, inputData);
 
     ShadowSampleCoords shadowSample = GetShadowSampleData(inputData.positionWS, inputData.positionSS);
     half4 color = FragmentBlinnPhong(inputData, surfaceData.albedo, 0, 0, 0, surfaceData.alpha, shadowSample);//half4(surfaceData.albedo, surfaceData.alpha);

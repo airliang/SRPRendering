@@ -31,7 +31,7 @@ namespace Insanity
         private Material m_prefilterMaterial = null;
         //eGaussianRadius m_filterRadius = eGaussianRadius.eGausian3x3;
 
-        public TextureDesc GetShadowMapTextureDesc(int shadowMapWidth, int shadowMapHeight, string textureName, ShadowType shadowType)
+        public TextureDesc GetShadowMapTextureDesc(int shadowMapWidth, int shadowMapHeight, string textureName, eShadowType shadowType)
         {
             return new TextureDesc(shadowMapWidth, shadowMapHeight)
             {
@@ -45,7 +45,7 @@ namespace Insanity
             };
         }
 
-        private TextureHandle CreateBlurShadowTexture(RenderGraph graph, int shadowMapWidth, int shadowMapHeight, string textureName, ShadowType shadowType)
+        private TextureHandle CreateBlurShadowTexture(RenderGraph graph, int shadowMapWidth, int shadowMapHeight, string textureName, eShadowType shadowType)
         {
 
             //Texture description

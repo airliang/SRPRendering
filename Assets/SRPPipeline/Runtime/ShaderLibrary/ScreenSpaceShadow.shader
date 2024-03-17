@@ -19,7 +19,7 @@ Shader "Insanity/ScreenSpaceShadow"
             #pragma multi_compile _ _USE_DRAW_PROCEDURAL
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
-            #pragma multi_compile _ _SHADOWS_SOFT
+            //#pragma multi_compile _ _SHADOWS_SOFT
             #pragma multi_compile _ _SHADOW_PCSS
 
             #pragma enable_d3d11_debug_symbols

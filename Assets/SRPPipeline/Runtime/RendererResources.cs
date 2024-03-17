@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 
 namespace Insanity
 {
-    public class ForwardRenderPathResources : RenderPipelineResources
+    public class RendererDataResources : RenderPipelineResources
     {
         [Serializable, ReloadGroup]
         public sealed class ShaderResources

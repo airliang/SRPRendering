@@ -33,7 +33,7 @@ namespace Insanity
         RenderGraph m_RenderGraph = new RenderGraph("Insanity");
         public static ShaderVariablesGlobal m_ShaderVariablesGlobalCB = new ShaderVariablesGlobal();
         RenderingData m_RenderingData = new RenderingData();
-        RenderPath m_CurrentRenderer = null;
+        InsanityRenderer m_CurrentRenderer = null;
         
         //SATRenderer m_satRenderer = new SATRenderer();
 
@@ -62,7 +62,7 @@ namespace Insanity
             {
                 UpdateGlobalRenderSettings(camera);
                 BeginCameraRendering(context, camera);
-                m_CurrentRenderer = asset.RenderPath;
+                m_CurrentRenderer = asset.Renderer;
                 //Culling
                 ScriptableCullingParameters cullingParams;
                 

@@ -18,9 +18,9 @@ namespace Insanity
         Vector3 m_Cascade4Split = new Vector3(0.067f, 0.2f, 0.467f);
         public float depthBias = 1.0f;
         public float normalBias = 0.8f;
-        public bool supportSoftShadow = false;
-        public ShadowType shadowType = ShadowType.PCF;
-        public ShadowPCFFilter shadowPCFFilter = ShadowPCFFilter.PCF_None;
+        //public bool supportSoftShadow = false;
+        public eShadowType shadowType = eShadowType.PCF;
+        public eShadowPCFFilter shadowPCFFilter = eShadowPCFFilter.PCF_None;
         public bool adaptiveShadowBias = true;
         public float maxShadowDistance = 0;
         public bool csmBlendEnable = false;
@@ -44,13 +44,13 @@ namespace Insanity
             set { m_Cascade4Split = value; }
         }
 
-        public static GraphicsFormat GetShadowmapFormat(ShadowType shadowType)
+        public static GraphicsFormat GetShadowmapFormat(eShadowType shadowType)
         {
             switch (shadowType)
             {
-                case ShadowType.VSM:
+                case eShadowType.VSM:
                     return GraphicsFormat.R16G16_UNorm;
-                case ShadowType.EVSM:
+                case eShadowType.EVSM:
                     return GraphicsFormat.R16G16B16A16_SFloat;
                 default:
                     return GraphicsFormat.R16_UNorm;

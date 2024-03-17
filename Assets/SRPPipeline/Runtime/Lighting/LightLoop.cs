@@ -130,7 +130,7 @@ namespace Insanity
         public static ShadowPassData RenderShadow(CameraData cameraData, RenderGraph graph, CullingResults cull, ComputeShader scanCS)
         {
             ShadowPassData shadowPassData = ShadowManager.Instance.RenderShadowMap(graph, cull, m_ShaderVariablesGlobalCB);
-            if (shadowPassData != null && shadowPassData.m_ShadowType == ShadowType.VSM)
+            if (shadowPassData != null && shadowPassData.m_ShadowType == eShadowType.VSM)
             {
                 if (ShadowManager.Instance.shadowSettings.vsmSatEnable)
                 {

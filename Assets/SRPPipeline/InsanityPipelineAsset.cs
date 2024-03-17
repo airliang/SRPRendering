@@ -10,7 +10,7 @@ using UnityEngine.Scripting.APIUpdating;
 
 namespace Insanity
 {
-    public enum ShadowCascadesOption
+    public enum eShadowCascadesOption
     {
         NoCascades,
         TwoCascades,
@@ -18,14 +18,14 @@ namespace Insanity
     }
 
 
-    public enum ShadowQuality
+    public enum eShadowQuality
     {
         Disabled,
         HardShadows,
         SoftShadows,
     }
 
-    public enum ShadowType
+    public enum eShadowType
     {
         PCF,
         PCSS,
@@ -34,7 +34,7 @@ namespace Insanity
         MSM,
     }
 
-    public enum ShadowPCFFilter
+    public enum eShadowPCFFilter
     {
         PCF_None,
         PCF_3x3,
@@ -42,13 +42,12 @@ namespace Insanity
         PCF_7x7,
     }
 
-    public enum ShadowResolution
+    public enum eShadowResolution
     {
         _256 = 256,
         _512 = 512,
         _1024 = 1024,
-        _2048 = 2048,
-        _4096 = 4096
+        _2048 = 2048
     }
 
     public enum eAdditionalLightCullingFunction
@@ -88,11 +87,11 @@ namespace Insanity
             UnityEditor.AssetDatabase.CreateAsset(newAsset, pathName);
         }
 #endif
-        RenderPath m_RenderPath = null;
+        InsanityRenderer m_Renderer = null;
 
-        public RenderPath RenderPath
+        public InsanityRenderer Renderer
         {
-            get { return m_RenderPath; }
+            get { return m_Renderer; }
         }
 
         protected override RenderPipeline CreatePipeline()
@@ -137,17 +136,18 @@ namespace Insanity
         #region Shadowmap
         // Shadows Settings
         [SerializeField] float m_ShadowDistance = 50.0f;
-        [SerializeField] ShadowCascadesOption m_ShadowCascades = ShadowCascadesOption.NoCascades;
+        [SerializeField] eShadowCascadesOption m_ShadowCascades = eShadowCascadesOption.NoCascades;
         [SerializeField] float m_Cascade2Split = 0.25f;
         [SerializeField] Vector3 m_Cascade4Split = new Vector3(0.067f, 0.2f, 0.467f);
         [SerializeField] float m_ShadowDepthBias = 1.0f;
         [SerializeField] float m_ShadowNormalBias = 0.75f;
-        [SerializeField] bool m_SoftShadowsSupported = false;
+        //[SerializeField] bool m_SoftShadowsSupported = false;
         [SerializeField] bool m_AdaptiveShadowBias = false;
         [SerializeField] bool m_EnableCSMBlend = false;
         [SerializeField] float m_CSMBlendDistance = 0;
-        [SerializeField] ShadowType m_ShadowType = ShadowType.PCF;
-        [SerializeField] ShadowPCFFilter m_ShadowPCFFilter = ShadowPCFFilter.PCF_None;
+        [SerializeField] eShadowType m_ShadowType = eShadowType.PCF;
+        [SerializeField] eShadowPCFFilter m_ShadowPCFFilter = eShadowPCFFilter.PCF_None;
+        [SerializeField] eShadowResolution m_ShadowResolution = eShadowResolution._512;
         [SerializeField] float m_PCSSSoftness = 1.0f;
         [SerializeField] float m_PCSSSoftnessFalloff = 2.0f;
         [SerializeField] bool m_VSMSATEnable = false;
@@ -162,7 +162,7 @@ namespace Insanity
             set { m_ShadowDistance = Mathf.Max(0.0f, value); }
         }
 
-        public ShadowCascadesOption shadowCascadeOption
+        public eShadowCascadesOption shadowCascadeOption
         {
             get { return m_ShadowCascades; }
             set { m_ShadowCascades = value; }
@@ -191,11 +191,11 @@ namespace Insanity
             set { m_ShadowNormalBias = ValidateShadowBias(value); }
         }
 
-        public bool supportsSoftShadows
-        {
-            get { return m_SoftShadowsSupported; }
-            set { m_SoftShadowsSupported = value; }
-        }
+        //public bool supportsSoftShadows
+        //{
+        //    get { return m_SoftShadowsSupported; }
+        //    set { m_SoftShadowsSupported = value; }
+        //}
 
         float ValidateShadowBias(float value)
         {
@@ -220,16 +220,22 @@ namespace Insanity
             set { m_CSMBlendDistance = value; }
         }
 
-        public ShadowType ShadowType
+        public eShadowType ShadowType
         {
             get { return m_ShadowType; }
             set { m_ShadowType = value; }
         }
 
-        public ShadowPCFFilter PCFFilter
+        public eShadowPCFFilter PCFFilter
         {
             get { return m_ShadowPCFFilter; }
             set { m_ShadowPCFFilter = value; }
+        }
+
+        public eShadowResolution ShadowResolution
+        {
+            get { return m_ShadowResolution; }
+            set { m_ShadowResolution = value; }
         }
 
         public float PCSSSoftness
@@ -333,7 +339,7 @@ namespace Insanity
 
         //Pipeline resources
         [SerializeField] InsanityPipelineResources m_PipelineResources;
-        [SerializeField] RenderPathData m_RenderPathData;
+        [SerializeField] RendererData m_RendererData;
         
 
         public InsanityPipelineResources InsanityPipelineResources
@@ -342,10 +348,10 @@ namespace Insanity
             set { m_PipelineResources = value; }
         }
 
-        public RenderPathData RenderPathData 
+        public RendererData RendererData 
         { 
-            get { return m_RenderPathData; }
-            set { m_RenderPathData = value; }
+            get { return m_RendererData; }
+            set { m_RendererData = value; }
         }
 
         protected override void OnValidate()
@@ -359,21 +365,21 @@ namespace Insanity
 
         private void CreateRenderers(InsanityPipeline pipeline)
         {
-            if (m_RenderPath != null)
+            if (m_Renderer != null)
             {
                 Debug.LogError($"Creating renderers but previous instance wasn't properly destroyed");
             }
 
-            m_RenderPath = RenderPathData.Create(pipeline);
+            m_Renderer = m_RendererData.Create(pipeline);
         }
 
         private void DestroyRenderers()
         {
             Debug.Log("Destroy Renderers");
-            if (RenderPath != null)
+            if (m_Renderer != null)
             {
-                m_RenderPath.Dispose();
-                m_RenderPath = null;
+                m_Renderer.Dispose();
+                m_Renderer = null;
             }
         }
     }
