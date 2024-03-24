@@ -2,13 +2,17 @@
 #define LIT_INPUT_INCLUDED
 #include "PipelineCore.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 
 struct SurfaceData
 {
     half3 albedo;
+    half3 specular;
     half metallic;
     half smoothness;
     half3 normalTS;
+    half3 emission;
+    half occlusion;
     half  alpha;
 };
 
@@ -38,6 +42,8 @@ half _Cutoff;
 #ifdef _NORMALMAP
 half _NormalScale;
 #endif
+half _Metallic;
+half _Smoothness;
 CBUFFER_END
 
 half Alpha(half albedoAlpha, half4 color, half cutoff)
@@ -58,7 +64,7 @@ half4 SampleAlbedoAlpha(float2 uv, TEXTURE2D_PARAM(albedoAlphaMap, sampler_albed
 half3 SampleNormal(float2 uv, TEXTURE2D_PARAM( normalMap, sampler_normalMap), half scale = 1.0h)
 {
 #ifdef _NORMALMAP
-    half4 n = SAMPLE_TEXTURE2D_MEGA(normalMap, sampler_normalMap, uv);
+    half4 n = SAMPLE_TEXTURE2D(normalMap, sampler_normalMap, uv);
     return UnpackNormalScale(n, scale);
 #else
     return half3(0.0h, 0.0h, 1.0h);
@@ -71,12 +77,15 @@ inline void InitializeLitSurfaceData(float2 uv, out SurfaceData outSurfaceData)
     outSurfaceData.albedo = albedoAlpha.rgb;
     outSurfaceData.alpha = _BaseColor.a * albedoAlpha.a; //Alpha(albedoAlpha.a, _BaseColor, _Cutoff);
 #ifdef _NORMALMAP
-    outSurfaceData.normalTS = SampleNormal(uv, TEXTURE2D_MEGA_ARGS(_NormalMap, sampler_NormalMap), _NormalScale);
+    outSurfaceData.normalTS = SampleNormal(uv, TEXTURE2D_ARGS(_NormalMap, sampler_NormalMap), _NormalScale);
 #else
     outSurfaceData.normalTS = half3(0, 0, 1);
 #endif
-    outSurfaceData.metallic = 0;
-    outSurfaceData.smoothness = 0;
+    outSurfaceData.metallic = _Metallic;
+    outSurfaceData.smoothness = _Smoothness;
+    outSurfaceData.emission = 0;
+    outSurfaceData.occlusion = 1;
+    outSurfaceData.specular = 0;
 
 }
 

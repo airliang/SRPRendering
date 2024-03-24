@@ -4,7 +4,14 @@
 	{
 		//[MainTexture] _BaseMap("Albedo", 2D) = "white" {}
 		[MainColor] _BaseColor("Color", Color) = (1,1,1,1)
+        _NormalMap("Normal", 2D) = "bump" {}
+        _NormalScale("Normal Scale", Range(0.0, 1.0)) = 1.0
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
+        _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
+        _SmoothnessTextureChannel("Smoothness texture channel", Float) = 0
+
+        _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
+        _MetallicGlossMap("Metallic", 2D) = "white" {}
         // Blending state
         [HideInInspector] _Surface("__surface", Float) = 0.0
         [HideInInspector] _Blend("__blend", Float) = 0.0

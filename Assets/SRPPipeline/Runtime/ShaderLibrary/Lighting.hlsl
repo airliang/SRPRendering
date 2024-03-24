@@ -7,6 +7,7 @@
 #include "PipelineCore.hlsl"
 #include "Shadow/Shadows.hlsl"
 #include "RealtimeLights.hlsl"
+#include "GlobalIllumination.hlsl"
 
 struct Light
 {
@@ -90,7 +91,11 @@ Light GetMainLight()
 Light GetMainLight(ShadowSampleCoords shadowSampleCoords)
 {
     Light light = GetMainLight();
+#ifdef _SCREENSPACE_SHADOW
+    light.shadowAttenuation = SampleScreenSpaceShadowmap(shadowSampleCoords.positionSS.xy);
+#else
     light.shadowAttenuation = MainLightRealtimeShadow(shadowSampleCoords);   //this is the shadow visibility
+#endif
 
     return light;
 }
@@ -116,11 +121,12 @@ Light GetAdditionalLight(int lightIndex, float3 positionWS)
     // full-float precision required on some platforms
     float attenuation = DoAttenuation(range * range, distance * distance) * (spotRadian > 0 ? DoSpotCone(spotRadian, gpuLight.direction.xyz, lightVector) : 1);
     attenuation *= intensity;
-    Light light;
+    Light light = (Light)0;
     light.direction = lightVector;
     light.distanceAttenuation = attenuation;
     light.shadowAttenuation = 1.0; // This value can later be overridden in GetAdditionalLight(uint i, float3 positionWS, half4 shadowMask)
     light.color = gpuLight.color.xyz;
+    light.specularIntensity = 1.0;
 
     return light;
 }
@@ -547,7 +553,7 @@ half3 AdditionalLightingPhysicallyBased(BRDFData brdfData, Light light, half3 no
 #ifdef _TILEBASED_LIGHT_CULLING
 #include "LightCullingInclude.hlsl"
 StructuredBuffer<int> _LightVisibilityIndexBuffer;
-void TileBasedAdditionalLightingFragment(float3 positionWS, float3 normalWS, float3 viewDirWS, float2 screenPos, 
+void TileBasedAdditionalLightingFragmentBlinnPhong(float3 positionWS, float3 normalWS, float3 viewDirWS, float2 screenPos, 
     half smoothness, out half3 diffuse, out half3 specular)
 {
     diffuse = 0;
@@ -560,6 +566,20 @@ void TileBasedAdditionalLightingFragment(float3 positionWS, float3 normalWS, flo
         Light light = GetAdditionalLight(lightIndex, positionWS);
         diffuse += LightingLambert(light.color * light.distanceAttenuation, light.direction, normalWS);
         specular += LightingSpecular(light.color * light.distanceAttenuation, light.direction, normalWS, viewDirWS, smoothness);
+        lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset + i + 1];
+    }
+}
+
+void TileBasedAdditionalLightingFragmentPBR(BRDFData brdfData, float3 positionWS, float3 normalWS, float3 viewDirWS, float2 screenPos, out half3 outColor)
+{
+    outColor = 0;
+    uint2 tileId = screenPos * _TileNumber;
+    uint  lightIndexOffset = (tileId.y * _TileNumber.x + tileId.x) * MAX_LIGHT_NUM_PER_TILE;
+    int lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset];
+    for (int i = 0; i < MAX_LIGHT_NUM_PER_TILE && lightIndex >= 0; ++i)
+    {
+        Light light = GetAdditionalLight(lightIndex, positionWS);
+        outColor += AdditionalLightingPhysicallyBased(brdfData, light, normalWS, viewDirWS);
         lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset + i + 1];
     }
 }
@@ -588,7 +608,7 @@ half3 GlobalIllumination(BRDFData brdfData, half3 bakedGI, half occlusion, float
     half fresnelTerm = Pow4(1.0 - saturate(dot(normalWS, viewDirectionWS)));
 
     half3 indirectDiffuse = bakedGI * occlusion;
-    half3 indirectSpecular = half3(0, 0, 0);//GlossyEnvironmentReflection(reflectVector, brdfData.perceptualRoughness, occlusion, positionWS);
+    half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, brdfData.perceptualRoughness, occlusion, positionWS);
 
     return EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
 }
@@ -605,7 +625,7 @@ half4 FragmentBlinnPhong(InputData inputData, half3 diffuse, half4 specularGloss
     #ifdef _TILEBASED_LIGHT_CULLING
     half3 diffuseAdditonal = 0;
     half3 specularAdditional = 0;
-    TileBasedAdditionalLightingFragment(inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS, inputData.positionSS, smoothness, diffuseAdditonal, specularAdditional);
+    TileBasedAdditionalLightingFragmentBlinnPhong(inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS, inputData.positionSS, smoothness, diffuseAdditonal, specularAdditional);
     specularColor += specularAdditional;
     diffuseColor += diffuseAdditonal;
     #else
@@ -633,20 +653,36 @@ half4 FragmentBlinnPhong(InputData inputData, half3 diffuse, half4 specularGloss
 //                      Fragment Functions                                   //
 //       Used by ShaderGraph and others builtin renderers                    //
 ///////////////////////////////////////////////////////////////////////////////
-half4 UniversalFragmentPBR(InputData inputData, half3 albedo, half metallic, half3 specular,
-    half smoothness, half occlusion, half3 emission, half alpha, ShadowSampleCoords shadowSample)
+half4 FragmentPBR(InputData inputData, SurfaceData surface, ShadowSampleCoords shadowSample)
 {
     // initialize brdf data.
     BRDFData brdfData;
-    InitializeBRDFData(albedo, metallic, specular, smoothness, alpha, brdfData);
+    InitializeBRDFData(surface.albedo, surface.metallic, surface.specular, surface.smoothness, surface.alpha, brdfData);
 
     Light mainLight = GetMainLight(shadowSample);
 
-    half3 color = GlobalIllumination(brdfData, inputData.bakedGI, occlusion, inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS);
+    half3 color = GlobalIllumination(brdfData, inputData.bakedGI, surface.occlusion, inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS);
     color += LightingPhysicallyBased(brdfData, mainLight, inputData.normalWS, inputData.viewDirectionWS);
+#if defined(_ADDITIONAL_LIGHTS)
+    half3 diffuseAdditonal = 0;
+    #ifdef _TILEBASED_LIGHT_CULLING
+    TileBasedAdditionalLightingFragmentPBR(brdfData, inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS, inputData.positionSS, diffuseAdditonal);
 
-    color += emission;
-    return half4(color, alpha);
+    #else
+    uint pixelLightCount = GetAdditionalLightsCount();
+
+    for (uint lightIndex = 0; lightIndex < min(pixelLightCount, MAX_VISIBLE_LIGHTS); lightIndex++)
+    {
+        //FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
+
+        Light additionalLight = GetAdditionalLight(lightIndex, inputData.positionWS);
+        diffuseAdditonal += LightingPhysicallyBased(brdfData, additionalLight, inputData.normalWS, inputData.viewDirectionWS);
+    }
+    #endif
+    color += diffuseAdditonal;
+#endif
+    color += surface.emission;
+    return half4(color, surface.alpha);
 }
 
 #endif

@@ -105,6 +105,8 @@ namespace UnityEditor.Insanity
 
         protected MaterialProperty baseColorProp { get; set; }
 
+        protected MaterialProperty normalMapProp { get; set; }
+
         protected MaterialProperty emissionMapProp { get; set; }
 
         protected MaterialProperty emissionColorProp { get; set; }
@@ -146,6 +148,7 @@ namespace UnityEditor.Insanity
             receiveShadowsProp = FindProperty("_ReceiveShadows", properties, false);
             baseMapProp = FindProperty("_BaseMap", properties, false);
             baseColorProp = FindProperty("_BaseColor", properties, false);
+            normalMapProp = FindProperty("_NormalMap", properties, false);
             emissionMapProp = FindProperty("_EmissionMap", properties, false);
             emissionColorProp = FindProperty("_EmissionColor", properties, false);
             queueOffsetProp = FindProperty("_QueueOffset", properties, false);
@@ -396,8 +399,8 @@ namespace UnityEditor.Insanity
                 shouldEmissionBeEnabled = material.GetFloat("_EmissionEnabled") >= 0.5f;
             CoreUtils.SetKeyword(material, "_EMISSION", shouldEmissionBeEnabled);
             // Normal Map
-            if(material.HasProperty("_BumpMap"))
-                CoreUtils.SetKeyword(material, "_NORMALMAP", material.GetTexture("_BumpMap"));
+            if(material.HasProperty("_NormalMap"))
+                CoreUtils.SetKeyword(material, "_NORMALMAP", material.GetTexture("_NormalMap"));
             // Shader specific keyword functions
             shadingModelFunc?.Invoke(material);
             shaderFunc?.Invoke(material);

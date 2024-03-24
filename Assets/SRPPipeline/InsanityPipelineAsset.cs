@@ -152,9 +152,11 @@ namespace Insanity
         [SerializeField] float m_PCSSSoftnessFalloff = 2.0f;
         [SerializeField] bool m_VSMSATEnable = false;
         [SerializeField] eGaussianRadius m_ShadowPrefitlerGaussianRadius = eGaussianRadius.eGausian3x3;
+        [SerializeField] bool m_ScreenSpaceShadow = false;
+        [SerializeField] float m_ScreenSpaceShadowScale = 1.0f;
         [SerializeField] Vector2 m_EVSMExponents = new Vector2(10, 10);
         [SerializeField] float m_LightBleedingReduction = 0.5f;
-        [SerializeField] DebugViewMode m_DebugViewMode = DebugViewMode.None;
+        
 
         public float shadowDistance
         {
@@ -273,6 +275,18 @@ namespace Insanity
             get { return m_LightBleedingReduction; }
             set { m_LightBleedingReduction = value; }
         }
+
+        public bool ScreenSpaceShadow
+        {
+            get { return m_ScreenSpaceShadow; }
+            set { m_ScreenSpaceShadow = value;}
+        }
+
+        public float ScreenSpaceShadowScale
+        {
+            get { return m_ScreenSpaceShadowScale; }
+            set { m_ScreenSpaceShadowScale = value;}
+        }
         #endregion
 
         #region Lighting
@@ -330,6 +344,7 @@ namespace Insanity
         #endregion
 
         #region Debug View
+        [SerializeField] DebugViewMode m_DebugViewMode = DebugViewMode.None;
         public DebugViewMode CurrentDebugMode
         {
             get { return m_DebugViewMode; }

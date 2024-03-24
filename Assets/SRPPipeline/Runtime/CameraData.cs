@@ -220,7 +220,7 @@ namespace Insanity
             actualWidth = Math.Max((int)finalViewport.size.x, 1);
             actualHeight = Math.Max((int)finalViewport.size.y, 1);
 
-            DynamicResolutionHandler.instance.finalViewport = new Vector2Int((int)finalViewport.width, (int)finalViewport.height);
+            //DynamicResolutionHandler.instance.finalViewport = new Vector2Int((int)finalViewport.width, (int)finalViewport.height);
 
             Vector2Int nonScaledViewport = new Vector2Int(actualWidth, actualHeight);
 

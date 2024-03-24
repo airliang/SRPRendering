@@ -42,6 +42,8 @@ namespace UnityEditor.Insanity
             public static GUIContent gaussianFilterRadius = EditorGUIUtility.TrTextContent("Gaussian Prefilter Radius", "The gaussian kernel size to filtering.");
             public static GUIContent exponentialConstants = EditorGUIUtility.TrTextContent("Exponential Variance Shadow Constants", "Setting the exponential constants of EVSM");
             public static GUIContent lightBleedingReduction = EditorGUIUtility.TrTextContent("LightBleeding Reduction Value", "Clamp the [pMax, 1] to the [lightBleeding, 1]");
+            public static GUIContent screenSpaceShadow = EditorGUIUtility.TrTextContent("Screen Space Shadow Map", "Screen Space Shadow Map Enable");
+            public static GUIContent screenSpaceShadowScale = EditorGUIUtility.TrTextContent("Screen Space Shadow Map Scale", "Shadow Map Scale[0, 1] of the screen");
             public static string[] shadowCascadeOptions = { "No Cascades", "Two Cascades", "Four Cascades" };
             public static string[] shadowResolutionOptions = { "256", "512", "1024", "2048" };
             public static string[] shadowTypeOptions = { "PCF", "PCSS", "VSM", "EVSM", "MSM" };
@@ -104,6 +106,8 @@ namespace UnityEditor.Insanity
         SerializedProperty m_ShadowPrefilterGaussians;
         SerializedProperty m_ExponentialConstants;
         SerializedProperty m_LightBleedingReduction;
+        SerializedProperty m_ScreenSpaceShadow;
+        SerializedProperty m_ScreenSpaceShadowScale;
 
         SavedBool m_LightingSettingsFoldout;
         SerializedProperty m_AdditionalLightEnable;
@@ -165,6 +169,8 @@ namespace UnityEditor.Insanity
             m_PCSSSoftnessFalloff = serializedObject.FindProperty("m_PCSSSoftnessFalloff");
             m_VSMSATEnable = serializedObject.FindProperty("m_VSMSATEnable");
             m_ShadowPrefilterGaussians = serializedObject.FindProperty("m_ShadowPrefitlerGaussianRadius");
+            m_ScreenSpaceShadow = serializedObject.FindProperty("m_ScreenSpaceShadow");
+            m_ScreenSpaceShadowScale = serializedObject.FindProperty("m_ScreenSpaceShadowScale");
             m_ExponentialConstants = serializedObject.FindProperty("m_EVSMExponents");
             m_LightBleedingReduction = serializedObject.FindProperty("m_LightBleedingReduction");
             m_PipelineResources = serializedObject.FindProperty("m_PipelineResources");
@@ -269,6 +275,11 @@ namespace UnityEditor.Insanity
 
                 
                 EditorGUILayout.PropertyField(m_AdaptiveShadowBias, Styles.adaptiveShadowBias);
+                m_ScreenSpaceShadow.boolValue = EditorGUILayout.Toggle(Styles.screenSpaceShadow, m_ScreenSpaceShadow.boolValue);
+                if (m_ScreenSpaceShadow.boolValue)
+                {
+                    m_ScreenSpaceShadowScale.floatValue = EditorGUILayout.Slider(Styles.screenSpaceShadowScale, m_ScreenSpaceShadowScale.floatValue, 0.25f, 1.0f);
+                }
 
 
                 EditorGUI.indentLevel--;

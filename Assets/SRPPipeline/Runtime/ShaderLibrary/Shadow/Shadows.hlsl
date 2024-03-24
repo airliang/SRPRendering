@@ -2,12 +2,12 @@
 #define SHADOWS_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
 #include "ShadowSampling.hlsl"
 #include "../PipelineCore.hlsl"
 
-#define SHADOWS_SCREEN 1
+
 #define MAX_SHADOW_CASCADES 4
 
 #if defined(_MAIN_LIGHT_SHADOWS)
@@ -24,9 +24,6 @@ CBUFFER_START(MainlightShadowVariablesGlobal)
 float4x4    _MainLightWorldToShadow[MAX_SHADOW_CASCADES + 1];
 float4      _CascadeShadowSplitSpheres[MAX_SHADOW_CASCADES];
 float       _MainLightShadowDepthRange[MAX_SHADOW_CASCADES + 1];
-//float4      _CascadeShadowSplitSpheres1;
-//float4      _CascadeShadowSplitSpheres2;
-//float4      _CascadeShadowSplitSpheres3;
 float4      _CascadeShadowSplitSphereRadii;
 half4       _MainLightShadowOffset0;  //use in moble for soft shadow
 half4       _MainLightShadowOffset1;
@@ -35,6 +32,7 @@ half4       _MainLightShadowOffset3;
 float4       _MainLightShadowParams;  // (x: shadowStrength, y: 1.0 if soft shadows, 0.0 otherwise, z: csm blend distance, w: active cascade counts)
 float4      _MainLightShadowmapSize; // (xy: 1/width and 1/height, zw: width and height)
 half        _ShadowDistance;
+float4 _ScreenSpaceShadowmapSize;
 #ifndef SHADER_API_GLES3
 CBUFFER_END
 #endif
@@ -54,9 +52,9 @@ float2 _ShadowExponents;
 float _LightBleedingReduction;
 #endif
 
-
+#ifdef _SCREENSPACE_SHADOW
 Texture2D _ScreenSpaceShadowmapTexture;
-SamplerState sampler_ScreenSpaceShadowmapTexture;
+#endif
 
 #define BEYOND_SHADOW_FAR(shadowCoord) shadowCoord.z <= 0.0 || shadowCoord.z >= 1.0
 
@@ -81,15 +79,16 @@ half4 GetMainLightShadowParams()
     return _MainLightShadowParams;
 }
 
-
-half SampleScreenSpaceShadowmap(float4 shadowCoord)
+#ifdef _SCREENSPACE_SHADOW
+half SampleScreenSpaceShadowmap(float2 shadowCoord)
 {
-    shadowCoord.xy /= shadowCoord.w;
+    //shadowCoord.xy /= shadowCoord.w;
 
-    half attenuation = SAMPLE_TEXTURE2D(_ScreenSpaceShadowmapTexture, sampler_ScreenSpaceShadowmapTexture, shadowCoord.xy).x;
+    half attenuation = SAMPLE_TEXTURE2D(_ScreenSpaceShadowmapTexture, sampler_LinearClamp, shadowCoord.xy).x;
 
     return attenuation;
 }
+#endif
 
 #ifdef _SHADOW_PCSS
 inline float GetPCSSScale(float4 cascadeWeights)
@@ -340,7 +339,7 @@ struct VertexInput
 struct v2f
 {
     float4 positionCS      : SV_POSITION;
-    half4  texcoord : TEXCOORD0;
+    float4 texcoord : TEXCOORD0;
 };
 
 v2f VertScreenSpaceShadow(VertexInput input)
@@ -353,6 +352,10 @@ v2f VertScreenSpaceShadow(VertexInput input)
     projPos.xy = projPos.xy + projPos.w;
 
     o.texcoord.xy = GetFullScreenTriangleTexCoord(input.vertexID);
+#if !UNITY_UV_STARTS_AT_TOP
+    //if (_FlipY)
+    o.texcoord.y = 1 - o.texcoord.y;
+#endif
     o.texcoord.zw = projPos.xy;
 
     return o;
@@ -360,21 +363,24 @@ v2f VertScreenSpaceShadow(VertexInput input)
 
 half4 FragScreenSpaceShadow(v2f input) : SV_Target
 {
-    float deviceDepth = LoadCameraDepth(input.positionCS.xy);//_CameraDepthTexture.Sample(sampler_CameraDepthTexture, i.texcoord.xy).r;
+    float deviceDepth = SAMPLE_TEXTURE2D(_CameraDepthTexture, sampler_PointClamp, input.texcoord.xy).r; //LoadCameraDepth(input.positionCS.xy);
+    #if !UNITY_REVERSED_Z
+    deviceDepth = 2.0 * deviceDepth - 1.0;
+    #endif
     if (deviceDepth == UNITY_RAW_FAR_CLIP_VALUE)
         return 1.0f;
-
-    PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenSize.zw, deviceDepth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
+    float2 positionSS = input.texcoord.xy;
+    PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenSpaceShadowmapSize.zw, deviceDepth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
+    float3 positionWS = ComputeWorldSpacePosition(input.texcoord.xy, deviceDepth, UNITY_MATRIX_I_VP);
 
     //float blendDistance = _MainLightShadowParams.z;
     half4 final = 1;
 
-    //float4 shadow_coords = TransformWorldToShadowCoord(posInput.positionWS);
-    //float attenuation = MainLightRealtimeShadow(shadow_coords);
-    ShadowSampleCoords shadowSample = GetShadowSampleData(posInput.positionWS, posInput.positionSS);
+    ShadowSampleCoords shadowSample = GetShadowSampleData(positionWS, positionSS);
     float attenuation = MainLightRealtimeShadow(shadowSample);
     final.rgb = attenuation;
-
+    //ShadowSampleCoords shadowSample2 = GetShadowSampleData(posInput.positionWS, posInput.positionSS);
+    //final.rgb = MainLightRealtimeShadow(shadowSample2);
 
     return final;
 }

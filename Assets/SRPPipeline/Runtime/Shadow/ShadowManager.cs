@@ -44,6 +44,7 @@ namespace Insanity
     public class ShadowInitPassData
     {
         public bool m_supportMainLightShadow = false;
+        public bool m_screenSpaceShadow = false;
     }
 
     public class PushShadowSATData
@@ -57,6 +58,8 @@ namespace Insanity
         public TextureHandle m_SSShadowmap;
         public TextureHandle m_Shadowmap;
         public TextureHandle m_Depth;
+        public Rect m_ScreenSpaceShadowRect;
+        public Vector4 m_ScreenSpaceShadowSize;
     }
 
     public class ShadowRequest
@@ -163,7 +166,7 @@ namespace Insanity
             public static int _ShadowBias;
             public static int _ShadowDistance;
             public static int _Shadowmap;
-            
+            public static int _ScreenSpaceShadowmapSize;
         }
 
         private static class PCSSConstantBuffer
@@ -210,6 +213,7 @@ namespace Insanity
             MainLightShadowConstantBuffer._ShadowBias = Shader.PropertyToID("_ShadowBias");
             MainLightShadowConstantBuffer._ShadowDistance = Shader.PropertyToID("_ShadowDistance");
             MainLightShadowConstantBuffer._Shadowmap = Shader.PropertyToID("_ShadowMap");
+            MainLightShadowConstantBuffer._ScreenSpaceShadowmapSize = Shader.PropertyToID("_ScreenSpaceShadowmapSize");
             PCSSConstantBuffer._PCSSSoftness = Shader.PropertyToID("_Softness");
             PCSSConstantBuffer._PCF_Samples = Shader.PropertyToID("_PCF_Samples");
             PCSSConstantBuffer._SoftnessFalloff = Shader.PropertyToID("_SoftnessFalloff");
@@ -317,6 +321,8 @@ namespace Insanity
             m_shadowSettings.prefilterGaussianRadius = asset.ShadowPrefilterGaussian;
             m_shadowSettings.exponentialConstants = asset.EVSMExponentConstants;
             m_shadowSettings.lightBleedingReduction = asset.LightBleedingReduction;
+            m_shadowSettings.requiresScreenSpaceShadowResolve = asset.ScreenSpaceShadow;
+            m_shadowSettings.screenSpaceShadowScale = asset.ScreenSpaceShadowScale;
             if (asset.shadowCascadeOption == eShadowCascadesOption.NoCascades)
             {
                 m_shadowSettings.mainLightShadowCascadesCount = 1;
@@ -412,12 +418,14 @@ namespace Insanity
         public TextureDesc GetScreenSpaceShadowMapDesc(int width, int height)
         {
             TextureDesc ssShadowmapDesc = new TextureDesc(width, height);
-            ssShadowmapDesc.colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, false);
+            ssShadowmapDesc.colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.R8, false);
             ssShadowmapDesc.depthBufferBits = 0;
             ssShadowmapDesc.msaaSamples = MSAASamples.None;
             ssShadowmapDesc.enableRandomWrite = false;
             ssShadowmapDesc.clearBuffer = true;
             ssShadowmapDesc.clearColor = Color.black;
+            ssShadowmapDesc.filterMode = FilterMode.Point;
+            ssShadowmapDesc.wrapMode = TextureWrapMode.Clamp;
             return ssShadowmapDesc;
         }
 
@@ -444,28 +452,27 @@ namespace Insanity
             return renderGraph.CreateTexture(colorRTDesc);
         }
 
-        TextureHandle GetScreenSpaceShadowMap(RenderGraph renderGraph, Camera camera)
+        TextureHandle GetScreenSpaceShadowMap(RenderGraph renderGraph, float scale)
         {
-            renderGraph.CreateTextureIfInvalid(GetScreenSpaceShadowMapDesc(camera.pixelWidth, camera.pixelHeight), ref m_SSShadowMap);
+            renderGraph.CreateTextureIfInvalid(GetScreenSpaceShadowMapDesc((int)(GlobalRenderSettings.screenResolution.width * scale), 
+                (int)(GlobalRenderSettings.screenResolution.height * scale)), ref m_SSShadowMap);
             return m_SSShadowMap;
         }
 
         public void ExecuteShadowInitPass(RenderGraph renderGraph)
         {
-            if (shadowSettings.supportsMainLightShadows)
+            if (!shadowSettings.supportsMainLightShadows)
                 return;
             using (var builder = renderGraph.AddRenderPass<ShadowInitPassData>("Init Shadow", out var passData, new ProfilingSampler("Init Shadow Profiler")))
             {
                 passData.m_supportMainLightShadow = shadowSettings.supportsMainLightShadows;
+                passData.m_screenSpaceShadow = shadowSettings.requiresScreenSpaceShadowResolve;
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc(
                     (ShadowInitPassData data, RenderGraphContext ctx) =>
                     {
-                        if (!data.m_supportMainLightShadow)
-                        {
-                            Shader.DisableKeyword("_MAIN_LIGHT_SHADOWS");
-                            //Shader.DisableKeyword("_SHADOWS_SOFT");
-                        }
+                        CoreUtils.SetKeyword(ctx.cmd, "_MAIN_LIGHT_SHADOWS", data.m_supportMainLightShadow);
+                        CoreUtils.SetKeyword(ctx.cmd, "_SCREENSPACE_SHADOW", data.m_screenSpaceShadow);
                     });
              }
         }
@@ -657,22 +664,25 @@ namespace Insanity
                 return null;
             using (var builder = renderGraph.AddRenderPass<ScreenSpaceShadowPassData>("Render ScreenSpace Shadow Maps", out var passData, new ProfilingSampler("ScreenSpace Shadow Pass Profiler")))
             {
-                passData.m_SSShadowmap = builder.ReadWriteTexture(GetScreenSpaceShadowMap(renderGraph, camera)); //builder.UseColorBuffer(GetScreenSpaceShadowMap(renderGraph), 0);
+                passData.m_SSShadowmap = builder.WriteTexture(GetScreenSpaceShadowMap(renderGraph, shadowSettings.screenSpaceShadowScale)); //builder.UseColorBuffer(GetScreenSpaceShadowMap(renderGraph), 0);
                 passData.m_Depth = builder.ReadTexture(mainCameraDepth);
                 passData.m_Shadowmap = builder.ReadTexture(shadowMap);
+                passData.m_ScreenSpaceShadowRect = new Rect(0, 0, GlobalRenderSettings.screenResolution.width * shadowSettings.screenSpaceShadowScale,
+                    GlobalRenderSettings.screenResolution.height * shadowSettings.screenSpaceShadowScale);
+                passData.m_ScreenSpaceShadowSize = new Vector4(passData.m_ScreenSpaceShadowRect.width, passData.m_ScreenSpaceShadowRect.height, 
+                    1.0f / passData.m_ScreenSpaceShadowRect.width, 1.0f/ passData.m_ScreenSpaceShadowRect.height);
+                builder.AllowPassCulling(false);
 
-
-                //builder.ReadTexture(passData.m_SSShadowmap);
-                //builder.Us
                 builder.SetRenderFunc(
                     (ScreenSpaceShadowPassData data, RenderGraphContext ctx) =>
                     {
-                        ctx.cmd.SetRenderTarget(passData.m_SSShadowmap);
+                        ctx.cmd.SetRenderTarget(data.m_SSShadowmap);
                         ctx.cmd.ClearRenderTarget(true, true, Color.black);
 
                         //m_ScreenSpaceShadowsMaterial.SetTexture("_CameraDepthTexture", data.m_Depth);
                         ctx.cmd.SetGlobalTexture("_CameraDepthTexture", data.m_Depth);
-
+                        //ctx.cmd.SetViewport(data.m_ScreenSpaceShadowRect);
+                        ctx.cmd.SetGlobalVector(MainLightShadowConstantBuffer._ScreenSpaceShadowmapSize, data.m_ScreenSpaceShadowSize);
                         CoreUtils.DrawFullScreen(ctx.cmd, m_ScreenSpaceShadowsMaterial);
 
                         ctx.renderContext.ExecuteCommandBuffer(ctx.cmd);

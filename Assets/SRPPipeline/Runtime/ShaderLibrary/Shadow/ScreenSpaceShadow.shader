@@ -24,7 +24,7 @@ Shader "Insanity/ScreenSpaceShadow"
 
             #pragma enable_d3d11_debug_symbols
 
-            #include "Shadow/Shadows.hlsl"
+            #include "Shadows.hlsl"
 
             ENDHLSL
         }

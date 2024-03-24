@@ -1,0 +1,147 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+#include "AtmosphereScattering.hlsl"
+float3 _MainLightPosition;
+float _MainLightIntensity;
+
+Texture3D<float4> _SkyboxLUT;
+
+half3 GetSkyColor(float3 viewDirWS, float3 sunDir)
+{
+    float w, h, d;
+    _SkyboxLUT.GetDimensions(w, h, d);
+    // Reverse it to point into the scene
+    float3 rayStart = float3(0, 1, 0);
+    float3 earthCenter = float3(0, -_EarthRadius, 0);
+    float height = max(length(rayStart - earthCenter) - _EarthRadius, 0);
+    float3 groundNormal = normalize(rayStart - earthCenter);
+    float cosView = dot(groundNormal, viewDirWS);
+    float cosSun = dot(groundNormal, -sunDir);
+
+    float3 texCoords;
+    texCoords.x = pow(height / _AtmosphereHeight, 0.5);
+    float ch = -sqrt(height * (2 * _EarthRadius + height)) / (_EarthRadius + height);
+
+    texCoords.y = cosView > ch ? (0.5 * pow((cosView - ch) / (1.0 - ch), 0.2) + 0.5)
+        : (0.5 * pow((ch - cosView) / (1.0 + ch), 0.2));
+
+    texCoords.z = 0.5 * ((atan(max(cosSun, -0.1975) * tan(1.26 * 1.1)) / 1.1) + (1 - 0.26));
+    int3 texCoordsInt = int3(texCoords * float3(w, h, d));
+    half4 scattering = _SkyboxLUT[texCoordsInt]; //tex3D(_SkyboxLUT, texCoords);
+    //return scattering;
+    //
+    float cosTheta = dot(viewDirWS, -sunDir);
+    half3 scatteringR = scattering.rgb * GetModifyRayleighPhase(cosTheta) * _BetaRayleigh / (4.0 * PI);
+    half3 sM = scattering.rgb * scattering.w / scattering.r;
+    half3 scatteringM = sM * GetHGMiePhase(cosTheta, _MieG) * _BetaMie / (4.0 * PI);
+    half3 skyColor = (scatteringR + scatteringM) * _MainLightIntensity * _SunLightColor;
+    return skyColor;
+}
+
+//https://www.shadertoy.com/view/WlsSRr
+// direction -> cubemap face normal
+float3 GetCubeFaceDir(float3 dir)
+{
+    float3 absDir = abs(dir);
+    float maxDir = max(max(absDir.x, absDir.y), absDir.z);
+    float3 faceDir;
+    faceDir.x = step(maxDir, absDir.x) * sign(dir.x);
+    faceDir.y = step(maxDir, absDir.y) * sign(dir.y);
+    faceDir.z = step(maxDir, absDir.z) * sign(dir.z);
+    return faceDir;
+}
+
+// cubemap face normal -> face ID
+float CubeFaceDirToID(float3 faceDir)
+{
+    return dot(clamp(faceDir, 0., 1.), float3(0., 1., 2.)) + dot(clamp(-faceDir, 0., 1.), float3(3., 4., 5.));
+}
+
+// cubemap face normal, direction -> face UVs
+float2 CubeFaceCoords(float3 faceDir, float3 viewDir)
+{
+    float3 uv3d = viewDir / dot(viewDir, faceDir) - faceDir;
+    float3 uDir = float3(faceDir.z + abs(faceDir.y), 0, -faceDir.x);
+    float3 vDir = float3(0, 1. - abs(faceDir.y), -faceDir.y);
+    return float2(dot(uv3d, uDir), dot(uv3d, vDir)) * .5 + .5;
+}
+
+RWTexture2DArray<float3> _Cubemap;
+uint2 _CubemapSize;
+
+#define CUBE_FACE_POSITIVEX 0
+#define CUBE_FACE_NEGATIVEX 1
+#define CUBE_FACE_POSITIVEY 2
+#define CUBE_FACE_NEGATIVEY 3
+#define CUBE_FACE_POSITIVEZ 4
+#define CUBE_FACE_NEGATIVEZ 5
+
+static float3 transforms[6] =
+{
+    float3(1, 1, -1),
+    float3(-1, 1, 1),
+    float3(1, 1, -1),
+    float3(1, -1, 1),
+    float3(1, 1, 1),
+    float3(-1, 1, -1)
+};
+
+float3 GetDirection(uint2 faceCoord, uint face)
+{
+    float3 dir;
+    
+    if (face == CUBE_FACE_POSITIVEX)
+    {
+        float x = 1;
+        float2 yz = (float2) faceCoord / _CubemapSize * 2 - 1;
+        dir = float3(x, yz.x, -yz.y);
+    }
+    else if (face == CUBE_FACE_NEGATIVEX)
+    {
+        float x = -1;
+        float2 yz = (float2)faceCoord / _CubemapSize * 2 - 1;
+        dir = float3(x, yz.x, yz.y);
+    }
+    else if (face == CUBE_FACE_POSITIVEY)
+    {
+        float y = 1;
+        float2 xz = (float2)faceCoord / _CubemapSize * 2 - 1;
+        dir = float3(xz.x, y, -xz.y);
+    }
+    else if (face == CUBE_FACE_NEGATIVEY)
+    {
+        float y = -1;
+        float2 xz = (float2) faceCoord / _CubemapSize * 2 - 1;
+        dir = float3(xz.x, y, xz.y);
+    }
+    else if (face == CUBE_FACE_POSITIVEZ)
+    {
+        float z = 1;
+        float2 xy = (float2) faceCoord / _CubemapSize * 2 - 1;
+        dir = float3(xy.x, xy.y, z);
+    }
+    else if (face == CUBE_FACE_NEGATIVEZ)
+    {
+        float z = -1;
+        float2 xy = (float2) faceCoord / _CubemapSize * 2 - 1;
+        dir = float3(-xy.x, xy.y, z);
+    }
+
+    return normalize(dir);
+}
+
+[numthreads(8,8,1)]
+void CSMain(uint3 id : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+{
+    // TODO: insert actual code here!
+    float3 direction = GetDirection(id.xy, groupId.x);
+    
+    float3 sunDir = -normalize(_MainLightPosition.xyz);
+    //calculate the incoming light from the atmosphere
+    
+
+    half3 skyColor = GetSkyColor(direction, sunDir);
+    _Cubemap[uint3(id.xy, groupId.x)] = skyColor;
+
+}

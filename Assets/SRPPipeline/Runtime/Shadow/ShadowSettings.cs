@@ -10,6 +10,7 @@ namespace Insanity
     {
         public bool supportsMainLightShadows;
         public bool requiresScreenSpaceShadowResolve;
+        public float screenSpaceShadowScale = 1.0f;
         //public int mainLightShadowmapWidth = 512;
         //public int mainLightShadowmapHeight = 512;
         public int mainLightResolution = 512;

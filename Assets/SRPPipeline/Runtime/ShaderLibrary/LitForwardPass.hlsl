@@ -62,7 +62,7 @@ void InitializeInputData(Varyings input, float3 normalTS, out InputData inputDat
 
     half3 viewDirWS = SafeNormalize(input.viewDirWS);
 
-#ifdef _NORMAL_MAP
+#ifdef _NORMALMAP
     float sgn = input.tangentWS.w;      // should be either +1 or -1
     float3 bitangent = sgn * cross(input.normalWS.xyz, input.tangentWS.xyz);
     inputData.normalWS = TransformTangentToWorld(normalTS, half3x3(input.tangentWS.xyz, bitangent.xyz, input.normalWS.xyz));
@@ -151,7 +151,8 @@ half4 LitPassFragment(Varyings input) : SV_Target
     InitializeInputData(input, surfaceData.normalTS, inputData);
 
     ShadowSampleCoords shadowSample = GetShadowSampleData(inputData.positionWS, inputData.positionSS);
-    half4 color = FragmentBlinnPhong(inputData, surfaceData.albedo, 0, 0, 0, surfaceData.alpha, shadowSample);//half4(surfaceData.albedo, surfaceData.alpha);
+    //half4 color = FragmentBlinnPhong(inputData, surfaceData.albedo, 0, 0, 0, surfaceData.alpha, shadowSample);//half4(surfaceData.albedo, surfaceData.alpha);
+    half4 color = FragmentPBR(inputData, surfaceData, shadowSample);
     return color;
 }
 

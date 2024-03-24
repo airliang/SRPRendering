@@ -8,7 +8,13 @@
 struct SurfaceData
 {
     half3 albedo;
-    half  alpha;
+    half3 specular;
+    half metallic;
+    half smoothness;
+    half3 normalTS;
+    half3 emission;
+    half occlusion;
+    half alpha;
 };
 
 struct InputData
@@ -39,6 +45,7 @@ float3 IntToColor(int color)
 
 inline void InitializeLitSurfaceData(out SurfaceData outSurfaceData, half3 color)
 {
+    outSurfaceData = (SurfaceData)0;
     outSurfaceData.albedo = color;
     outSurfaceData.alpha = 1; //Alpha(albedoAlpha.a, _BaseColor, _Cutoff);
 }

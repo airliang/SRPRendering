@@ -91,10 +91,12 @@ namespace Insanity
                                 else
                                     shadowmap = prefilterPassData.m_BlurShadowmap;
                             }
-                        }
 
-                        //if (shadowPassData != null)
-                        //    RenderScreenSpaceShadow(cameraData, m_RenderGraph, shadowPassData, depthPassData);
+                            if (ShadowManager.Instance.shadowSettings.requiresScreenSpaceShadowResolve)
+                            {
+                                ShadowManager.Instance.Render_ScreenSpaceShadow(renderingData.renderGraph, renderingData.cameraData.camera, shadowmap, depthPassData.m_Depth);
+                            }
+                        }
                     }
 
                     ForwardPassData forwardPassData = RenderPasses.Render_OpaqueFowardPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, shadowmap);
@@ -159,62 +161,62 @@ namespace Insanity
                 if (DebugView.NeedDebugView())
                 {
                     DebugView.DebugViewForwardPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth);
-                    //DebugView.DebugViewTextures textures = new DebugView.DebugViewTextures();
-                    //textures.m_Depth = depthPassData.m_Depth;
-                    //textures.m_TileVisibleLightCount = lightCullingData.tileVisibleLightCounts;
-                    //DebugView.ShowDebugPass(renderingData, ref textures, m_debugViewBlitMaterial);
                 }
-                //else
+ 
+                ShadowManager.Instance.ExecuteShadowInitPass(renderingData.renderGraph);
+                ShadowPassData shadowPassData = null;
+                TextureHandle shadowmap = TextureHandle.nullHandle;
+                if (ShadowManager.Instance.shadowSettings.supportsMainLightShadows)
                 {
-                    ShadowManager.Instance.ExecuteShadowInitPass(renderingData.renderGraph);
-                    ShadowPassData shadowPassData = null;
-                    TextureHandle shadowmap = TextureHandle.nullHandle;
-                    if (ShadowManager.Instance.shadowSettings.supportsMainLightShadows)
-                    {
-                        shadowPassData = InsanityPipeline.RenderShadow(renderingData.cameraData, renderingData.renderGraph, renderingData.cullingResults, m_parallelScan);
+                    shadowPassData = InsanityPipeline.RenderShadow(renderingData.cameraData, renderingData.renderGraph, renderingData.cullingResults, m_parallelScan);
 
-                        if (shadowPassData != null)
+                    if (shadowPassData != null)
+                    {
+                        shadowmap = shadowPassData.m_Shadowmap;
+                        if (ShadowManager.Instance.NeedPrefilterShadowmap(shadowPassData))
                         {
-                            shadowmap = shadowPassData.m_Shadowmap;
-                            if (ShadowManager.Instance.NeedPrefilterShadowmap(shadowPassData))
-                            {
-                                PrefilterShadowPassData prefilterPassData = ShadowManager.Instance.PrefilterShadowPass(
-                                    renderingData.renderGraph, shadowPassData);
-                                //shadowPassData.m_Shadowmap = prefilterPassData.m_BlurShadowmap;
-                                if (prefilterPassData.m_filterRadius != eGaussianRadius.eGausian3x3)
-                                    shadowmap = prefilterPassData.m_Shadowmap;
-                                else
-                                    shadowmap = prefilterPassData.m_BlurShadowmap;
-                            }
+                            PrefilterShadowPassData prefilterPassData = ShadowManager.Instance.PrefilterShadowPass(
+                                renderingData.renderGraph, shadowPassData);
+                            //shadowPassData.m_Shadowmap = prefilterPassData.m_BlurShadowmap;
+                            if (prefilterPassData.m_filterRadius != eGaussianRadius.eGausian3x3)
+                                shadowmap = prefilterPassData.m_Shadowmap;
+                            else
+                                shadowmap = prefilterPassData.m_BlurShadowmap;
+                        }
+
+                        if (ShadowManager.Instance.shadowSettings.requiresScreenSpaceShadowResolve)
+                        {
+                            ShadowManager.Instance.Render_ScreenSpaceShadow(renderingData.renderGraph, renderingData.cameraData.camera, shadowmap, depthPassData.m_Depth);
                         }
                     }
-
-                    ForwardPassData forwardPassData = RenderPasses.Render_OpaqueFowardPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, shadowmap);
-                    Atmosphere atmosphere = Atmosphere.Instance;
-                    if (asset.PhysicalBasedSky)
-                    {
-                        //BakeAtmosphereSH(ref context, asset.AtmosphereResources);
-                        Atmosphere.Instance.BakeSkyToSHAmbient(ref context, asset.AtmosphereResources, m_sunLight);
-                        atmosphere.Update();
-                        RenderPasses.Render_PhysicalBaseSky(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, asset);
-                    }
-                    else
-                    {
-                        Cubemap cubemap = asset.InsanityPipelineResources.materials.Skybox.GetTexture("_Cubemap") as Cubemap;
-                        atmosphere.BakeCubemapToSHAmbient(ref context, asset.AtmosphereResources, cubemap);
-                        atmosphere.Update();
-                        RenderPasses.Render_SkyPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, asset.InsanityPipelineResources.materials.Skybox);
-                    }
-
-                    RenderPasses.FinalBlitPass(renderingData, forwardPassData.m_Albedo, m_finalBlitMaterial);
-                    if (DebugView.NeedDebugView())
-                    {
-                        DebugView.DebugViewGPUResources textures = new DebugView.DebugViewGPUResources();
-                        textures.m_Depth = depthPassData.m_Depth;
-                        textures.m_LightVisibilityIndexBuffer = lightCullingData != null ? lightCullingData.lightVisibilityIndexBuffer : LightCulling.Instance.LightsVisibilityIndexBuffer;
-                        DebugView.ShowDebugPass(renderingData, ref textures, m_debugViewBlitMaterial);
-                    }
                 }
+
+                ForwardPassData forwardPassData = RenderPasses.Render_OpaqueFowardPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, shadowmap);
+                Atmosphere atmosphere = Atmosphere.Instance;
+                if (asset.PhysicalBasedSky)
+                {
+                    //BakeAtmosphereSH(ref context, asset.AtmosphereResources);
+                    Atmosphere.Instance.BakeSkyToSHAmbient(ref context, asset.AtmosphereResources, m_sunLight);
+                    atmosphere.Update();
+                    RenderPasses.Render_PhysicalBaseSky(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, asset);
+                }
+                else
+                {
+                    Cubemap cubemap = asset.InsanityPipelineResources.materials.Skybox.GetTexture("_Cubemap") as Cubemap;
+                    atmosphere.BakeCubemapToSHAmbient(ref context, asset.AtmosphereResources, cubemap);
+                    atmosphere.Update();
+                    RenderPasses.Render_SkyPass(renderingData, depthPassData.m_Albedo, depthPassData.m_Depth, asset.InsanityPipelineResources.materials.Skybox);
+                }
+
+                RenderPasses.FinalBlitPass(renderingData, forwardPassData.m_Albedo, m_finalBlitMaterial);
+                if (DebugView.NeedDebugView())
+                {
+                    DebugView.DebugViewGPUResources textures = new DebugView.DebugViewGPUResources();
+                    textures.m_Depth = depthPassData.m_Depth;
+                    textures.m_LightVisibilityIndexBuffer = lightCullingData != null ? lightCullingData.lightVisibilityIndexBuffer : LightCulling.Instance.LightsVisibilityIndexBuffer;
+                    DebugView.ShowDebugPass(renderingData, ref textures, m_debugViewBlitMaterial);
+                }
+                
             }
 
             context.ExecuteCommandBuffer(cmdRG);
