@@ -25,6 +25,9 @@ namespace Insanity
         [Reload("Runtime/ShaderLibrary/PrecomputeScattering.compute")]
         public ComputeShader PrecomputeScattering;
         public ComputeShader ProjAtmosphereToSH;
+        public ComputeShader BakeToCubemap;
+        public ComputeShader DownSampleCubemap;
+        public ComputeShader PrefilterSpecularCubemap;
         public Texture SkyboxLUT;
 
         public Vector3 ScatteringCoefficientRayleigh = new Vector3(6.55f, 17.3f, 23.0f);

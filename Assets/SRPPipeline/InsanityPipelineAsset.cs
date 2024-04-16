@@ -67,6 +67,29 @@ namespace Insanity
         TriangleOverdraw
     }
 
+    public enum MsaaQuality
+    {
+        /// <summary>
+        /// Disables MSAA.
+        /// </summary>
+        Disabled = 1,
+
+        /// <summary>
+        /// Use this for 2 samples per pixel.
+        /// </summary>
+        _2x = 2,
+
+        /// <summary>
+        /// Use this for 4 samples per pixel.
+        /// </summary>
+        _4x = 4,
+
+        /// <summary>
+        /// Use this for 8 samples per pixel.
+        /// </summary>
+        _8x = 8
+    }
+
     [ExecuteInEditMode]
     public class InsanityPipelineAsset : RenderPipelineAsset
     {
@@ -107,6 +130,7 @@ namespace Insanity
         [SerializeField] float m_Exposure = 1.0f;
         [SerializeField] float m_ResolutionRate = 1.0f;
         [SerializeField] bool m_UseSRPBatcher = true;
+        [SerializeField] MsaaQuality m_MSAASamples = MsaaQuality.Disabled;
 
         public bool HDREnable
         {
@@ -130,6 +154,12 @@ namespace Insanity
         {
             get { return m_UseSRPBatcher; }
             set { m_UseSRPBatcher = value; }
+        }
+
+        public MsaaQuality MSAASamples
+        {
+            get { return m_MSAASamples; }
+            set { m_MSAASamples = value; }
         }
         #endregion
 

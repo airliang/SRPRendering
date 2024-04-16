@@ -47,37 +47,21 @@ namespace Insanity
         static ShaderTagId m_DebugViewShaderTag = new ShaderTagId("DebugView");
         public static DebugViewVariables m_DebugViewVariablesCB = new DebugViewVariables();
 
-        public static DebugViewPassData DebugViewForwardPass(RenderingData renderingData, TextureHandle colorTarget, TextureHandle depthTarget)
+        public static DebugViewPassData DebugViewPreparePass(RenderingData renderingData/*, TextureHandle colorTarget, TextureHandle depthTarget*/)
         {
-            using (var builder = renderingData.renderGraph.AddRenderPass<DebugViewPassData>("DebugView Forward Pass", out var passData,
-                new ProfilingSampler("DebugView Forward Pass Profiler")))
+            using (var builder = renderingData.renderGraph.AddRenderPass<DebugViewPassData>("DebugView Prepare Pass", out var passData,
+                new ProfilingSampler("DebugView Prepare Pass Profiler")))
             {
-                //TextureHandle Albedo = CreateColorTexture(graph, cameraData.camera, "Albedo");
-                passData.m_Albedo = builder.UseColorBuffer(colorTarget, 0);
-                builder.UseDepthBuffer(depthTarget, DepthAccess.Read);
-
-
-                // Renderers
-                UnityEngine.Rendering.RendererUtils.RendererListDesc rendererDesc_base_Opaque =
-                    new UnityEngine.Rendering.RendererUtils.RendererListDesc(m_DebugViewShaderTag, renderingData.cullingResults, renderingData.cameraData.camera);
-                rendererDesc_base_Opaque.sortingCriteria = SortingCriteria.CommonOpaque;
-                rendererDesc_base_Opaque.renderQueueRange = RenderQueueRange.opaque;
-                RendererListHandle rHandle_base_Opaque = renderingData.renderGraph.CreateRendererList(rendererDesc_base_Opaque);
-                passData.m_renderList_opaque = builder.UseRendererList(rHandle_base_Opaque);
-                passData.m_AdditionalLightsEnable = renderingData.supportAdditionalLights;
                 m_DebugViewVariablesCB.debugViewType = (int)debugViewType;
                 passData.m_debugViewVariable = m_DebugViewVariablesCB;
-
-                UnityEngine.Rendering.RendererUtils.RendererListDesc rendererDesc_base_Transparent =
-                    new UnityEngine.Rendering.RendererUtils.RendererListDesc(m_DebugViewShaderTag, renderingData.cullingResults, renderingData.cameraData.camera);
 
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc((DebugViewPassData data, RenderGraphContext context) =>
                 {
                     ConstantBuffer.PushGlobal(context.cmd, passData.m_debugViewVariable, ShaderIDs._DebugViewVariables);
-                    CoreUtils.SetKeyword(context.cmd, "_ADDITIONAL_LIGHTS", data.m_AdditionalLightsEnable);
-                    CoreUtils.DrawRendererList(context.renderContext, context.cmd, data.m_renderList_opaque);
-                    
+                    context.renderContext.ExecuteCommandBuffer(context.cmd);
+                    context.cmd.Clear();
+
                 });
                 return passData;
             }
@@ -102,14 +86,16 @@ namespace Insanity
             public TextureHandle m_Overdraw;
             public bool flip;
             public Material m_finalBlitMaterial;
+            public int m_DebugViewMode;
+            public TextureHandle m_Dest;
         }
 
         
 
-        public static void ShowDebugPass(RenderingData renderingData, ref DebugViewGPUResources debugViewTextures, Material finalBlitMaterial)
+        public static void ShowDebugPass(RenderingData renderingData, ref DebugViewGPUResources debugViewTextures, TextureHandle colorTarget, Material finalBlitMaterial, int debugViewMode)
         {
             if (finalBlitMaterial == null)
-                finalBlitMaterial = CoreUtils.CreateEngineMaterial("Insanity/DebugViewBlit");
+                finalBlitMaterial = CoreUtils.CreateEngineMaterial(asset.InsanityPipelineResources.shaders.DebugViewBlit);
 
             using (var builder = renderingData.renderGraph.AddRenderPass<DebugViewBlitPassData>("DebugViewBlitPass", out var passData, new ProfilingSampler("DebugView Blit Profiler")))
             {
@@ -126,19 +112,25 @@ namespace Insanity
                 {
                     passData.m_LightVisibilityIndexBuffer = debugViewTextures.m_LightVisibilityIndexBuffer;
                 }
+                passData.m_Dest = builder.UseColorBuffer(colorTarget, 0);
                 passData.flip = renderingData.cameraData.isMainGameView;
                 passData.m_finalBlitMaterial = finalBlitMaterial;
                 passData.m_finalBlitMaterial.SetInt("_FlipY", passData.flip ? 1 : 0);
+                passData.m_DebugViewMode = debugViewMode;
 
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc((DebugViewBlitPassData data, RenderGraphContext context) =>
                 {
+                    data.m_finalBlitMaterial.SetInt("_DebugViewMode", data.m_DebugViewMode);
                     context.cmd.SetGlobalTexture("_DepthTexture", data.m_Depth);
                     context.cmd.SetGlobalBuffer("_LightVisibilityIndexBuffer", data.m_LightVisibilityIndexBuffer);
-                    context.cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
+                    context.cmd.SetRenderTarget(data.m_Dest);
+                    
+                    //context.cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
                     //context.cmd.ClearRenderTarget(true, renderingData.cameraData.camera.cameraType != CameraType.SceneView, renderingData.cameraData.camera.backgroundColor);
                     context.cmd.SetViewport(renderingData.cameraData.camera.pixelRect);
-                    CoreUtils.DrawFullScreen(context.cmd, data.m_finalBlitMaterial);
+                    context.cmd.DrawProcedural(Matrix4x4.identity, data.m_finalBlitMaterial, 0, MeshTopology.Triangles, 3);
+                    //CoreUtils.DrawFullScreen(context.cmd, data.m_finalBlitMaterial);
 
                 });
             }

@@ -131,7 +131,7 @@
             #pragma multi_compile _ _DEBUGVIEW
 			
 #include "LitInput.hlsl"
-#include "DebugViewPass.hlsl"
+#include "Debug/DebugViewPass.hlsl"
 
 			ENDHLSL
         }

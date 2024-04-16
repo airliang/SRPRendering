@@ -1,0 +1,64 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+#pragma enable_d3d11_debug_symbols
+#include "BakeAtmosphereScatteringInclude.hlsl"
+
+//https://research.activision.com/publications/archives/fast-filtering-of-reflection-probes
+
+TextureCube _InputCubemap;
+SamplerState _LinearRepeat;
+
+float calcWeight(float u, float v)
+{
+    float val = u * u + v * v + 1;
+    return val * sqrt(val);
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    uint res_lo;
+    uint h, e;
+    _Cubemap.GetDimensions(res_lo, h, e);
+    int mipLevel = log2(CUBEMAP_SIZE / res_lo) - 1;
+
+
+    if (id.x < res_lo && id.y < res_lo)
+    {
+        float inv_res_lo = rcp((float) res_lo);
+        
+        //float2 uv = ((float2) id.xy + 0.5) * inv_res_lo * 2 - 1;
+
+        float u0 = ((float) id.x * 2.0f + 1.0f - .75f) * inv_res_lo - 1.0f;
+        float u1 = ((float) id.x * 2.0f + 1.0f + .75f) * inv_res_lo - 1.0f;
+
+        float v0 = ((float) id.y * 2.0f + 1.0f - .75f) * -inv_res_lo + 1.0f;
+        float v1 = ((float) id.y * 2.0f + 1.0f + .75f) * -inv_res_lo + 1.0f;
+
+        float weights[4];
+        weights[0] = calcWeight(u0, v0);
+        weights[1] = calcWeight(u1, v0);
+        weights[2] = calcWeight(u0, v1);
+        weights[3] = calcWeight(u1, v1);
+
+        const float wsum = 0.5f / (weights[0] + weights[1] + weights[2] + weights[3]);
+		[unroll]
+        for (int i = 0; i < 4; i++)
+            weights[i] = weights[i] * wsum + .125f;
+        
+        float4 color = 0;
+        float3 dir = GetDirection(float2(u0, v0), id.z);
+        color += _InputCubemap.SampleLevel(_LinearRepeat, dir, mipLevel) * weights[0];
+        
+        dir = GetDirection(float2(u1, v0), id.z);
+        color += _InputCubemap.SampleLevel(_LinearRepeat, dir, mipLevel) * weights[1];
+        
+        dir = GetDirection(float2(u0, v1), id.z);
+        color += _InputCubemap.SampleLevel(_LinearRepeat, dir, mipLevel) * weights[2];
+        
+        dir = GetDirection(float2(u1, v1), id.z);
+        color += _InputCubemap.SampleLevel(_LinearRepeat, dir, mipLevel) * weights[3];
+
+        _Cubemap[id] = color;
+    }
+}

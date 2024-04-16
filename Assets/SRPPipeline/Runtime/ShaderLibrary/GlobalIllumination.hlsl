@@ -17,7 +17,7 @@ half3 GlossyEnvironmentReflection(half3 reflectVector, float3 positionWS, half p
     half mip = PerceptualRoughnessToMipmapLevel(perceptualRoughness);
     half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, reflectVector, mip));
 
-    half3 irradiance = DecodeHDREnvironment(encodedIrradiance, unity_SpecCube0_HDR);
+    half3 irradiance = DecodeHDREnvironment(encodedIrradiance, 0);
 
     return irradiance * occlusion;
 
@@ -37,7 +37,7 @@ half3 GlossyEnvironmentReflection(half3 reflectVector, half perceptualRoughness,
     half mip = PerceptualRoughnessToMipmapLevel(perceptualRoughness);
     half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, reflectVector, mip));
 
-    irradiance = DecodeHDREnvironment(encodedIrradiance, unity_SpecCube0_HDR);
+    irradiance = DecodeHDREnvironment(encodedIrradiance, 0);
 
     return irradiance * occlusion;
 #else

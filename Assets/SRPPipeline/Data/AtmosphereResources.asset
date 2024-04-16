@@ -15,6 +15,10 @@ MonoBehaviour:
   PrecomputeScattering: {fileID: 7200000, guid: f29ed63cf0dc4584e905a83c826a0b6e,
     type: 3}
   ProjAtmosphereToSH: {fileID: 7200000, guid: 1f7919f1bf397e14a9ba8286128230ae, type: 3}
+  BakeToCubemap: {fileID: 7200000, guid: 9f373623ee961214f8c61d4b5770092b, type: 3}
+  DownSampleCubemap: {fileID: 7200000, guid: 1781416e3386862469f69840e64948d3, type: 3}
+  PrefilterSpecularCubemap: {fileID: 7200000, guid: 9c746223f85d5004480cae54ce0b67b7,
+    type: 3}
   SkyboxLUT: {fileID: 11700000, guid: c055b6287f65fa040828f60c2b7f2fec, type: 2}
   ScatteringCoefficientRayleigh: {x: 5.8, y: 13.5, z: 33.1}
   ScatteringCoefficientMie: {x: 2, y: 2, z: 2}

@@ -88,23 +88,20 @@ namespace Insanity
                     CoreUtils.SetKeyword(context.cmd, "GAUSSIAN13x13", data.m_filterRadius == eGaussianRadius.eGausian13x13);
                     if (data.m_filterRadius != eGaussianRadius.eGausian3x3)
                     {
-                        //context.cmd.SetGlobalTexture("_MainLightShadowmapBlur", data.m_Shadowmap);
-                        //context.cmd.SetGlobalTexture("_MainLightShadowmapBlur1", data.m_BlurShadowmap);
                         data.m_FilterMaterial.SetTexture("_MainLightShadowmapBlur", data.m_BlurShadowmap);
-                        //data.m_FilterMaterial.SetTexture("_MainLightShadowmapBlur1", data.m_BlurShadowmap1);
                         context.cmd.SetRenderTarget(data.m_BlurShadowmap, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-                        CoreUtils.DrawFullScreen(context.cmd, data.m_FilterMaterial, null, 0);
+                        //CoreUtils.DrawFullScreen(context.cmd, data.m_FilterMaterial, null, 0);
+                        context.cmd.DrawProcedural(Matrix4x4.identity, data.m_FilterMaterial, 0, MeshTopology.Triangles, 3);
                         context.cmd.SetRenderTarget(data.m_Shadowmap, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-                        //context.cmd.SetGlobalTexture("_MainLightShadowmapBlur1", data.m_BlurShadowmap);
-                        CoreUtils.DrawFullScreen(context.cmd, data.m_FilterMaterial, null, 1);
-                        //context.cmd.SetGlobalTexture("_ShadowMap", data.m_Shadowmap);
+
+                        //CoreUtils.DrawFullScreen(context.cmd, data.m_FilterMaterial, null, 1);
+                        context.cmd.DrawProcedural(Matrix4x4.identity, data.m_FilterMaterial, 1, MeshTopology.Triangles, 3);
                     }
                     else
                     {
                         context.cmd.SetRenderTarget(data.m_BlurShadowmap, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-                        CoreUtils.DrawFullScreen(context.cmd, data.m_FilterMaterial, null, 2);
-
-                        //context.cmd.SetGlobalTexture("_ShadowMap", data.m_BlurShadowmap);
+                        //CoreUtils.DrawFullScreen(context.cmd, data.m_FilterMaterial, null, 2);
+                        context.cmd.DrawProcedural(Matrix4x4.identity, data.m_FilterMaterial, 2, MeshTopology.Triangles, 3);
                     }
                 });
 

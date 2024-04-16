@@ -22,6 +22,8 @@ namespace UnityEditor.Insanity
             public static GUIContent hdrExposureText = EditorGUIUtility.TrTextContent("Exposure", "Controls the global HDR exposure settings.");
             public static GUIContent screenPercentageText = EditorGUIUtility.TrTextContent("Screen Resolution Percentage", "Controls the global screen resolution settings.");
             public static GUIContent srpBatcherText = EditorGUIUtility.TrTextContent("SRP Batcher", "Controls the global SRP Batcher settings.");
+            public static GUIContent msaaText = EditorGUIUtility.TrTextContent("MSAA", "Controls the global anti aliasing settings");
+            public static string[] msaaOptions = { "Disabled", "2x", "4x", "8x" };
 
             public static GUIContent shadowSettingsText = EditorGUIUtility.TrTextContent("Shadows");
 
@@ -81,6 +83,7 @@ namespace UnityEditor.Insanity
         SerializedProperty m_HDRExposureProp;
         SerializedProperty m_ScreenResolutionProp;
         SerializedProperty m_SRPBatcherProp;
+        SerializedProperty m_MSAAProp;
 
         SavedBool m_ShadowSettingsFoldout;
 
@@ -149,6 +152,7 @@ namespace UnityEditor.Insanity
             m_HDRExposureProp = serializedObject.FindProperty("m_Exposure");
             m_ScreenResolutionProp = serializedObject.FindProperty("m_ResolutionRate");
             m_SRPBatcherProp = serializedObject.FindProperty("m_UseSRPBatcher");
+            m_MSAAProp = serializedObject.FindProperty("m_MSAASamples");
 
             m_ShadowSettingsFoldout = new SavedBool($"{target.GetType()}.ShadowSettingsFoldout", false);
 
@@ -211,6 +215,7 @@ namespace UnityEditor.Insanity
                 m_ScreenResolutionProp.floatValue = EditorGUILayout.Slider(Styles.screenPercentageText, m_ScreenResolutionProp.floatValue, 0.1f, 1.0f);
 
                 m_SRPBatcherProp.boolValue = EditorGUILayout.Toggle(Styles.srpBatcherText, m_SRPBatcherProp.boolValue);
+                EditorGUILayout.PropertyField(m_MSAAProp, Styles.msaaText);
             }
             EditorGUILayout.EndFoldoutHeaderGroup();
         }

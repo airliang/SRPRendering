@@ -17,6 +17,11 @@ namespace Insanity
             public Shader HDRISky;
             [Reload("Runtime/ShaderLibrary/ParallelScan.compute")]
             public ComputeShader ParallelScan;
+            [Reload("Runtime/ShaderLibrary/Shadow/ScreenSpaceShadow.shader")]
+            public Shader ScreenSpaceShadow;
+            public Shader CopyDepth;
+            [Reload("Runtime/ShaderLibrary/Debug/DebugViewBlit.shader")]
+            public Shader DebugViewBlit;
         }
 
         [Serializable, ReloadGroup]
@@ -30,8 +35,15 @@ namespace Insanity
             public Material PhysicalBaseSky;
         }
 
+        [Serializable, ReloadGroup]
+        public sealed class InternalTextures
+        {
+            public Texture BRDFLut;
+        }
+
         public ShaderResources shaders;
         public MaterialResources materials;
+        public InternalTextures internalTextures;
     }
 }
 

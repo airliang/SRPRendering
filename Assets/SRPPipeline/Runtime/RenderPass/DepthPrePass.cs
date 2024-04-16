@@ -10,8 +10,8 @@ namespace Insanity
     public class DepthPrepassData
     {
         public RendererListHandle m_renderList_opaque;
-        public TextureHandle m_Depth;
-        public TextureHandle m_Albedo;
+        //public TextureHandle m_Depth;
+        //public TextureHandle m_Albedo;
     }
 
 
@@ -20,7 +20,7 @@ namespace Insanity
     {
         static ShaderTagId m_DepthPrePassId = new ShaderTagId("DepthPrepass");
 
-        private static TextureHandle CreateDepthTexture(RenderGraph graph, Camera camera)
+        private static TextureHandle CreateDepthTexture(RenderGraph graph, Camera camera, string name)
         {
             //Texture description
             float width = GlobalRenderSettings.ResolutionRate * camera.pixelWidth;
@@ -32,7 +32,7 @@ namespace Insanity
             depthRTDesc.enableRandomWrite = false;
             depthRTDesc.clearBuffer = true;
             depthRTDesc.clearColor = Color.black;
-            depthRTDesc.name = "Depth";
+            depthRTDesc.name = name;
 
             return graph.CreateTexture(depthRTDesc);
         }
@@ -57,15 +57,15 @@ namespace Insanity
             return graph.CreateTexture(colorRTDesc);
         }
 
-        public static DepthPrepassData Render_DepthPrePass(RenderingData renderingData)
+        public static DepthPrepassData Render_DepthPrePass(RenderingData renderingData, TextureHandle depth)
         {
             using (var builder = renderingData.renderGraph.AddRenderPass<DepthPrepassData>("DepthPrepass", out var passData, new ProfilingSampler("DepthPrepass Profiler")))
             {
                 //Textures - Multi-RenderTarget
-                TextureHandle Depth = CreateDepthTexture(renderingData.renderGraph, renderingData.cameraData.camera);
-                passData.m_Depth = builder.UseDepthBuffer(Depth, DepthAccess.ReadWrite);
-                TextureHandle Albedo = CreateColorTexture(renderingData.renderGraph, renderingData.cameraData.camera, "Albedo");
-                passData.m_Albedo = Albedo;
+                //TextureHandle Depth = CreateDepthTexture(renderingData.renderGraph, renderingData.cameraData.camera);
+                builder.UseDepthBuffer(depth, DepthAccess.Write);
+                
+                //passData.m_Albedo = Albedo;
 
                 //Renderers
                 UnityEngine.Rendering.RendererUtils.RendererListDesc rendererDesc_base_Opaque = 

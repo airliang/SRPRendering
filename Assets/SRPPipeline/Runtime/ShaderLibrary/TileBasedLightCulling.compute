@@ -15,6 +15,7 @@ uint2 _TileNumber;
 uint _TotalLightNum;
 
 RWTexture2D<uint> _TileVisibleLightCounts;
+//RWStructuredBuffer<TileAABB> _TileAABBs;
 
 groupshared uint _MinDepth;
 groupshared uint _MaxDepth;
@@ -68,9 +69,49 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
         minInView /= minInView.w;
         float4 maxInView = mul(_ProjInverse, float4(maxInClip, maxDepth, 1));
         maxInView /= maxInView.w;
-    
         _AABBInView.center = (minInView.xyz + maxInView.xyz) * 0.5;
         _AABBInView.extents = (maxInView.xyz - minInView.xyz) * 0.5;
+        
+        float4 viewSpaceAABB[8];
+        //bottom left near corner
+        viewSpaceAABB[0] = mul(_ProjInverse, float4(minInClip, minDepth, 1));
+        viewSpaceAABB[0] /= viewSpaceAABB[0].w;
+        //bottom right near corner
+        viewSpaceAABB[1] = mul(_ProjInverse, float4(float2(groupId.x + 1, groupId.y) / _TileNumber * 2.0 - 1.0, minDepth, 1));
+        viewSpaceAABB[1] /= viewSpaceAABB[1].w;
+        //top left near
+        viewSpaceAABB[2] = mul(_ProjInverse, float4(float2(groupId.x, groupId.y + 1) / _TileNumber * 2.0 - 1.0, minDepth, 1));
+        viewSpaceAABB[2] /= viewSpaceAABB[2].w;
+        //top right near
+        viewSpaceAABB[3] = mul(_ProjInverse, float4(float2(groupId.x + 1, groupId.y + 1) / _TileNumber * 2.0 - 1.0, minDepth, 1));
+        viewSpaceAABB[3] /= viewSpaceAABB[3].w;
+        
+        //bottom left far corner
+        viewSpaceAABB[4] = mul(_ProjInverse, float4(minInClip, maxDepth, 1));
+        viewSpaceAABB[4] /= viewSpaceAABB[4].w;
+        //bottom right far corner
+        viewSpaceAABB[5] = mul(_ProjInverse, float4(float2(groupId.x + 1, groupId.y) / _TileNumber * 2.0 - 1.0, maxDepth, 1));
+        viewSpaceAABB[5] /= viewSpaceAABB[5].w;
+        //top left far
+        viewSpaceAABB[6] = mul(_ProjInverse, float4(float2(groupId.x, groupId.y + 1) / _TileNumber * 2.0 - 1.0, maxDepth, 1));
+        viewSpaceAABB[6] /= viewSpaceAABB[6].w;
+        //top right far
+        viewSpaceAABB[7] = mul(_ProjInverse, float4(float2(groupId.x + 1, groupId.y + 1) / _TileNumber * 2.0 - 1.0, maxDepth, 1));
+        viewSpaceAABB[7] /= viewSpaceAABB[7].w;
+        
+        float3 minAABB = 10000000;
+        float3 maxAABB = -10000000;
+		[unroll]
+        for (uint i = 0; i < 8; ++i)
+        {
+            minAABB = min(minAABB, viewSpaceAABB[i].xyz);
+            maxAABB = max(maxAABB, viewSpaceAABB[i].xyz);
+        }
+        _AABBInView.center = (minAABB + maxAABB) * 0.5;
+        _AABBInView.extents = maxAABB - _AABBInView.center;
+        
+        //_TileAABBs[tileIndex] = _AABBInView;
+
     }
     GroupMemoryBarrierWithGroupSync();
     
@@ -86,12 +127,6 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
             if (SphereIntersectsAABB(float4(lightPosInView.xyz, light.position.w), _AABBInView))
             {
                 intersect = true;
-                //uint index = 0; // Index into the visible lights array.
-                //InterlockedAdd(_TileLightCount, 1, index);
-                //if (index < MAX_LIGHT_NUM_PER_TILE)
-                //{
-                //    _LightList[index] = i;
-                //}
             }
         }
         else   //spot light

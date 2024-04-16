@@ -16,7 +16,7 @@ Shader "Insanity/ScreenSpaceShadow"
             #pragma vertex VertScreenSpaceShadow
             #pragma fragment FragScreenSpaceShadow
             #pragma multi_compile_fragment _ _LINEAR_TO_SRGB_CONVERSION
-            #pragma multi_compile _ _USE_DRAW_PROCEDURAL
+            //#pragma multi_compile _ _USE_DRAW_PROCEDURAL
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
             //#pragma multi_compile _ _SHADOWS_SOFT

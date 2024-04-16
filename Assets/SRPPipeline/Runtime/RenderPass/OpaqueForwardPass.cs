@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
@@ -13,11 +14,12 @@ namespace Insanity
     {
         public RendererListHandle m_renderList_opaque;
         public RendererListHandle m_renderList_transparent;
-        public TextureHandle m_Albedo;
+        //public TextureHandle m_Albedo;
         public TextureHandle m_ShadowMap;
         public bool m_AdditionalLightsEnable;
         public eAdditionalLightCullingFunction m_AdditionalLightCullingFunction;
         public ComputeBuffer m_LightVisibilityIndexBuffer;
+        public int m_AlbedoSamples = 1;
     }
 
     public partial class RenderPasses
@@ -25,14 +27,13 @@ namespace Insanity
         static ShaderTagId m_ForwardPass = new ShaderTagId("InsanityForward");
 
 
-        public static ForwardPassData Render_OpaqueFowardPass(RenderingData renderingData,
-            TextureHandle colorTarget, TextureHandle depthTarget, TextureHandle shadowmap)
+        public static ForwardPassData Render_OpaqueFowardPass(RenderingData renderingData, TextureHandle depthTarget, TextureHandle colorTarget, TextureHandle shadowmap)
         {
             using (var builder = renderingData.renderGraph.AddRenderPass<ForwardPassData>("Opaque Forward Pass", out var passData, 
                 new ProfilingSampler("Opaque Forward Pass Profiler")))
             {
-                //TextureHandle Albedo = CreateColorTexture(graph, cameraData.camera, "Albedo");
-                passData.m_Albedo = builder.UseColorBuffer(colorTarget, 0);
+                //TextureHandle Albedo = CreateColorTexture(renderingData.renderGraph, renderingData.cameraData.camera, "Albedo");
+                builder.UseColorBuffer(colorTarget, 0);
                 builder.UseDepthBuffer(depthTarget, DepthAccess.Read);
                 //if (shadowData != null)
                 if (shadowmap.IsValid())
@@ -69,6 +70,9 @@ namespace Insanity
                             context.cmd.SetGlobalBuffer(LightCulling.LightCullingShaderParams._LightVisibilityIndexBuffer, data.m_LightVisibilityIndexBuffer);
                         }
                     }
+                    //var attachments = new NativeArray<AttachmentDescriptor>(1, Allocator.Temp);
+                    //attachments[0] = data.m_Albedo;
+                    //context.renderContext.BeginRenderPass(Screen.width, Screen.height, 2, attachments,);
                     CoreUtils.DrawRendererList(context.renderContext, context.cmd, data.m_renderList_opaque);
                     RenderingEventManager.InvokeEvent(RenderingEvents.OpaqueForwardPassEvent, context.renderContext, context.cmd);
                 });

@@ -16,15 +16,15 @@ Shader "Insanity/DebugViewBlit"
             HLSLPROGRAM
             #pragma vertex FullscreenVert
             #pragma fragment Fragment
-            #pragma multi_compile _ _USE_DRAW_PROCEDURAL
+            //#pragma multi_compile _ _USE_DRAW_PROCEDURAL
 
             #pragma enable_d3d11_debug_symbols
 
-            #include "Fullscreen.hlsl"
+            #include "../Fullscreen.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
-            #include "ColorConvert.hlsl"
+            #include "../ColorConvert.hlsl"
             #include "DebugViewCommon.hlsl"
-#include "LightCullingInclude.hlsl"
+            #include "../LightCullingInclude.hlsl"
             //Texture2D<int> _TileVisibleCount;
             TEXTURE2D(_DepthTexture);
             SAMPLER(sampler_DepthTexture);

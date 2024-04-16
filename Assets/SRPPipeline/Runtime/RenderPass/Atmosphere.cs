@@ -77,6 +77,15 @@ namespace Insanity
             public static int _SunLightColor;
             public static int _PreOrderScatteringLUT;
             public static int _OutScatteringLUT;
+            public static int _Cubemap;
+            public static int _InputCubemap;
+            public static int _OutputCubemap0;
+            public static int _OutputCubemap1;
+            public static int _OutputCubemap2;
+            public static int _OutputCubemap3;
+            public static int _OutputCubemap4;
+            public static int _OutputCubemap5;
+            public static int _ATMOSPHERE_SPECULAR;
         }
 
         private static void InitShaderParameters()
@@ -93,6 +102,15 @@ namespace Insanity
             AtmosphereShaderParameters._SunLightColor = Shader.PropertyToID("_SunLightColor");
             AtmosphereShaderParameters._PreOrderScatteringLUT = Shader.PropertyToID("_PreOrderScatteringLUT");
             AtmosphereShaderParameters._OutScatteringLUT = Shader.PropertyToID("_OutScatteringLUT");
+            AtmosphereShaderParameters._Cubemap = Shader.PropertyToID("_Cubemap");
+            AtmosphereShaderParameters._InputCubemap = Shader.PropertyToID("_InputCubemap");
+            AtmosphereShaderParameters._OutputCubemap0 = Shader.PropertyToID("_OutputCubemap0");
+            AtmosphereShaderParameters._OutputCubemap1 = Shader.PropertyToID("_OutputCubemap1");
+            AtmosphereShaderParameters._OutputCubemap2 = Shader.PropertyToID("_OutputCubemap2");
+            AtmosphereShaderParameters._OutputCubemap3 = Shader.PropertyToID("_OutputCubemap3");
+            AtmosphereShaderParameters._OutputCubemap4 = Shader.PropertyToID("_OutputCubemap4");
+            AtmosphereShaderParameters._OutputCubemap5 = Shader.PropertyToID("_OutputCubemap5");
+            AtmosphereShaderParameters._ATMOSPHERE_SPECULAR = Shader.PropertyToID("_ATMOSPHERE_SPECULAR");
         }
 
         public Atmosphere()
@@ -173,6 +191,9 @@ namespace Insanity
                             ctx.cmd.SetComputeFloatParam(data.csSkyboxLUT, AtmosphereShaderParameters._MieG, data.mieG);
                             ctx.cmd.SetComputeTextureParam(data.csSkyboxLUT, data.kernelSkyboxLUT, AtmosphereShaderParameters._SkyboxLUT, data.skyboxLUT);
                             ctx.cmd.DispatchCompute(data.csSkyboxLUT, data.kernelSkyboxLUT, _skyboxLUTSize.x, _skyboxLUTSize.y, _skyboxLUTSize.z);
+
+                            ctx.renderContext.ExecuteCommandBuffer(ctx.cmd);
+                            ctx.cmd.Clear();
                         }
                     }
                     );
@@ -224,7 +245,8 @@ namespace Insanity
                                curOrderOutput = tmp;
                            }
 
-                           
+                           ctx.renderContext.ExecuteCommandBuffer(ctx.cmd);
+                           ctx.cmd.Clear();
                        }
                    });
                 return passData;
@@ -233,7 +255,7 @@ namespace Insanity
 
         private static RenderTexture CreateLUTRenderTexture(string name)
         {
-            RenderTexture lut = RenderTexture.GetTemporary(_skyboxLUTSize.x, _skyboxLUTSize.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);//new RenderTexture(_skyboxLUTSize.x, _skyboxLUTSize.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+            RenderTexture lut = RenderTexture.GetTemporary(_skyboxLUTSize.x, _skyboxLUTSize.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
             lut.dimension = TextureDimension.Tex3D;
             lut.volumeDepth = _skyboxLUTSize.z;
             lut.enableRandomWrite = true;
@@ -261,7 +283,7 @@ namespace Insanity
             InitShaderParameters();
 
             //RenderTexture skyboxLUT = new RenderTexture(_skyboxLUTSize.x, _skyboxLUTSize.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
-            RenderTexture skyboxLUT = RenderTexture.GetTemporary(_skyboxLUTSize.x, _skyboxLUTSize.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);//new RenderTexture(_skyboxLUTSize.x, _skyboxLUTSize.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+            RenderTexture skyboxLUT = RenderTexture.GetTemporary(_skyboxLUTSize.x, _skyboxLUTSize.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
             skyboxLUT.dimension = TextureDimension.Tex3D;
             skyboxLUT.volumeDepth = _skyboxLUTSize.z;
             skyboxLUT.autoGenerateMips = false;
@@ -556,7 +578,30 @@ namespace Insanity
         const string m_BakeSHProfilerTag = "Baking Atmophere Scattering to SHs";
         ProfilingSampler m_BakeSHProfilingSampler = new ProfilingSampler(m_BakeSHProfilerTag);
 
-        public void BakeSkyToSHAmbient(ref ScriptableRenderContext context, AtmosphereResources atmosphereResources, Light sunLight)
+        class BakeAtmosphereToSHPassData
+        {
+            public ComputeShader csProjAtmosphereToSH;
+            public int kDirectBake = -1;
+            public int kPreSumSH = -1;
+            public int kPreSumSHGroup = -1;
+            public int kBakeSHToTexture = -1;
+            public Texture SkyLUT;
+            public RenderTexture m_SHCoefficientsTexture;
+            public RenderTexture m_SHCoefficientsGroupSumTexture;
+            public ComputeBuffer m_FinalProjSH;
+            public ComputeBuffer m_BakeSamples;
+            //public ComputeBuffer m_SHCoefficientsGroupSumArray;
+            public Vector4 rayleightScatteringCoef;
+            public Vector4 mieScatteringCoef;
+            public float atmosphereHeight;
+            public float earthRadius;
+            public float mieG;
+            public Vector4 mainLightPosition;
+            public float mainLightIntensity;
+            public int bakeSamplesCount;
+        }
+
+        public void BakeSkyToSHAmbient(RenderGraph renderGraph, ref ScriptableRenderContext context, AtmosphereResources atmosphereResources, Light sunLight)
         {
             if (atmosphereResources.ProjAtmosphereToSH == null)
                 return;
@@ -610,6 +655,7 @@ namespace Insanity
                 m_skySHSetting.m_FinalProjSH = new ComputeBuffer(1, Marshal.SizeOf<GPUAmbientSHCoefL2>(), ComputeBufferType.Structured);
 
 
+            /*
             ComputeShader csProjAtmosphereToSH = atmosphereResources.ProjAtmosphereToSH;
             CommandBuffer cmd = CommandBufferPool.Get(m_BakeSHProfilerTag);
             
@@ -731,6 +777,286 @@ namespace Insanity
             }
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
+            */
+
+            using (var builder = renderGraph.AddRenderPass<BakeAtmosphereToSHPassData>("Bake Atmosphere Scattering to SH Pass",
+                out var passData, new ProfilingSampler("Bake Atmosphere Scattering to SH Pass Profiler")))
+            {
+                passData.csProjAtmosphereToSH = atmosphereResources.ProjAtmosphereToSH;
+                passData.kPreSumSH = atmosphereResources.ProjAtmosphereToSH.FindKernel("PresumSHCoefficient");
+                passData.kPreSumSHGroup = atmosphereResources.ProjAtmosphereToSH.FindKernel("PreSumGroupSH");
+                passData.kBakeSHToTexture = atmosphereResources.ProjAtmosphereToSH.FindKernel("BakeSHToTexture");
+                passData.SkyLUT = atmosphereResources.SkyboxLUT;
+                passData.m_SHCoefficientsTexture = m_skySHSetting.m_SHCoefficientsTexture;
+                passData.m_SHCoefficientsGroupSumTexture = m_skySHSetting.m_SHCoefficientsGroupSumTexture;
+                passData.m_FinalProjSH = m_skySHSetting.m_FinalProjSH;
+                passData.m_BakeSamples = m_skySHSetting.m_BakeSamples;
+                passData.rayleightScatteringCoef = atmosphereResources.ScatteringCoefficientRayleigh * 0.000001f * atmosphereResources.ScaleRayleigh;
+                passData.mieScatteringCoef = atmosphereResources.ScatteringCoefficientMie * 0.00001f * atmosphereResources.ScaleMie;
+                passData.mieG = atmosphereResources.MieG;
+                passData.earthRadius = Atmosphere.kAtmosphereHeight;
+                passData.atmosphereHeight = Atmosphere.kAtmosphereHeight;
+                passData.mainLightPosition = -sunLight.transform.localToWorldMatrix.GetColumn(2);
+                passData.mainLightPosition.w = 0;
+                passData.mainLightIntensity = sunLight.intensity;
+                passData.bakeSamplesCount = m_bakeSHSamples.Length;
+
+                builder.SetRenderFunc((BakeAtmosphereToSHPassData data, RenderGraphContext context) =>
+                {
+                    LocalKeyword bakeCubemap = new LocalKeyword(data.csProjAtmosphereToSH, "_BAKE_CUBEMAP");
+                    context.cmd.DisableKeyword(data.csProjAtmosphereToSH, bakeCubemap);
+
+                    context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
+                    context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
+                    context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._BetaRayleigh, data.rayleightScatteringCoef);
+                    context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._BetaMie, data.mieScatteringCoef);
+                    context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._MieG, data.mieG);
+
+                    context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._MainLightPosition, data.mainLightPosition);
+                    context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._MainLightIntensity, data.mainLightIntensity);
+
+                    //pass 1 parallen sum the sh coefficients into array.
+                    context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSH, AtmosphereShaderParameters._SkyboxLUT, data.SkyLUT);
+                    context.cmd.SetComputeBufferParam(data.csProjAtmosphereToSH, data.kPreSumSH, ProjSHShaderParameters._BakeSamples, data.m_BakeSamples);
+                    int groupsNumX = data.bakeSamplesCount / 128;
+
+                    context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSH, ProjSHShaderParameters._SHCoefficients, data.m_SHCoefficientsTexture);
+                    context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kPreSumSH, groupsNumX, 9, 1);
+
+
+                    //pass 2, sum the last element of sh coefficients to the group array.
+                    if (groupsNumX > 1)
+                    {
+                        if (data.kPreSumSHGroup >= 0)
+                        {
+                            context.cmd.SetComputeIntParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._ArrayLengthPerThreadGroup, groupsNumX);
+                            context.cmd.SetComputeIntParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._GroupsNumPowOf2, Mathf.NextPowerOfTwo(groupsNumX));
+
+                            context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, data.m_SHCoefficientsTexture);
+                            context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSHGroup,
+                                ProjSHShaderParameters._SHCoefficientsGroupSumArray, data.m_SHCoefficientsGroupSumTexture);
+                            context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kPreSumSHGroup, 1, 9, 1);
+                        }
+                    }
+
+                    //pass 3
+                    if (data.kBakeSHToTexture >= 0)
+                    {
+                        context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kBakeSHToTexture,
+                                ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, data.m_SHCoefficientsGroupSumTexture);
+
+
+                        context.cmd.SetComputeBufferParam(data.csProjAtmosphereToSH, data.kBakeSHToTexture, ProjSHShaderParameters._FinalProjSH, data.m_FinalProjSH);
+                        context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kBakeSHToTexture, 1, 1, 1);
+
+                        
+                    }
+
+                    context.renderContext.ExecuteCommandBuffer(context.cmd);
+                    context.cmd.Clear();
+                });
+
+                GetAmbientSHData(m_skySHSetting.m_FinalProjSH);
+            }
+
+            BakeAtmosphereToCubemap(renderGraph, ref context, atmosphereResources, sunLight);
+        }
+
+        const int m_CubemapSize = 32;
+        Cubemap m_AtmosphereCubemap;   //irradiance
+        Cubemap m_AtmospherePrefilterSpecular;   //prefilter specular cubemap
+        TextureHandle[] m_AtmosphereCubeArrays = new TextureHandle[(int)Mathf.Log(m_CubemapSize, 2) + 1];
+        
+
+        TextureHandle CreateAtmosphereFaceTextureArray(RenderGraph renderGraph, int size)
+        {
+            TextureDesc textureDesc = new TextureDesc(size, size);
+            textureDesc.slices = 6;
+            textureDesc.colorFormat = GraphicsFormat.R16G16B16A16_SFloat;
+            textureDesc.useMipMap = false;
+            textureDesc.enableRandomWrite = true;
+            textureDesc.autoGenerateMips = false;
+            textureDesc.wrapMode = TextureWrapMode.Clamp;
+            textureDesc.filterMode = FilterMode.Bilinear;
+            textureDesc.dimension = TextureDimension.Tex2DArray;
+
+
+            int textureIndex = (int)Mathf.Log((float)m_CubemapSize / size, 2.0f);
+            renderGraph.CreateTextureIfInvalid(textureDesc, ref m_AtmosphereCubeArrays[textureIndex]);
+            return m_AtmosphereCubeArrays[textureIndex];
+        }
+
+        public class BakeAtmosphereToCubeData
+        {
+            public ComputeShader m_ComputeShader;
+            public int kBakeAtmosphereToCube = -1;
+            public Texture SkyLUT;
+            public TextureHandle m_FaceTextureArray;
+            public Vector4 mainLightPosition;
+            public float mainLightIntensity;
+            public int cubeMapWidth;
+            public int cubeMapHeight;
+            public Cubemap m_Cubemap;
+        }
+
+        public class DownSampleCubeData
+        {
+            public ComputeShader m_ComputeShader;
+            public int kDownSampleCube = -1;
+            public Cubemap m_InputCubemap;
+            public TextureHandle m_OutputFaceTextureArray;
+            public int m_OutputTextureSize;
+            public int m_MipLevel;
+        }
+
+        public class PrefilterSpecularPassData
+        {
+            public ComputeShader m_ComputeShader;
+            public int kPrefilterSpecular = -1;
+            public Cubemap m_InputCubemap;
+            public TextureHandle m_OutputFaceTextureArray0;
+            public TextureHandle m_OutputFaceTextureArray1;
+            public TextureHandle m_OutputFaceTextureArray2;
+            public TextureHandle m_OutputFaceTextureArray3;
+            public TextureHandle m_OutputFaceTextureArray4;
+            public TextureHandle m_OutputFaceTextureArray5;
+            public Cubemap m_OutputCubemap;
+        }
+
+        public void BakeAtmosphereToCubemap(RenderGraph renderGraph, ref ScriptableRenderContext context, AtmosphereResources atmosphereResources, Light sunLight)
+        {
+            if (atmosphereResources.BakeToCubemap == null)
+                return;
+
+            if (m_AtmosphereCubemap == null)
+            {
+                m_AtmosphereCubemap = new Cubemap(32, TextureFormat.RGBAHalf, true, true);
+            }
+
+            if (m_AtmospherePrefilterSpecular == null)
+            {
+                m_AtmospherePrefilterSpecular = new Cubemap(32, TextureFormat.RGBAHalf, true, true);
+            }
+
+
+            using (var builder = renderGraph.AddRenderPass<BakeAtmosphereToCubeData>("Bake Atmosphere Scattering to Cubemap Pass",
+                out var passData, new ProfilingSampler("Bake Atmosphere Scattering to Cubemap Pass Profiler")))
+            {
+                passData.m_ComputeShader = atmosphereResources.BakeToCubemap;
+                passData.kBakeAtmosphereToCube = atmosphereResources.BakeToCubemap.FindKernel("CSMain");
+                passData.SkyLUT = atmosphereResources.SkyboxLUT;
+                passData.m_FaceTextureArray = builder.WriteTexture(CreateAtmosphereFaceTextureArray(renderGraph, m_CubemapSize));
+                passData.mainLightPosition = -sunLight.transform.localToWorldMatrix.GetColumn(2);
+                passData.mainLightPosition.w = 0;
+                passData.mainLightIntensity = sunLight.intensity;
+                passData.m_Cubemap = m_AtmosphereCubemap;
+                passData.cubeMapWidth = m_AtmosphereCubemap.width;
+                passData.cubeMapHeight = m_AtmosphereCubemap.height;
+                builder.AllowPassCulling(false);
+
+                builder.SetRenderFunc((BakeAtmosphereToCubeData data, RenderGraphContext context) =>
+                {
+                    context.cmd.SetComputeVectorParam(data.m_ComputeShader, ProjSHShaderParameters._MainLightPosition, data.mainLightPosition);
+                    context.cmd.SetComputeFloatParam(data.m_ComputeShader, ProjSHShaderParameters._MainLightIntensity, data.mainLightIntensity);
+
+                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kBakeAtmosphereToCube, AtmosphereShaderParameters._SkyboxLUT, data.SkyLUT);
+                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kBakeAtmosphereToCube, AtmosphereShaderParameters._Cubemap, data.m_FaceTextureArray);
+
+                    int groupX = data.cubeMapWidth / 8;
+                    int groupY = data.cubeMapHeight / 8;
+                    context.cmd.DispatchCompute(data.m_ComputeShader, data.kBakeAtmosphereToCube, groupX, groupY, 6);
+
+                    for (int i = 0; i < 6; i++)
+                    {
+                        context.cmd.CopyTexture(data.m_FaceTextureArray, i, 0, data.m_Cubemap, i, 0);
+                    }
+
+                    context.renderContext.ExecuteCommandBuffer(context.cmd);
+                    context.cmd.Clear();
+                });
+            }
+
+            //Down sample cube map texture array
+            int remainTextureMip = (int)Mathf.Log(m_CubemapSize, 2.0f);
+            for (int mip = 0; mip < remainTextureMip; ++mip)
+            {
+                using (var builder = renderGraph.AddRenderPass<DownSampleCubeData>("Downsample Cubemap Pass",
+                    out var passData, new ProfilingSampler("Downsample Cubemap Pass Profiler")))
+                {
+                    passData.kDownSampleCube = atmosphereResources.DownSampleCubemap.FindKernel("CSMain");
+                    passData.m_ComputeShader = atmosphereResources.DownSampleCubemap;
+                    passData.m_InputCubemap = m_AtmosphereCubemap;
+                    passData.m_MipLevel = mip + 1;
+                    passData.m_OutputTextureSize = m_CubemapSize >> passData.m_MipLevel;
+                    passData.m_OutputFaceTextureArray = builder.WriteTexture(CreateAtmosphereFaceTextureArray(renderGraph, passData.m_OutputTextureSize));
+
+                    builder.AllowPassCulling(false);
+
+                    builder.SetRenderFunc((DownSampleCubeData data, RenderGraphContext context) =>
+                    {
+                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kDownSampleCube, AtmosphereShaderParameters._Cubemap, data.m_OutputFaceTextureArray);
+                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kDownSampleCube, AtmosphereShaderParameters._InputCubemap, data.m_InputCubemap);
+                        int groupX = Mathf.Max(data.m_OutputTextureSize / 8, 1);
+                        int groupY = groupX;
+                        context.cmd.DispatchCompute(data.m_ComputeShader, data.kDownSampleCube, groupX, groupY, 6);
+
+                        for (int i = 0; i < 6; i++)
+                        {
+                            context.cmd.CopyTexture(data.m_OutputFaceTextureArray, i, 0, data.m_InputCubemap, i, passData.m_MipLevel);
+                        }
+
+                        context.renderContext.ExecuteCommandBuffer(context.cmd);
+                        context.cmd.Clear();
+                    });
+                }
+            }
+
+            //prefilter specular cubemap
+            using (var builder = renderGraph.AddRenderPass<PrefilterSpecularPassData>("Prefilter Specular Cubemap Pass",
+                out var passData, new ProfilingSampler("Prefilter Specular Cubemap Pass Profiler")))
+            {
+                passData.kPrefilterSpecular = atmosphereResources.PrefilterSpecularCubemap.FindKernel("CSMain");
+                passData.m_ComputeShader = atmosphereResources.PrefilterSpecularCubemap;
+                passData.m_InputCubemap = m_AtmosphereCubemap;
+                passData.m_OutputFaceTextureArray0 = builder.WriteTexture(CreateAtmosphereFaceTextureArray(renderGraph, 32));
+                passData.m_OutputFaceTextureArray1 = builder.WriteTexture(CreateAtmosphereFaceTextureArray(renderGraph, 16));
+                passData.m_OutputFaceTextureArray2 = builder.WriteTexture(CreateAtmosphereFaceTextureArray(renderGraph, 8));
+                passData.m_OutputFaceTextureArray3 = builder.WriteTexture(CreateAtmosphereFaceTextureArray(renderGraph, 4));
+                passData.m_OutputFaceTextureArray4 = builder.WriteTexture(CreateAtmosphereFaceTextureArray(renderGraph, 2));
+                passData.m_OutputFaceTextureArray5 = builder.WriteTexture(CreateAtmosphereFaceTextureArray(renderGraph, 1));
+                passData.m_OutputCubemap = m_AtmospherePrefilterSpecular;
+
+                builder.AllowPassCulling(false);
+
+                builder.SetRenderFunc((PrefilterSpecularPassData data, RenderGraphContext context) =>
+                {
+                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._InputCubemap, data.m_InputCubemap);
+                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap0, data.m_OutputFaceTextureArray0);
+                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap1, data.m_OutputFaceTextureArray1);
+                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap2, data.m_OutputFaceTextureArray2);
+                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap3, data.m_OutputFaceTextureArray3);
+                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap4, data.m_OutputFaceTextureArray4);
+                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap5, data.m_OutputFaceTextureArray5);
+
+                    int threadTotal = 32 * 32 + 16 * 16 + 8 * 8 + 4 * 4 + 2 * 2 + 1;
+                    int groupX = Mathf.CeilToInt((float)threadTotal / 64);
+                    context.cmd.DispatchCompute(data.m_ComputeShader, data.kPrefilterSpecular, groupX, 1, 6);
+
+                    for (int i = 0; i < 6; i++)
+                    {
+                        context.cmd.CopyTexture(data.m_OutputFaceTextureArray0, i, 0, data.m_OutputCubemap, i, 0);
+                        context.cmd.CopyTexture(data.m_OutputFaceTextureArray1, i, 0, data.m_OutputCubemap, i, 1);
+                        context.cmd.CopyTexture(data.m_OutputFaceTextureArray2, i, 0, data.m_OutputCubemap, i, 2);
+                        context.cmd.CopyTexture(data.m_OutputFaceTextureArray3, i, 0, data.m_OutputCubemap, i, 3);
+                        context.cmd.CopyTexture(data.m_OutputFaceTextureArray4, i, 0, data.m_OutputCubemap, i, 4);
+                        context.cmd.CopyTexture(data.m_OutputFaceTextureArray5, i, 0, data.m_OutputCubemap, i, 5);
+                    }
+                    context.cmd.SetGlobalTexture(AtmosphereShaderParameters._ATMOSPHERE_SPECULAR, data.m_OutputCubemap);
+
+                    context.renderContext.ExecuteCommandBuffer(context.cmd);
+                    context.cmd.Clear();
+                });
+            }
         }
             
         public void Release()
@@ -754,6 +1080,15 @@ namespace Insanity
                     NativeArray<GPUAmbientSHCoefL2> result = m_SHBakeReadbacks.Peek().GetData<GPUAmbientSHCoefL2>();
                     result.CopyTo(m_finalPolySHL2);
                     GPUAmbientSHCoefL2 sh = m_finalPolySHL2[0] * Mathf.GammaToLinearSpace(RenderSettings.ambientIntensity);
+                    //Debug.Log("c0=" + sh.c0);
+                    //Debug.Log("c1=" + sh.c1);
+                    //Debug.Log("c2=" + sh.c2);
+                    //Debug.Log("c3=" + sh.c3);
+                    //Debug.Log("c4=" + sh.c4);
+                    //Debug.Log("c5=" + sh.c5);
+                    //Debug.Log("c6=" + sh.c6);
+                    //Debug.Log("c7=" + sh.c7);
+                    //Debug.Log("c8=" + sh.c8);
                     GPUPolynomialSHL2 polynomialSHL2 = GetEnvmapSHPolyCoef(ref sh);
                     Shader.SetGlobalVector(ProjSHShaderParameters._SHAr, polynomialSHL2.SHAr);
                     Shader.SetGlobalVector(ProjSHShaderParameters._SHAg, polynomialSHL2.SHAg);

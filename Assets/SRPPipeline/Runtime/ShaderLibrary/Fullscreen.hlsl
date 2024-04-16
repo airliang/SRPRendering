@@ -18,6 +18,7 @@ struct Attributes
 {
 //#if _USE_DRAW_PROCEDURAL
     uint vertexID     : SV_VertexID;
+    UNITY_VERTEX_INPUT_INSTANCE_ID
 //#else
 //    float4 positionOS : POSITION;
 //    float2 uv         : TEXCOORD0;
@@ -33,7 +34,7 @@ struct Varyings
 Varyings FullscreenVert(Attributes input)
 {
     Varyings output;
-
+    UNITY_SETUP_INSTANCE_ID(input);
     output.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
 
     //Texcoord holds the coordinates of the original rendering before post processing.

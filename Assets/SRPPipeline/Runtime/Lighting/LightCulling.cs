@@ -46,6 +46,7 @@ namespace Insanity
             public static int _TotalLightNum;
             public static int _TileVisibleLightCounts;
             public static int _ViewMatrix;
+            public static int _TileAABBsBuffer;
         }
 
 
@@ -54,8 +55,13 @@ namespace Insanity
 
         ComputeBuffer m_AdditionalLightsBuffer = null;
         ComputeBuffer m_LightsVisibilityIndexBuffer = null;
+        
         ComputeBuffer m_TileFrustumBuffer = null;
+        //for debugging
+        bool m_DebugMode = false;
         RenderTexture m_TileVisibleLightCounts;
+        ComputeBuffer m_TileAABBsBuffer = null;
+        //----------
         GPULightData[] m_AdditionalLights = new GPULightData[MAX_LIGHTS_NUM];
         int m_ValidLightsCount = 0;
 
@@ -90,6 +96,7 @@ namespace Insanity
             LightCullingShaderParams._TotalLightNum = Shader.PropertyToID("_TotalLightNum");
             LightCullingShaderParams._TileVisibleLightCounts = Shader.PropertyToID("_TileVisibleLightCounts");
             LightCullingShaderParams._ViewMatrix = Shader.PropertyToID("_ViewMatrix");
+            LightCullingShaderParams._TileAABBsBuffer = Shader.PropertyToID("_TileAABBs");
         }
 
         private LightCulling()
@@ -178,6 +185,15 @@ namespace Insanity
                     m_TileVisibleLightCounts.Release();
                     m_TileVisibleLightCounts = null;
                 }
+                if (m_DebugMode)
+                {
+                    if (m_TileAABBsBuffer != null)
+                    {
+                        m_TileAABBsBuffer.Release();
+                        m_TileAABBsBuffer = null;
+                    }
+                }
+                
 
                 if (m_LightsVisibilityIndexBuffer == null)
                 {
@@ -186,11 +202,18 @@ namespace Insanity
                 }
 
                 m_TileFrustumBuffer = new ComputeBuffer(m_CurrentTileNumbers.x * m_CurrentTileNumbers.y, Marshal.SizeOf<Vector4>() * 4, ComputeBufferType.Default);
+                
+                m_LightsVisibilityIndexBuffer = new ComputeBuffer(m_CurrentTileNumbers.x * m_CurrentTileNumbers.y * MAX_VISIBLE_LIGHTS_PER_TILE, 
+                    sizeof(int), ComputeBufferType.Default);
+
                 m_TileVisibleLightCounts = new RenderTexture(m_CurrentTileNumbers.x, m_CurrentTileNumbers.y, 0, RenderTextureFormat.RInt);
                 m_TileVisibleLightCounts.enableRandomWrite = true;
                 m_TileVisibleLightCounts.Create();
-                m_LightsVisibilityIndexBuffer = new ComputeBuffer(m_CurrentTileNumbers.x * m_CurrentTileNumbers.y * MAX_VISIBLE_LIGHTS_PER_TILE, 
-                    sizeof(int), ComputeBufferType.Default);
+                if (m_DebugMode)
+                {
+                    m_TileAABBsBuffer = new ComputeBuffer(m_CurrentTileNumbers.x * m_CurrentTileNumbers.y, Marshal.SizeOf<Vector3>() * 2, ComputeBufferType.Default);
+                }
+                
             }  
 
             if (ValidAdditionalLightsCount == 0)
@@ -295,6 +318,7 @@ namespace Insanity
             public Vector2 screenSize;
             public int totalLightsNum;
             public Matrix4x4 viewMatrix;
+            public ComputeBuffer tileAABBsBuffer;
         }
 
 
@@ -317,7 +341,7 @@ namespace Insanity
                 passData.kernelId = m_kernelLightCulling;
                 TextureHandle tileLightVisibleCounts = CreateLightVisibleCountTexture(renderingData.renderGraph, m_CurrentTileNumbers.x, m_CurrentTileNumbers.y);
 
-                passData.tileVisibleLightCounts = builder.ReadWriteTexture(tileLightVisibleCounts); //m_TileVisibleLightCounts;
+                passData.tileVisibleLightCounts = builder.WriteTexture(tileLightVisibleCounts); //m_TileVisibleLightCounts;
                 passData.depthTexture = depthTexture;
                 passData.tileNumbers = m_CurrentTileNumbers;
                 passData.tileSize = m_tileSize;
@@ -328,6 +352,8 @@ namespace Insanity
                 passData.viewMatrix = renderingData.cameraData.camera.transform.worldToLocalMatrix;
                 Vector3 cameraPos = renderingData.cameraData.camera.transform.position;
                 Vector3 cameraPosInView = passData.viewMatrix.MultiplyPoint(cameraPos);
+
+                passData.tileAABBsBuffer = m_TileAABBsBuffer;
 
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc((TileBasedLightCullingData data, RenderGraphContext context) =>
@@ -342,6 +368,11 @@ namespace Insanity
                     context.cmd.SetComputeMatrixParam(data.computeShader, LightCullingShaderParams._ProjInverse, data.projInverse);
                     context.cmd.SetComputeIntParam(data.computeShader, LightCullingShaderParams._TotalLightNum, data.totalLightsNum);
                     context.cmd.SetComputeMatrixParam(data.computeShader, LightCullingShaderParams._ViewMatrix, data.viewMatrix);
+                    if (m_DebugMode)
+                    {
+                        context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._TileAABBsBuffer, data.tileAABBsBuffer);
+                    }
+                    
                     int threadGroupX = (int)data.tileNumbers.x;
                     int threadGroupY = (int)data.tileNumbers.y;
                     context.cmd.DispatchCompute(data.computeShader, data.kernelId, threadGroupX, threadGroupY, 1);
@@ -364,6 +395,7 @@ namespace Insanity
                 m_TileVisibleLightCounts.Release();
                 m_TileVisibleLightCounts = null;
             }
+            CoreUtils.SafeRelease(m_TileAABBsBuffer);
             m_kernelTileFrustumCompute = -1;
             m_kernelLightCulling = -1;
             m_CurrentTileNumbers = Vector2Int.zero;

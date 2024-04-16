@@ -60,6 +60,7 @@ namespace Insanity
         public TextureHandle m_Depth;
         public Rect m_ScreenSpaceShadowRect;
         public Vector4 m_ScreenSpaceShadowSize;
+        public Material m_DrawSSShadowMaterial;
     }
 
     public class ShadowRequest
@@ -657,36 +658,36 @@ namespace Insanity
         {
             if (m_ScreenSpaceShadowsMaterial == null)
             {
-                m_ScreenSpaceShadowsMaterial = CoreUtils.CreateEngineMaterial("Insanity/ScreenSpaceShadow");
+                m_ScreenSpaceShadowsMaterial = CoreUtils.CreateEngineMaterial(asset.InsanityPipelineResources.shaders.ScreenSpaceShadow);
             }
 
             if (m_ScreenSpaceShadowsMaterial == null)
                 return null;
             using (var builder = renderGraph.AddRenderPass<ScreenSpaceShadowPassData>("Render ScreenSpace Shadow Maps", out var passData, new ProfilingSampler("ScreenSpace Shadow Pass Profiler")))
             {
-                passData.m_SSShadowmap = builder.WriteTexture(GetScreenSpaceShadowMap(renderGraph, shadowSettings.screenSpaceShadowScale)); //builder.UseColorBuffer(GetScreenSpaceShadowMap(renderGraph), 0);
+                passData.m_SSShadowmap = builder.UseColorBuffer(GetScreenSpaceShadowMap(renderGraph, shadowSettings.screenSpaceShadowScale), 0); //builder.UseColorBuffer(GetScreenSpaceShadowMap(renderGraph), 0);
                 passData.m_Depth = builder.ReadTexture(mainCameraDepth);
                 passData.m_Shadowmap = builder.ReadTexture(shadowMap);
                 passData.m_ScreenSpaceShadowRect = new Rect(0, 0, GlobalRenderSettings.screenResolution.width * shadowSettings.screenSpaceShadowScale,
                     GlobalRenderSettings.screenResolution.height * shadowSettings.screenSpaceShadowScale);
                 passData.m_ScreenSpaceShadowSize = new Vector4(passData.m_ScreenSpaceShadowRect.width, passData.m_ScreenSpaceShadowRect.height, 
                     1.0f / passData.m_ScreenSpaceShadowRect.width, 1.0f/ passData.m_ScreenSpaceShadowRect.height);
+                passData.m_DrawSSShadowMaterial = m_ScreenSpaceShadowsMaterial;
                 builder.AllowPassCulling(false);
 
                 builder.SetRenderFunc(
                     (ScreenSpaceShadowPassData data, RenderGraphContext ctx) =>
                     {
                         ctx.cmd.SetRenderTarget(data.m_SSShadowmap);
-                        ctx.cmd.ClearRenderTarget(true, true, Color.black);
+                        //ctx.cmd.ClearRenderTarget(true, true, Color.black);
 
-                        //m_ScreenSpaceShadowsMaterial.SetTexture("_CameraDepthTexture", data.m_Depth);
                         ctx.cmd.SetGlobalTexture("_CameraDepthTexture", data.m_Depth);
-                        //ctx.cmd.SetViewport(data.m_ScreenSpaceShadowRect);
                         ctx.cmd.SetGlobalVector(MainLightShadowConstantBuffer._ScreenSpaceShadowmapSize, data.m_ScreenSpaceShadowSize);
-                        CoreUtils.DrawFullScreen(ctx.cmd, m_ScreenSpaceShadowsMaterial);
+                        //CoreUtils.DrawFullScreen(ctx.cmd, m_ScreenSpaceShadowsMaterial);
+                        ctx.cmd.DrawProcedural(Matrix4x4.identity, data.m_DrawSSShadowMaterial, 0, MeshTopology.Triangles, 3);
 
-                        ctx.renderContext.ExecuteCommandBuffer(ctx.cmd);
-                        ctx.cmd.Clear();
+                        //ctx.renderContext.ExecuteCommandBuffer(ctx.cmd);
+                        //ctx.cmd.Clear();
                         ctx.cmd.SetGlobalTexture("_ScreenSpaceShadowmapTexture", data.m_SSShadowmap);
                     });
                 return passData;

@@ -314,6 +314,62 @@ namespace Insanity
 
             s_Cameras.Clear();
         }
+
+        public RenderTextureDescriptor GetCameraTargetDescriptor(float renderScale, bool isHdrEnabled, int msaaSamples)
+        {
+            int scaledWidth = (int)((float)camera.pixelWidth * renderScale);
+            int scaledHeight = (int)((float)camera.pixelHeight * renderScale);
+
+            RenderTextureDescriptor desc;
+
+            if (camera.targetTexture == null)
+            {
+                desc = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight);
+                desc.width = scaledWidth;
+                desc.height = scaledHeight;
+                desc.graphicsFormat = isHdrEnabled ? GraphicsFormat.R16G16B16A16_SFloat : GraphicsFormat.R8G8B8A8_SRGB;
+                desc.depthBufferBits = 32;
+                desc.msaaSamples = msaaSamples;
+                desc.sRGB = (QualitySettings.activeColorSpace == ColorSpace.Linear);
+            }
+            else
+            {
+                desc = camera.targetTexture.descriptor;
+                desc.msaaSamples = msaaSamples;
+                desc.width = scaledWidth;
+                desc.height = scaledHeight;
+
+                if (camera.cameraType == CameraType.SceneView && !isHdrEnabled)
+                {
+                    desc.graphicsFormat = SystemInfo.GetGraphicsFormat(DefaultFormat.LDR);
+                }
+                // SystemInfo.SupportsRenderTextureFormat(camera.targetTexture.descriptor.colorFormat)
+                // will assert on R8_SINT since it isn't a valid value of RenderTextureFormat.
+                // If this is fixed then we can implement debug statement to the user explaining why some
+                // RenderTextureFormats available resolves in a black render texture when no warning or error
+                // is given.
+            }
+
+            // Make sure dimension is non zero
+            desc.width = Mathf.Max(1, desc.width);
+            desc.height = Mathf.Max(1, desc.height);
+
+            desc.enableRandomWrite = false;
+            desc.bindMS = false;
+            desc.useDynamicScale = camera.allowDynamicResolution;
+
+            // check that the requested MSAA samples count is supported by the current platform. If it's not supported,
+            // replace the requested desc.msaaSamples value with the actual value the engine falls back to
+            desc.msaaSamples = SystemInfo.GetRenderTextureSupportedMSAASampleCount(desc);
+
+            // if the target platform doesn't support storing multisampled RTs and we are doing any offscreen passes, using a Load load action on the subsequent passes
+            // will result in loading Resolved data, which on some platforms is discarded, resulting in losing the results of the previous passes.
+            // As a workaround we disable MSAA to make sure that the results of previous passes are stored. (fix for Case 1247423).
+            if (!SystemInfo.supportsStoreAndResolveAction)
+                desc.msaaSamples = 1;
+
+            return desc;
+        }
     }
 }
 

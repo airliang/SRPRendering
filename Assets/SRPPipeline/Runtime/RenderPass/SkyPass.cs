@@ -47,8 +47,8 @@ namespace Insanity
                 builder.SetRenderFunc((SkyPassData data, RenderGraphContext context) =>
                 {
                     context.cmd.SetViewport(GlobalRenderSettings.screenResolution);
-                    CoreUtils.DrawFullScreen(context.cmd, data.m_skybox);
-
+                    //CoreUtils.DrawFullScreen(context.cmd, data.m_skybox);
+                    context.cmd.DrawProcedural(Matrix4x4.identity, data.m_skybox, 0, MeshTopology.Triangles, 3);
                 });
             }
         }
@@ -113,19 +113,12 @@ namespace Insanity
                     context.cmd.SetViewport(GlobalRenderSettings.screenResolution);
                     context.cmd.SetGlobalTexture(Atmosphere.AtmosphereShaderParameters._SkyboxLUT, data.m_SkyboxLUT);
                     data.m_skybox.SetFloat(AtmosphereShaderParameters._RunderSun, data.runderSun ? 1.0f : 0.0f);
-                    CoreUtils.DrawFullScreen(context.cmd, data.m_skybox);
-                    
+                    //CoreUtils.DrawFullScreen(context.cmd, data.m_skybox);
+                    context.cmd.DrawProcedural(Matrix4x4.identity, data.m_skybox, 0, MeshTopology.Triangles, 3);
+
+                    context.renderContext.ExecuteCommandBuffer(context.cmd);
+                    context.cmd.Clear();
                 });
-            }
-        }
-
-
-        public static void BakeAtmosphereSH(ref ScriptableRenderContext context, AtmosphereResources atmosphereResources, Light sunLight)
-        {
-            //if (m_sunLight.transform.forward != m_sunDirectionLastFrame)
-            {
-                Atmosphere.Instance.BakeSkyToSHAmbient(ref context, atmosphereResources, sunLight);
-                //m_sunDirectionLastFrame = m_sunLight.transform.forward;
             }
         }
     }

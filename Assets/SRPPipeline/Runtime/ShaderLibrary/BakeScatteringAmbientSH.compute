@@ -12,6 +12,7 @@
 
 float3 _MainLightPosition;
 float _MainLightIntensity;
+Texture3D<float4> _SkyboxLUT;
 
 #if defined(_BAKE_CUBEMAP)
 TextureCube<float4> _Cubemap;
@@ -22,7 +23,7 @@ half3 GetSkyColor(float3 viewDirWS)
     return _Cubemap.SampleLevel(_LinearClamp, viewDirWS, 0);
 }
 #else
-Texture3D<float4>   _SkyboxLUT;
+
 
 half3 GetSkyColor(float3 viewDirWS, float3 sunDir)
 {
@@ -45,7 +46,7 @@ half3 GetSkyColor(float3 viewDirWS, float3 sunDir)
 
     texCoords.z = 0.5 * ((atan(max(cosSun, -0.1975) * tan(1.26 * 1.1)) / 1.1) + (1 - 0.26));
     int3 texCoordsInt = int3(texCoords * float3(w, h, d));
-    half4 scattering = _SkyboxLUT[texCoordsInt];//tex3D(_SkyboxLUT, texCoords);
+    half4 scattering = _SkyboxLUT[texCoordsInt]; //tex3D(_SkyboxLUT, texCoords);
     //return scattering;
     //
     float cosTheta = dot(viewDirWS, -sunDir);

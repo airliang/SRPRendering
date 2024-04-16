@@ -16,6 +16,7 @@ MonoBehaviour:
   m_Exposure: 1.5
   m_ResolutionRate: 1
   m_UseSRPBatcher: 1
+  m_MSAASamples: 1
   m_ShadowDistance: 50
   m_ShadowCascades: 1
   m_Cascade2Split: 0.25

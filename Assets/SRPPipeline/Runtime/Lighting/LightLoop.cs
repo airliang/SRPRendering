@@ -70,6 +70,7 @@ namespace Insanity
             //public Light mainlight;
             public LightVariablesGlobal lightVariables;
             public ComputeBuffer additionalLightsBuffer;
+            public Texture brdfLUT;
         }
 
         public static void UpdateLightVariablesGlobalCB(RenderGraph renderGraph, Light mainLight, LightCulling lightCulling)
@@ -90,12 +91,14 @@ namespace Insanity
             {
                 passData.additionalLightsBuffer = lightCulling.AdditionalLightsBuffer;
                 passData.lightVariables = m_LightVariablesGlobalCB;
+                passData.brdfLUT = asset.InsanityPipelineResources.internalTextures.BRDFLut;
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc(
                     (UpdateLightCBPassData data, RenderGraphContext context) =>
                     {
                         ConstantBuffer.PushGlobal(context.cmd, passData.lightVariables, ShaderIDs._LightVariablesGlobal);
                         context.cmd.SetGlobalBuffer(ShaderIDs._GPUAdditionalLights, data.additionalLightsBuffer);
+                        context.cmd.SetGlobalTexture(ShaderIDs._BRDFLUTTex, data.brdfLUT);
                     });
             }
         }
@@ -145,9 +148,9 @@ namespace Insanity
             return shadowPassData;
         }
 
-        ScreenSpaceShadowPassData RenderScreenSpaceShadow(CameraData cameraData, RenderGraph graph, ShadowPassData shadowPassData, DepthPrepassData depthData)
+        ScreenSpaceShadowPassData RenderScreenSpaceShadow(CameraData cameraData, RenderGraph graph, ShadowPassData shadowPassData, TextureHandle depth)
         {
-            return ShadowManager.Instance.Render_ScreenSpaceShadow(graph, cameraData.camera, shadowPassData.m_Shadowmap, depthData.m_Depth);
+            return ShadowManager.Instance.Render_ScreenSpaceShadow(graph, cameraData.camera, shadowPassData.m_Shadowmap, depth);
         }
 
         void ClearScreenSpaceShadowPass()

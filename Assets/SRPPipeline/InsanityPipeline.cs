@@ -17,6 +17,7 @@ namespace Insanity
             public static readonly int _MainlightShadowVariablesGlobal = Shader.PropertyToID("MainlightShadowVariablesGlobal");
             public static readonly int _GPUAdditionalLights = Shader.PropertyToID("_GPUAdditionalLights");
             public static readonly int _DebugViewVariables = Shader.PropertyToID("DebugViewVariables");
+            public static readonly int _BRDFLUTTex = Shader.PropertyToID("_BRDFLUTTex");
         }
 
         public static InsanityPipelineAsset asset
@@ -128,6 +129,8 @@ namespace Insanity
             }
 
             ShadowManager.Instance.Clear();
+
+            RTHandleUtils.Cleanup();
         }
 
         private void InitializeRenderPipeline()

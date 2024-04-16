@@ -8,6 +8,7 @@
 #include "Shadow/Shadows.hlsl"
 #include "RealtimeLights.hlsl"
 #include "GlobalIllumination.hlsl"
+#include "ImageBasedLighting.hlsl"
 
 struct Light
 {
@@ -558,7 +559,7 @@ void TileBasedAdditionalLightingFragmentBlinnPhong(float3 positionWS, float3 nor
 {
     diffuse = 0;
     specular = 0;
-    uint2 tileId = screenPos * _TileNumber;
+    uint2 tileId = screenPos * (_TileNumber - 1);
     uint  lightIndexOffset = (tileId.y * _TileNumber.x + tileId.x) * MAX_LIGHT_NUM_PER_TILE;
     int lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset];
     for (int i = 0; i < MAX_LIGHT_NUM_PER_TILE && lightIndex >= 0; ++i)
@@ -573,7 +574,7 @@ void TileBasedAdditionalLightingFragmentBlinnPhong(float3 positionWS, float3 nor
 void TileBasedAdditionalLightingFragmentPBR(BRDFData brdfData, float3 positionWS, float3 normalWS, float3 viewDirWS, float2 screenPos, out half3 outColor)
 {
     outColor = 0;
-    uint2 tileId = screenPos * _TileNumber;
+    uint2 tileId = screenPos * (_TileNumber - 1);
     uint  lightIndexOffset = (tileId.y * _TileNumber.x + tileId.x) * MAX_LIGHT_NUM_PER_TILE;
     int lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset];
     for (int i = 0; i < MAX_LIGHT_NUM_PER_TILE && lightIndex >= 0; ++i)
@@ -608,7 +609,7 @@ half3 GlobalIllumination(BRDFData brdfData, half3 bakedGI, half occlusion, float
     half fresnelTerm = Pow4(1.0 - saturate(dot(normalWS, viewDirectionWS)));
 
     half3 indirectDiffuse = bakedGI * occlusion;
-    half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, brdfData.perceptualRoughness, occlusion, positionWS);
+    half3 indirectSpecular = EnviromentIBLSpecular(brdfData.perceptualRoughness, dot(normalWS, viewDirectionWS), reflectVector, brdfData.specular); //GlossyEnvironmentReflection(reflectVector, positionWS, brdfData.perceptualRoughness, occlusion);
 
     return EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
 }
