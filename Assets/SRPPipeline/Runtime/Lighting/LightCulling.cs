@@ -342,7 +342,7 @@ namespace Insanity
                 TextureHandle tileLightVisibleCounts = CreateLightVisibleCountTexture(renderingData.renderGraph, m_CurrentTileNumbers.x, m_CurrentTileNumbers.y);
 
                 passData.tileVisibleLightCounts = builder.WriteTexture(tileLightVisibleCounts); //m_TileVisibleLightCounts;
-                passData.depthTexture = depthTexture;
+                passData.depthTexture = builder.ReadTexture(depthTexture);
                 passData.tileNumbers = m_CurrentTileNumbers;
                 passData.tileSize = m_tileSize;
                 Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix * Matrix4x4.Scale(new Vector3(1, 1, -1)); //GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false);
