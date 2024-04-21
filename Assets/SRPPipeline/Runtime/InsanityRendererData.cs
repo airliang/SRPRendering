@@ -32,16 +32,16 @@ namespace Insanity
             /// <summary>Render all objects first in a g-buffer pass, then apply all lighting in a separate pass using deferred shading.</summary>
             Deferred = 1
         };
-        [SerializeField] RendererDataResources m_Resources;
+        //[SerializeField] RendererDataResources m_Resources;
         [SerializeField] eRenderingPath m_RenderingPath;
         [SerializeField] int m_TileSize = 16;
         //[SerializeField] bool m_AdditionalLightEnable = true;
 
-        public RendererDataResources DataResources
-        {
-            get { return m_Resources; }
-            set { m_Resources = value; }
-        }
+        //public RendererDataResources DataResources
+        //{
+        //    get { return m_Resources; }
+        //    set { m_Resources = value; }
+        //}
 
         public eRenderingPath RenderingPath
         {

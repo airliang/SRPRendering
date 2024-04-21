@@ -11,7 +11,7 @@ namespace Insanity
         [Serializable, ReloadGroup]
         public sealed class ShaderResources
         {
-            [Reload("Runtime/ShaderLibrary/Blit.shader")]
+            [Reload("Runtime/ShaderLibrary/Blit.shader"), SerializeField]
             public Shader Blit;
             [Reload("Runtime/ShaderLibrary/HDRISky.shader")]
             public Shader HDRISky;
@@ -22,6 +22,9 @@ namespace Insanity
             public Shader CopyDepth;
             [Reload("Runtime/ShaderLibrary/Debug/DebugViewBlit.shader")]
             public Shader DebugViewBlit;
+            [Reload("Runtime/ShaderLibrary/TileBasedLightCulling.compute")]
+            public ComputeShader TileBasedLightCulling;
+            //public ComputeShader TileFrustumCompute;
         }
 
         [Serializable, ReloadGroup]

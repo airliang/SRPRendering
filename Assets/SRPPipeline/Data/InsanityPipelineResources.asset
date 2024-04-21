@@ -17,9 +17,12 @@ MonoBehaviour:
     HDRISky: {fileID: 4800000, guid: 06c01dc3845ea1245802e318cacb5273, type: 3}
     ParallelScan: {fileID: 7200000, guid: 8a4fde720a0fdb34b99ff02187040f19, type: 3}
     ScreenSpaceShadow: {fileID: 4800000, guid: 24f0e9b2667eef342a89732cdfdbab8f, type: 3}
+    CopyDepth: {fileID: 4800000, guid: 0d5c91bb975d05348a9839168c5765ef, type: 3}
     DebugViewBlit: {fileID: 4800000, guid: 665a501746484a54b81a3cdb232c9705, type: 3}
+    TileBasedLightCulling: {fileID: 7200000, guid: 78d0310695d287c439af699535039abd,
+      type: 3}
   materials:
-    Blit: {fileID: 0}
+    Blit: {fileID: 2100000, guid: 5738be8920d05f947b18f39c6068cc7d, type: 2}
     Skybox: {fileID: 2100000, guid: 67452d3878198b14b84d18147ea1dab2, type: 2}
     PhysicalBaseSky: {fileID: 2100000, guid: 5a36ff6ec0205ac45a2fde5da7c0ac1d, type: 2}
   internalTextures:

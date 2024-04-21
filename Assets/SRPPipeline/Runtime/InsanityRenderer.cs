@@ -14,6 +14,7 @@ namespace Insanity
         private Material m_debugViewBlitMaterial = null;
         private Material m_copyDepthMaterial = null;
         private ComputeShader m_parallelScan;
+        private ComputeShader m_tilebasedLightCulling;
         Light m_sunLight;
         //ShadowManager m_ShadowMananger;
         int m_mainLightIndex = -1;
@@ -53,9 +54,11 @@ namespace Insanity
         {
             this.currentPipeline = pipeline;
             m_RendererData = data;
-            m_finalBlitMaterial = CoreUtils.CreateEngineMaterial(data.DataResources.shaders.Blit);
+
+            m_finalBlitMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.Blit);
             m_debugViewBlitMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.DebugViewBlit);
             m_copyDepthMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.CopyDepth);
+            m_tilebasedLightCulling = InsanityPipeline.asset.InsanityPipelineResources.shaders.TileBasedLightCulling;
         }
 
         void CreateFrameRenderSets(RenderGraph renderGraph, ScriptableRenderContext context, RenderingData renderingData)
@@ -124,7 +127,7 @@ namespace Insanity
                 {
                     //LightCulling.Instance.ExecuteTileFrustumCompute(renderingData, m_forwardRenderData.ForwardPathResources.shaders.TileFrustumCompute);
                     lightCullingData = LightCulling.Instance.ExecuteTilebasedLightCulling(renderingData, m_FrameRenderSets.cameraDepthResolved,
-                        m_RendererData.DataResources.shaders.TileBasedLightCulling);
+                        m_tilebasedLightCulling);
                 }
 
                 if (DebugView.NeedDebugView())

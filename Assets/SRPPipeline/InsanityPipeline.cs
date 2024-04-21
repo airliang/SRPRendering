@@ -38,6 +38,11 @@ namespace Insanity
         
         //SATRenderer m_satRenderer = new SATRenderer();
 
+        public InsanityPipeline()
+        {
+            
+        }
+
         void CleanupRenderGraph()
         {
             m_RenderGraph.Cleanup();
@@ -55,6 +60,7 @@ namespace Insanity
 
         protected override void Render(ScriptableRenderContext context, Camera[] cameras)
         {
+            RenderPasses.Initialize();
             GraphicsSettings.lightsUseLinearIntensity = (QualitySettings.activeColorSpace == ColorSpace.Linear);
             GraphicsSettings.useScriptableRenderPipelineBatching = asset.UseSRPBatcher;
             BeginFrameRendering(context, cameras);
@@ -131,6 +137,7 @@ namespace Insanity
             ShadowManager.Instance.Clear();
 
             RTHandleUtils.Cleanup();
+            RenderPasses.Cleanup();
         }
 
         private void InitializeRenderPipeline()
