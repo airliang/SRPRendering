@@ -1,6 +1,6 @@
 #ifndef VOXEL_INPUT_INCLUDED
 #define VOXEL_INPUT_INCLUDED
-#include "Assets/SRPPipeline/Runtime/ShaderLibrary/PipelineCore.hlsl"
+#include "InsanityRenderPipeline/Runtime/ShaderLibrary/PipelineCore.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
 
 #define OneOver256 0.00390625

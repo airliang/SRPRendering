@@ -2,10 +2,10 @@
 #define VOXEL_INSTANCE_PASS_INCLUDED
 //#include "Assets/SRPPipeline/Runtime/ShaderLibrary/PipelineCore.hlsl"
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
-#include "Assets/SRPPipeline/Runtime/ShaderLibrary/Lighting.hlsl"
+#include "InsanityRenderPipeline/Runtime/ShaderLibrary/Lighting.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
-#include "Assets/SRPPipeline/Runtime/ShaderLibrary/Shadow/Shadows.hlsl"
+#include "InsanityRenderPipeline/Runtime/ShaderLibrary/Shadow/Shadows.hlsl"
 
 
 struct VoxelAttributes

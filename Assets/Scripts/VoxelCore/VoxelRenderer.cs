@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
-using Insanity;
+//using Insanity;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
@@ -14,7 +14,7 @@ using UnityEngine.Experimental.Rendering;
 //[ExecuteInEditMode]
 public class VoxelRenderer : MonoBehaviour
 {
-
+    /*
     public static int MAX_INSTANCE_NUM = 128 * 128;//VoxelChunk.VOXELS_NUMBER.x * VoxelChunk.VOXELS_NUMBER.y * 6;  //6 face x 32 voxel x 32 voxel 
     public ComputeBuffer m_visibilityBuffer;
     public ComputeBuffer m_shadowVisibilityBuffer;
@@ -419,7 +419,7 @@ public class VoxelRenderer : MonoBehaviour
         return false;
     }
 
-    private void RenderShadowCasterPass(ScriptableRenderContext context, CommandBuffer cmd, ShadowSettings shadowSettings, 
+    private void RenderShadowCasterPass(ScriptableRenderContext context, CommandBuffer cmd, Insanity.ShadowSettings shadowSettings, 
         ref ShadowDrawingSettings shadowDrawSettings, int cascadeIndex)
     {
         if (!m_casterShadow)
@@ -692,6 +692,7 @@ public class VoxelRenderer : MonoBehaviour
         }
         m_FullyInFrustumBatch.Clear();
     }
+    */
 
     private void LateUpdate()
     {

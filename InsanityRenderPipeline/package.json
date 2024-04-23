@@ -1,0 +1,19 @@
+{
+  "name": "render-pipelines.insanity",
+  "description": "The Insanity Render Pipeline (IRP) is a prebuilt Scriptable Render Pipeline, made by LIANG AIRAN. IRP provides advanced rendering technique, now it only supports PCs.",
+  "version": "1.0.0",
+  "unity": "2022.3",
+  "displayName": "Insanity Rendering Pipeline",
+  "dependencies": {
+    "com.unity.mathematics": "1.2.1",
+    "com.unity.burst": "1.8.9",
+    "com.unity.render-pipelines.core": "14.0.9"
+  },
+  "keywords": [
+    "graphics",
+    "performance",
+    "rendering",
+    "render",
+    "pipeline"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+    "name": "InsanityRenderingPipeline.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:3eae0364be2026648bf74846acb8a731",
+        "GUID:3f8eb803c341cd447998890c3f6dbab1",
+        "GUID:df380645f10b7bc4b97d4f5eb6303d95"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
