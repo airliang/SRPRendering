@@ -21,6 +21,7 @@ namespace UnityEditor.Insanity
             public static GUIContent screenPercentageText = EditorGUIUtility.TrTextContent("Screen Resolution Percentage", "Controls the global screen resolution settings.");
             public static GUIContent srpBatcherText = EditorGUIUtility.TrTextContent("SRP Batcher", "Controls the global SRP Batcher settings.");
             public static GUIContent msaaText = EditorGUIUtility.TrTextContent("MSAA", "Controls the global anti aliasing settings");
+            public static GUIContent ssaoText = EditorGUIUtility.TrTextContent("SSAO", "Enable Screen Space Ambient Occlusion.");
             public static string[] msaaOptions = { "Disabled", "2x", "4x", "8x" };
 
             public static GUIContent shadowSettingsText = EditorGUIUtility.TrTextContent("Shadows");
@@ -31,15 +32,15 @@ namespace UnityEditor.Insanity
             public static GUIContent shadowNormalBias = EditorGUIUtility.TrTextContent("Normal Bias", "Controls distance at which the shadow casting surfaces will be shrunk along the surface normal. Useful for avoiding false self-shadowing artifacts.");
             //public static GUIContent supportsSoftShadows = EditorGUIUtility.TrTextContent("Soft Shadows", "If enabled pipeline will perform shadow filtering. Otherwise all lights that cast shadows will fallback to perform a single shadow sample.");
             public static GUIContent adaptiveShadowBias = EditorGUIUtility.TrTextContent("Adaptive Shadow Bias", "If enabled pipeline will enable adaptive shadow bias.");
-            public static GUIContent enableCSMBlend = EditorGUIUtility.TrTextContent("Enable CSM Blend", "Blend the shaodow between 2 cascades.");
+            public static GUIContent enableCSMBlend = EditorGUIUtility.TrTextContent("Enable CSM Blend", "Blend the shadow between 2 cascades.");
             public static GUIContent csmBlendDistance = EditorGUIUtility.TrTextContent("CSM Blend Distance", "Blend distance between 2 cascades.");
-            public static GUIContent shadowType = EditorGUIUtility.TrTextContent("Shadow Type", "Shadow Mapping algothrithm options.");
+            public static GUIContent shadowType = EditorGUIUtility.TrTextContent("Shadow Type", "Shadow Mapping algorithm options.");
             public static GUIContent shadowResolution = EditorGUIUtility.TrTextContent("Shadow Resolution", "Shadow Resolution options.");
             public static GUIContent shadowPCFFilter = EditorGUIUtility.TrTextContent("Shadow PCF Filter", "Shadow Mapping PCF Filter options.");
-            public static GUIContent pcssSoftness = EditorGUIUtility.TrTextContent("PCSS Softness", "Simulate the direction light size in PCSS algorithrm");
-            public static GUIContent pcssSoftnessFalloff = EditorGUIUtility.TrTextContent("PCSS Softness Falloff", "Softness falloff parameter use by a pow formular.");
+            public static GUIContent pcssSoftness = EditorGUIUtility.TrTextContent("PCSS Softness", "Simulate the direction light size in PCSS algorithm");
+            public static GUIContent pcssSoftnessFalloff = EditorGUIUtility.TrTextContent("PCSS Softness Falloff", "Softness falloff parameter use by a pow formula.");
             public static GUIContent vsmSATEnable = EditorGUIUtility.TrTextContent("VSM SAT Enable", "Enable the SAT algorithm to calculate the vsm filter.");
-            public static GUIContent gaussianFilterRadius = EditorGUIUtility.TrTextContent("Gaussian Prefilter Radius", "The gaussian kernel size to filtering.");
+            public static GUIContent gaussianFilterRadius = EditorGUIUtility.TrTextContent("Gaussian Prefilter Radius", "The Gaussian kernel size to filtering.");
             public static GUIContent exponentialConstants = EditorGUIUtility.TrTextContent("Exponential Variance Shadow Constants", "Setting the exponential constants of EVSM");
             public static GUIContent lightBleedingReduction = EditorGUIUtility.TrTextContent("LightBleeding Reduction Value", "Clamp the [pMax, 1] to the [lightBleeding, 1]");
             public static GUIContent screenSpaceShadow = EditorGUIUtility.TrTextContent("Screen Space Shadow Map", "Screen Space Shadow Map Enable");
@@ -82,6 +83,7 @@ namespace UnityEditor.Insanity
         SerializedProperty m_ScreenResolutionProp;
         SerializedProperty m_SRPBatcherProp;
         SerializedProperty m_MSAAProp;
+        SerializedProperty m_SSAOProp;
 
         SavedBool m_ShadowSettingsFoldout;
 
@@ -151,6 +153,7 @@ namespace UnityEditor.Insanity
             m_ScreenResolutionProp = serializedObject.FindProperty("m_ResolutionRate");
             m_SRPBatcherProp = serializedObject.FindProperty("m_UseSRPBatcher");
             m_MSAAProp = serializedObject.FindProperty("m_MSAASamples");
+            m_SSAOProp = serializedObject.FindProperty("m_SSAOEnable");
 
             m_ShadowSettingsFoldout = new SavedBool($"{target.GetType()}.ShadowSettingsFoldout", false);
 
@@ -214,6 +217,7 @@ namespace UnityEditor.Insanity
 
                 m_SRPBatcherProp.boolValue = EditorGUILayout.Toggle(Styles.srpBatcherText, m_SRPBatcherProp.boolValue);
                 EditorGUILayout.PropertyField(m_MSAAProp, Styles.msaaText);
+                m_SSAOProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoText, m_SSAOProp.boolValue);
             }
             EditorGUILayout.EndFoldoutHeaderGroup();
         }

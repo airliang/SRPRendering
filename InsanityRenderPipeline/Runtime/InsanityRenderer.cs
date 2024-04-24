@@ -33,6 +33,7 @@ namespace Insanity
             internal TextureHandle cameraColor;
             internal TextureHandle cameraDepth;
             internal TextureHandle cameraDepthResolved;
+            internal TextureHandle cameraNormal;
 
             internal TextureHandle mainShadowsTexture;
             internal TextureHandle additionalShadowsTexture;

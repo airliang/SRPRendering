@@ -9,6 +9,7 @@ namespace Insanity
     public enum RenderingEvents : byte
     {
         DepthPassEvent,
+        DepthNormalPassEvent,
         //ShadowCasterPassEvent,
         OpaqueForwardPassEvent,
         PostProcessEvent,
@@ -24,18 +25,19 @@ namespace Insanity
     public class RenderingEventManager
     {
         public static event RenderingEventDelegate DepthPassRenderDelegate;
+        public static event RenderingEventDelegate DepthNormalPassRenderDelegate;
         public static event ShadowCasterPassEventDelegate ShadowCasterRenderDelegate;
         public static event RenderingEventDelegate OpaqueForwardRenderDelegate;
         public static event RenderingEventDelegate PostProcessRenderDelegate;
         public static event RenderGraphPassDelegate BeforeExecuteRenderGraphDelegate;
         static RenderingEventDelegate[] m_Events = new RenderingEventDelegate[(int)RenderingEvents.MaxEvent]
         {
-            DepthPassRenderDelegate,  OpaqueForwardRenderDelegate, PostProcessRenderDelegate
+            DepthPassRenderDelegate, DepthNormalPassRenderDelegate, OpaqueForwardRenderDelegate, PostProcessRenderDelegate
         };
 
         static RenderGraphPassDelegate[] m_RenderGraphPassEvents = new RenderGraphPassDelegate[(int)RenderingEvents.MaxEvent]
         {
-            null, null, null
+            null, null, null, null
         };
 
         public static void AddEvent(RenderingEvents evt, RenderingEventDelegate del)

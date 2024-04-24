@@ -57,6 +57,26 @@
 
 		Pass
 		{
+            Name "DepthPrepass"
+			Tags { "LightMode" = "DepthNormalPrepass" }
+			ColorMask 0
+            ZWrite On
+            Cull[_Cull]
+
+			HLSLPROGRAM
+            #pragma shader_feature_local _ALPHATEST_ON
+			#pragma enable_d3d11_debug_symbols
+			#pragma vertex DepthOnlyVertex
+			#pragma fragment DepthOnlyFragment
+            #pragma multi_compile_instancing
+			#include "LitInput.hlsl"
+			#include "DepthOnlyPass.hlsl"
+			
+			ENDHLSL
+		}
+
+		Pass
+		{
 			Name "ShadowCaster"
 			Tags{"LightMode" = "ShadowCaster"}
             ColorMask [_ColorMaskShadow]
