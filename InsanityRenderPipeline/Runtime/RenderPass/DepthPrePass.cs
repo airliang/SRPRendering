@@ -19,7 +19,7 @@ namespace Insanity
     public partial class RenderPasses
     {
         static ShaderTagId m_DepthPrePassId = new ShaderTagId("DepthPrepass");
-
+        static ProfilingSampler s_DepthPrePassProfiler = new ProfilingSampler("DepthPrepass Profiler");
         private static TextureHandle CreateDepthTexture(RenderGraph graph, Camera camera, string name)
         {
             //Texture description
@@ -59,7 +59,7 @@ namespace Insanity
 
         public static DepthPrepassData Render_DepthPrePass(RenderingData renderingData, TextureHandle depth)
         {
-            using (var builder = renderingData.renderGraph.AddRenderPass<DepthPrepassData>("DepthPrepass", out var passData, new ProfilingSampler("DepthPrepass Profiler")))
+            using (var builder = renderingData.renderGraph.AddRenderPass<DepthPrepassData>("DepthPrepass", out var passData, s_DepthPrePassProfiler))
             {
                 //Textures - Multi-RenderTarget
                 //TextureHandle Depth = CreateDepthTexture(renderingData.renderGraph, renderingData.cameraData.camera);

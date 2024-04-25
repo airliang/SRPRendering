@@ -10,6 +10,7 @@ namespace Insanity
     public partial class RenderPasses
     {
         static ShaderTagId m_DepthNormalPrePassId = new ShaderTagId("DepthNormalPrepass");
+        static ProfilingSampler s_DepthNormalProfiler = new ProfilingSampler("DepthNormalPrepass Profiler");
 
         private static TextureHandle CreateNormalTexture(RenderGraph graph, int width, int height, int msaaSamples, string name)
         {
@@ -27,7 +28,7 @@ namespace Insanity
 
         public static void Render_DepthNormalPass(RenderingData renderingData, out TextureHandle normalHandle, TextureHandle depth)
         {
-            using (var builder = renderingData.renderGraph.AddRenderPass<DepthPrepassData>("DepthNormalPrepass", out var passData, new ProfilingSampler("DepthPrepass Profiler")))
+            using (var builder = renderingData.renderGraph.AddRenderPass<DepthPrepassData>("DepthNormalPrepass", out var passData, s_DepthNormalProfiler))
             {
                 float width = GlobalRenderSettings.ResolutionRate * renderingData.cameraData.camera.pixelWidth;
                 float height = GlobalRenderSettings.ResolutionRate * renderingData.cameraData.camera.pixelHeight;

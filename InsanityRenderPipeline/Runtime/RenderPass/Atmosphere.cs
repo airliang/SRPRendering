@@ -28,6 +28,12 @@ namespace Insanity
         public RenderTexture tmpMultipleScatteringOrderOutput;
     }
 
+    internal enum AtmosphereProfileId
+    {
+        DownsampleCubemap,
+        CopyArrayToCubemapFace,
+        PrefilterAtmosphereSpecular,
+    }
 
     public class Atmosphere
     {
@@ -112,6 +118,11 @@ namespace Insanity
             AtmosphereShaderParameters._OutputCubemap5 = Shader.PropertyToID("_OutputCubemap5");
             AtmosphereShaderParameters._ATMOSPHERE_SPECULAR = Shader.PropertyToID("_ATMOSPHERE_SPECULAR");
         }
+
+        private ProfilingSampler m_BakeAtmosphereToSHProfiler = new ProfilingSampler("Bake Atmosphere Scattering to SH Pass Profiler");
+        private ProfilingSampler m_BakeAtmosphereToCubemap = new ProfilingSampler("Bake Atmosphere Scattering to Cubemap Pass Profiler");
+        private ProfilingSampler m_DownSampleCubemapProfiler = new ProfilingSampler("Downsample Cubemap Pass Profiler");
+        private ProfilingSampler m_PrefilterAtmosphereSpecularProfiler = new ProfilingSampler("Prefilter Specular Cubemap Pass Profiler");
 
         public Atmosphere()
         {
@@ -654,133 +665,8 @@ namespace Insanity
             if (m_skySHSetting.m_FinalProjSH == null)
                 m_skySHSetting.m_FinalProjSH = new ComputeBuffer(1, Marshal.SizeOf<GPUAmbientSHCoefL2>(), ComputeBufferType.Structured);
 
-
-            /*
-            ComputeShader csProjAtmosphereToSH = atmosphereResources.ProjAtmosphereToSH;
-            CommandBuffer cmd = CommandBufferPool.Get(m_BakeSHProfilerTag);
-            
-            using (new ProfilingScope(cmd, m_BakeSHProfilingSampler))
-            {
-                LocalKeyword bakeCubemap = new LocalKeyword(csProjAtmosphereToSH, "_BAKE_CUBEMAP");
-                cmd.DisableKeyword(csProjAtmosphereToSH, bakeCubemap);
-                //set the cs parameters
-                Vector4 rayleightScatteringCoef = atmosphereResources.ScatteringCoefficientRayleigh * 0.000001f * atmosphereResources.ScaleRayleigh;
-                Vector4 mieScatteringCoef = atmosphereResources.ScatteringCoefficientMie * 0.00001f * atmosphereResources.ScaleMie;
-
-                cmd.SetComputeFloatParam(csProjAtmosphereToSH, AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
-                cmd.SetComputeFloatParam(csProjAtmosphereToSH, AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
-                cmd.SetComputeVectorParam(csProjAtmosphereToSH, AtmosphereShaderParameters._BetaRayleigh, rayleightScatteringCoef);
-                cmd.SetComputeVectorParam(csProjAtmosphereToSH, AtmosphereShaderParameters._BetaMie, mieScatteringCoef);
-                cmd.SetComputeFloatParam(csProjAtmosphereToSH, AtmosphereShaderParameters._MieG, atmosphereResources.MieG);
-                Vector4 mainLightPosition = -sunLight.transform.localToWorldMatrix.GetColumn(2);
-                mainLightPosition.w = 0;
-
-                cmd.SetComputeVectorParam(csProjAtmosphereToSH, ProjSHShaderParameters._MainLightPosition, mainLightPosition);
-                cmd.SetComputeFloatParam(csProjAtmosphereToSH, ProjSHShaderParameters._MainLightIntensity, sunLight.intensity);
-
-                float sqrtPI = Mathf.Sqrt(Mathf.PI);
-                float fC0 = (1.0f / (2.0f * sqrtPI));
-                float fC1 = (Mathf.Sqrt(3.0f) / (3.0f * sqrtPI));
-                float fC2 = (Mathf.Sqrt(15.0f) / (8.0f * sqrtPI));
-                float fC3 = (Mathf.Sqrt(5.0f) / (16.0f * sqrtPI));
-                float fC4 = (0.5f * fC2);
-
-
-                if (AtmosphereSHSetting.DIRECT_BAKING)
-                {
-                    int kBakeDirect = csProjAtmosphereToSH.FindKernel("BakeSHDirect");
-                    if (kBakeDirect == -1)
-                        return;
-
-
-                    cmd.SetComputeTextureParam(csProjAtmosphereToSH, kBakeDirect, AtmosphereShaderParameters._SkyboxLUT, atmosphereResources.SkyboxLUT);
-                    cmd.SetComputeBufferParam(csProjAtmosphereToSH, kBakeDirect, ProjSHShaderParameters._BakeSamples, m_skySHSetting.m_BakeSamples);
-                    cmd.SetComputeBufferParam(csProjAtmosphereToSH, kBakeDirect, ProjSHShaderParameters._FinalProjSH, m_skySHSetting.m_FinalProjSH);
-                    cmd.DispatchCompute(csProjAtmosphereToSH, kBakeDirect, 1, 1, 1);
-                    GetAmbientSHData(m_skySHSetting.m_FinalProjSH);
-                }
-                else
-                {
-                    int kPreSumSH = csProjAtmosphereToSH.FindKernel("PresumSHCoefficient");
-                    if (kPreSumSH == -1)
-                        return;
-
-                    //pass 1 parallen sum the sh coefficients into array.
-                    cmd.SetComputeTextureParam(csProjAtmosphereToSH, kPreSumSH, AtmosphereShaderParameters._SkyboxLUT, atmosphereResources.SkyboxLUT);
-                    cmd.SetComputeBufferParam(csProjAtmosphereToSH, kPreSumSH, ProjSHShaderParameters._BakeSamples, m_skySHSetting.m_BakeSamples);
-                    int groupsNumX = m_bakeSHSamples.Length / 128;
-                    if (AtmosphereSHSetting.OPTIMIZE_BAKING)
-                    {
-
-                        cmd.SetComputeTextureParam(csProjAtmosphereToSH, kPreSumSH, ProjSHShaderParameters._SHCoefficients, m_skySHSetting.m_SHCoefficientsTexture);
-                        cmd.DispatchCompute(csProjAtmosphereToSH, kPreSumSH, groupsNumX, 9, 1);
-                    }
-                    else
-                    {
-
-                        cmd.SetComputeBufferParam(csProjAtmosphereToSH, kPreSumSH, ProjSHShaderParameters._SHCoefficients, m_skySHSetting.m_SHCoefficientsArray);
-                        cmd.DispatchCompute(csProjAtmosphereToSH, kPreSumSH, groupsNumX, 1, 1);
-                    }
-
-                    //pass 2, sum the last element of sh coefficients to the group array.
-                    if (groupsNumX > 1)
-                    {
-                        int kPreSumSHGroup = csProjAtmosphereToSH.FindKernel("PreSumGroupSH");
-                        if (kPreSumSHGroup >= 0)
-                        {
-                            //csProjAtmosphereToSH.SetInt(ProjSHShaderParameters._ArrayLengthPerThreadGroup, groupsNumX);
-                            cmd.SetComputeIntParam(csProjAtmosphereToSH, ProjSHShaderParameters._ArrayLengthPerThreadGroup, groupsNumX);
-                            cmd.SetComputeIntParam(csProjAtmosphereToSH, ProjSHShaderParameters._GroupsNumPowOf2, Mathf.NextPowerOfTwo(groupsNumX));
-                            if (AtmosphereSHSetting.OPTIMIZE_BAKING)
-                            {
-
-                                cmd.SetComputeTextureParam(csProjAtmosphereToSH, kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, m_skySHSetting.m_SHCoefficientsTexture);
-                                cmd.SetComputeTextureParam(csProjAtmosphereToSH, kPreSumSHGroup,
-                                    ProjSHShaderParameters._SHCoefficientsGroupSumArray, m_skySHSetting.m_SHCoefficientsGroupSumTexture);
-                                cmd.DispatchCompute(csProjAtmosphereToSH, kPreSumSHGroup, 1, 9, 1);
-                            }
-                            else
-                            {
-
-                                cmd.SetComputeBufferParam(csProjAtmosphereToSH, kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, m_skySHSetting.m_SHCoefficientsArray);
-                                cmd.SetComputeBufferParam(csProjAtmosphereToSH, kPreSumSHGroup,
-                                    ProjSHShaderParameters._SHCoefficientsGroupSumArray, m_skySHSetting.m_SHCoefficientsGroupSumArray);
-                                cmd.DispatchCompute(csProjAtmosphereToSH, kPreSumSHGroup, 1, 1, 1);
-                            }
-
-
-                        }
-                    }
-
-                    //pass 3
-                    int kBakeSHToTexture = csProjAtmosphereToSH.FindKernel("BakeSHToTexture");
-                    if (kBakeSHToTexture >= 0)
-                    {
-                        if (AtmosphereSHSetting.OPTIMIZE_BAKING)
-                        {
-                            cmd.SetComputeTextureParam(csProjAtmosphereToSH, kBakeSHToTexture,
-                                ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, m_skySHSetting.m_SHCoefficientsGroupSumTexture);
-                        }
-                        else
-                        {
-
-                            cmd.SetComputeBufferParam(csProjAtmosphereToSH, kBakeSHToTexture,
-                                ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, m_skySHSetting.m_SHCoefficientsGroupSumArray);
-                        }
-
-                        cmd.SetComputeBufferParam(csProjAtmosphereToSH, kBakeSHToTexture, ProjSHShaderParameters._FinalProjSH, m_skySHSetting.m_FinalProjSH);
-                        cmd.DispatchCompute(csProjAtmosphereToSH, kBakeSHToTexture, 1, 1, 1);
-
-                        GetAmbientSHData(m_skySHSetting.m_FinalProjSH);
-                    }
-                }
-            }
-            context.ExecuteCommandBuffer(cmd);
-            CommandBufferPool.Release(cmd);
-            */
-
             using (var builder = renderGraph.AddRenderPass<BakeAtmosphereToSHPassData>("Bake Atmosphere Scattering to SH Pass",
-                out var passData, new ProfilingSampler("Bake Atmosphere Scattering to SH Pass Profiler")))
+                out var passData, m_BakeAtmosphereToSHProfiler))
             {
                 passData.csProjAtmosphereToSH = atmosphereResources.ProjAtmosphereToSH;
                 passData.kPreSumSH = atmosphereResources.ProjAtmosphereToSH.FindKernel("PresumSHCoefficient");
@@ -940,7 +826,7 @@ namespace Insanity
 
 
             using (var builder = renderGraph.AddRenderPass<BakeAtmosphereToCubeData>("Bake Atmosphere Scattering to Cubemap Pass",
-                out var passData, new ProfilingSampler("Bake Atmosphere Scattering to Cubemap Pass Profiler")))
+                out var passData, m_BakeAtmosphereToCubemap))
             {
                 passData.m_ComputeShader = atmosphereResources.BakeToCubemap;
                 passData.kBakeAtmosphereToCube = atmosphereResources.BakeToCubemap.FindKernel("CSMain");
@@ -981,7 +867,7 @@ namespace Insanity
             for (int mip = 0; mip < remainTextureMip; ++mip)
             {
                 using (var builder = renderGraph.AddRenderPass<DownSampleCubeData>("Downsample Cubemap Pass",
-                    out var passData, new ProfilingSampler("Downsample Cubemap Pass Profiler")))
+                    out var passData, m_DownSampleCubemapProfiler))
                 {
                     passData.kDownSampleCube = atmosphereResources.DownSampleCubemap.FindKernel("CSMain");
                     passData.m_ComputeShader = atmosphereResources.DownSampleCubemap;
@@ -994,26 +880,35 @@ namespace Insanity
 
                     builder.SetRenderFunc((DownSampleCubeData data, RenderGraphContext context) =>
                     {
-                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kDownSampleCube, AtmosphereShaderParameters._Cubemap, data.m_OutputFaceTextureArray);
-                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kDownSampleCube, AtmosphereShaderParameters._InputCubemap, data.m_InputCubemap);
-                        int groupX = Mathf.Max(data.m_OutputTextureSize / 8, 1);
-                        int groupY = groupX;
-                        context.cmd.DispatchCompute(data.m_ComputeShader, data.kDownSampleCube, groupX, groupY, 6);
-
-                        for (int i = 0; i < 6; i++)
+                        using (new ProfilingScope(context.cmd, ProfilingSampler.Get(AtmosphereProfileId.DownsampleCubemap)))
                         {
-                            context.cmd.CopyTexture(data.m_OutputFaceTextureArray, i, 0, data.m_InputCubemap, i, passData.m_MipLevel);
+                            context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kDownSampleCube, AtmosphereShaderParameters._Cubemap, data.m_OutputFaceTextureArray);
+                            context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kDownSampleCube, AtmosphereShaderParameters._InputCubemap, data.m_InputCubemap);
+                            int groupX = Mathf.Max(data.m_OutputTextureSize / 8, 1);
+                            int groupY = groupX;
+                            context.cmd.DispatchCompute(data.m_ComputeShader, data.kDownSampleCube, groupX, groupY, 6);
+                            context.renderContext.ExecuteCommandBuffer(context.cmd);
+                            context.cmd.Clear();
                         }
 
-                        context.renderContext.ExecuteCommandBuffer(context.cmd);
-                        context.cmd.Clear();
+                        using (new ProfilingScope(context.cmd, ProfilingSampler.Get(AtmosphereProfileId.CopyArrayToCubemapFace)))
+                        {
+                            for (int i = 0; i < 6; i++)
+                            {
+                                context.cmd.CopyTexture(data.m_OutputFaceTextureArray, i, 0, data.m_InputCubemap, i, passData.m_MipLevel);
+                            }
+
+                            context.renderContext.ExecuteCommandBuffer(context.cmd);
+                            context.cmd.Clear();
+                        }
+                        
                     });
                 }
             }
 
             //prefilter specular cubemap
             using (var builder = renderGraph.AddRenderPass<PrefilterSpecularPassData>("Prefilter Specular Cubemap Pass",
-                out var passData, new ProfilingSampler("Prefilter Specular Cubemap Pass Profiler")))
+                out var passData, m_PrefilterAtmosphereSpecularProfiler))
             {
                 passData.kPrefilterSpecular = atmosphereResources.PrefilterSpecularCubemap.FindKernel("CSMain");
                 passData.m_ComputeShader = atmosphereResources.PrefilterSpecularCubemap;
@@ -1030,17 +925,23 @@ namespace Insanity
 
                 builder.SetRenderFunc((PrefilterSpecularPassData data, RenderGraphContext context) =>
                 {
-                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._InputCubemap, data.m_InputCubemap);
-                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap0, data.m_OutputFaceTextureArray0);
-                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap1, data.m_OutputFaceTextureArray1);
-                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap2, data.m_OutputFaceTextureArray2);
-                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap3, data.m_OutputFaceTextureArray3);
-                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap4, data.m_OutputFaceTextureArray4);
-                    context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap5, data.m_OutputFaceTextureArray5);
+                    using (new ProfilingScope(context.cmd, ProfilingSampler.Get(AtmosphereProfileId.PrefilterAtmosphereSpecular)))
+                    {
+                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._InputCubemap, data.m_InputCubemap);
+                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap0, data.m_OutputFaceTextureArray0);
+                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap1, data.m_OutputFaceTextureArray1);
+                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap2, data.m_OutputFaceTextureArray2);
+                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap3, data.m_OutputFaceTextureArray3);
+                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap4, data.m_OutputFaceTextureArray4);
+                        context.cmd.SetComputeTextureParam(data.m_ComputeShader, data.kPrefilterSpecular, AtmosphereShaderParameters._OutputCubemap5, data.m_OutputFaceTextureArray5);
 
-                    int threadTotal = 32 * 32 + 16 * 16 + 8 * 8 + 4 * 4 + 2 * 2 + 1;
-                    int groupX = Mathf.CeilToInt((float)threadTotal / 64);
-                    context.cmd.DispatchCompute(data.m_ComputeShader, data.kPrefilterSpecular, groupX, 1, 6);
+                        int threadTotal = 32 * 32 + 16 * 16 + 8 * 8 + 4 * 4 + 2 * 2 + 1;
+                        int groupX = Mathf.CeilToInt((float)threadTotal / 64);
+                        context.cmd.DispatchCompute(data.m_ComputeShader, data.kPrefilterSpecular, groupX, 1, 6);
+
+                        context.renderContext.ExecuteCommandBuffer(context.cmd);
+                        context.cmd.Clear();
+                    }
 
                     for (int i = 0; i < 6; i++)
                     {

@@ -36,8 +36,12 @@ Varyings DepthNormalVertex(Attributes input)
 
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
     output.positionCS = TransformObjectToHClip(input.position.xyz);
-    // float3 positionWS = TransformObjectToWorld(positionOS);
-    // output.positionCS = TransformWorldToHClip(positionWS);
+    VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
+#ifdef _NORMALMAP
+    real sign = input.tangentOS.w * GetOddNegativeScale();
+    output.tangentWS = half4(normalInput.tangentWS.xyz, sign);
+#endif
+    output.normalWS = normalInput.normalWS;
     return output;
 }
 
@@ -47,6 +51,16 @@ half4 DepthNormalFragment(Varyings input) : SV_TARGET
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
     Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
-    return 0;
-}
+        
+#ifdef _NORMALMAP
+    float sgn = input.tangentWS.w;      // should be either +1 or -1
+    float3 bitangent = sgn * cross(input.normalWS.xyz, input.tangentWS.xyz);
+    float3 normalWS = TransformTangentToWorld(normalTS, half3x3(input.tangentWS.xyz, bitangent.xyz, input.normalWS.xyz));
+    normalWS = SafeNormalize(normalWS);
+#else
+    float3 normalWS = normalize(input.normalWS.xyz);
+#endif
+        normalWS = normalWS * 0.5 + 0.5;
+        return half4(normalWS, 1);
+    }
 #endif

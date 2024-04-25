@@ -120,7 +120,12 @@ namespace Insanity
                 }
 
                 InsanityPipeline.UpdateLightVariablesGlobalCB(renderingData.renderGraph, m_sunLight, LightCulling.Instance);
-                DepthPrepassData depthPassData = RenderPasses.Render_DepthPrePass(renderingData, m_FrameRenderSets.cameraDepth);
+                if (IsNormalPassEnable())
+                {
+                    RenderPasses.Render_DepthNormalPass(renderingData, out m_FrameRenderSets.cameraNormal, m_FrameRenderSets.cameraDepth);
+                }
+                else
+                    RenderPasses.Render_DepthPrePass(renderingData, m_FrameRenderSets.cameraDepth);
                 RenderPasses.CopyDepthPass(renderingData, out m_FrameRenderSets.cameraDepthResolved, m_FrameRenderSets.cameraDepth, m_copyDepthMaterial, (int)asset.MSAASamples);
 
                 LightCulling.TileBasedLightCullingData lightCullingData = null;
@@ -256,6 +261,11 @@ namespace Insanity
         void InitShadowSettings(bool mainLightCastShadows, ref CullingResults cullResults, CameraData cameraData, int lightIndex)
         {
             ShadowManager.Instance.Setup(mainLightCastShadows, ref cullResults, cameraData, lightIndex);
+        }
+
+        bool IsNormalPassEnable()
+        {
+            return InsanityPipeline.asset.SSAOEnable;
         }
     }
 }
