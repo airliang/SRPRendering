@@ -79,17 +79,21 @@ Shader "Insanity/DebugViewBlit"
 #endif
                     col = half4(depth, depth, depth, 1);
                 }
-    else if (_DebugViewMode == DebugLinearDepth)
-    {
-        float depth = SAMPLE_DEPTH_TEXTURE(_DepthTexture, sampler_DepthTexture, input.uv);
-#if UNITY_REVERSED_Z
+                else if (_DebugViewMode == DebugLinearDepth)
+                {
+                    float depth = SAMPLE_DEPTH_TEXTURE(_DepthTexture, sampler_DepthTexture, input.uv);
+            #if UNITY_REVERSED_Z
                     depth = depth > 0 ? (1.0 - depth) : 0;
-#endif
-        float4 clipPos = float4(input.uv * 2.0 - 1.0, depth, 1);
-        float4 viewPos = mul(_ProjInverse, clipPos);
-        viewPos /= viewPos.w;
-        col = half4(viewPos.z, viewPos.z, viewPos.z, 1);
-    }
+            #endif
+                    float4 clipPos = float4(input.uv * 2.0 - 1.0, depth, 1);
+                    float4 viewPos = mul(_ProjInverse, clipPos);
+                    viewPos /= viewPos.w;
+                    col = half4(viewPos.z, viewPos.z, viewPos.z, 1);
+                }
+                else if (_DebugViewMode == DebugNormal)
+                {
+                    col = SAMPLE_TEXTURE2D(_NormalTexture, sampler_NormalTexture, input.uv);
+                }
 
                 return col;
             }

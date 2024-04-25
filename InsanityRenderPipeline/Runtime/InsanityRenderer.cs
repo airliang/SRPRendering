@@ -64,7 +64,7 @@ namespace Insanity
 
         void CreateFrameRenderSets(RenderGraph renderGraph, ScriptableRenderContext context, RenderingData renderingData)
         {
-            RenderTargetIdentifier rtBackbuffer = renderingData.cameraData.camera.targetTexture != null ? 
+            RenderTargetIdentifier rtBackbuffer = renderingData.cameraData.camera.targetTexture != null ?
                 new RenderTargetIdentifier(renderingData.cameraData.camera.targetTexture) : BuiltinRenderTextureType.CameraTarget;
 
             m_FrameRenderSets.backBufferColor = renderGraph.ImportBackbuffer(rtBackbuffer);
@@ -74,7 +74,7 @@ namespace Insanity
             colorDescriptor.autoGenerateMips = false;
             colorDescriptor.depthBufferBits = 0;
             RTHandleUtils.ReAllocateIfNeeded(ref m_FrameRenderSets.m_CameraColorHandle,
-                colorDescriptor, 
+                colorDescriptor,
                 FilterMode.Bilinear, TextureWrapMode.Clamp, name: "Color");
 
             RenderTextureDescriptor depthDescriptor = colorDescriptor;
@@ -192,11 +192,12 @@ namespace Insanity
                         DebugView.DebugViewGPUResources textures = new DebugView.DebugViewGPUResources();
                         textures.m_Depth = m_FrameRenderSets.cameraDepthResolved;
                         textures.m_LightVisibilityIndexBuffer = lightCullingData != null ? lightCullingData.lightVisibilityIndexBuffer : LightCulling.Instance.LightsVisibilityIndexBuffer;
+                        textures.m_Normal = m_FrameRenderSets.cameraNormal;
                         DebugView.ShowDebugPass(renderingData, ref textures, m_FrameRenderSets.backBufferColor, m_debugViewBlitMaterial, (int)DebugView.debugViewType);
                     }
                     else
                     {
-                        
+
                     }
                 }
             }
@@ -210,17 +211,17 @@ namespace Insanity
 
         private void RenderGraphForwardPath(ScriptableRenderContext context, CommandBuffer cmdRG, RenderingData renderingData)
         {
-            
+
         }
 
         public void Dispose()
         {
             m_FrameRenderSets.Release();
-            CoreUtils.Destroy(m_finalBlitMaterial); 
+            CoreUtils.Destroy(m_finalBlitMaterial);
             m_finalBlitMaterial = null;
             CoreUtils.Destroy(m_debugViewBlitMaterial);
             m_debugViewBlitMaterial = null;
-            CoreUtils.Destroy(m_copyDepthMaterial); 
+            CoreUtils.Destroy(m_copyDepthMaterial);
             m_copyDepthMaterial = null;
         }
 
@@ -236,13 +237,13 @@ namespace Insanity
 
         void PrepareGPULightData(ref CullingResults cullResults, RenderingData renderingData)
         {
-            if (renderingData.supportAdditionalLights) 
+            if (renderingData.supportAdditionalLights)
             {
                 LightCulling.Instance.SetupAdditionalLights(cullResults.visibleLights, renderingData.cameraData);
                 LightCulling.Instance.SetupTiles((int)GlobalRenderSettings.screenResolution.width, (int)GlobalRenderSettings.screenResolution.height,
                     m_RendererData.TileSize);
             }
-            
+
 
             bool mainLightCastShadows = false;
             if (InsanityPipeline.asset.shadowDistance > 0)
@@ -265,7 +266,7 @@ namespace Insanity
 
         bool IsNormalPassEnable()
         {
-            return InsanityPipeline.asset.SSAOEnable;
+            return InsanityPipeline.asset.SSAOEnable || DebugView.debugViewType == DebugView.DebugViewType.WorldSpaceNormal;
         }
     }
 }

@@ -43,6 +43,26 @@
 			ENDHLSL
 		}
 
+        Pass
+		{
+            Name "DepthNormalPrepass"
+			Tags {"LightMode" = "DepthNormalPrepass" }
+
+            ZWrite On
+            Cull[_Cull]
+
+            HLSLPROGRAM
+            #pragma shader_feature_local _ALPHATEST_ON
+			#pragma enable_d3d11_debug_symbols
+			#pragma vertex DepthNormalVertex
+			#pragma fragment DepthNormalFragment
+            #pragma multi_compile_instancing
+            #include "LitInput.hlsl"
+            #include "DepthNormalPass.hlsl"
+			
+			ENDHLSL
+		}
+
 		Pass 
 		{
 			Tags { "LightMode" = "InsanityForward" }

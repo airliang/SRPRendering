@@ -103,9 +103,9 @@ namespace Insanity
                 {
                     passData.m_Depth = builder.ReadTexture(debugViewTextures.m_Depth);
                 }
-                //else if (debugViewType == DebugViewType.WorldSpaceNormal)
+                if (debugViewType == DebugViewType.WorldSpaceNormal)
                 {
-                    //passData.m_Normal = builder.ReadTexture(debugViewTextures.m_Normal);
+                    passData.m_Normal = builder.ReadTexture(debugViewTextures.m_Normal);
                     //passData.m_Overdraw = builder.ReadTexture(debugViewTextures.m_Overdraw);
                 }
                 //else if (debugViewType == DebugViewType.TileBasedCullingResult)
@@ -124,6 +124,7 @@ namespace Insanity
                     data.m_finalBlitMaterial.SetInt("_DebugViewMode", data.m_DebugViewMode);
                     context.cmd.SetGlobalTexture("_DepthTexture", data.m_Depth);
                     context.cmd.SetGlobalBuffer("_LightVisibilityIndexBuffer", data.m_LightVisibilityIndexBuffer);
+                    data.m_finalBlitMaterial.SetTexture("_NormalTexture", data.m_Normal);
                     context.cmd.SetRenderTarget(data.m_Dest);
                     
                     //context.cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);

@@ -623,12 +623,15 @@ namespace Insanity
 
                             ctx.renderContext.DrawShadows(ref data.shadowDrawSettings);
                             //CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, RendererList.Create(data.shadowDrawSettings));
+                            ctx.cmd.DisableScissorRect();
+                            ctx.renderContext.ExecuteCommandBuffer(ctx.cmd);
+                            ctx.cmd.Clear();
 
                             RenderingEventManager.InvokeShadowCasterEvent(ctx.renderContext, ctx.cmd, shadowSettings, ref data.shadowDrawSettings, i);
                         }
                         //ctx.cmd.SetGlobalFloat(HDShaderIDs._ZClip, 1.0f);   // Re-enable zclip globally
 
-                        ctx.cmd.DisableScissorRect();
+                        
                         ctx.cmd.SetGlobalDepthBias(0.0f, 0.0f);             // Reset depth bias.
                         //CoreUtils.SetKeyword(ctx.cmd, "_MAIN_LIGHT_SHADOWS", true);
                         //CoreUtils.SetKeyword(ctx.cmd, "_SHADOWS_SOFT", data.m_SoftShadows);

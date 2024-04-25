@@ -57,20 +57,19 @@
 
 		Pass
 		{
-            Name "DepthPrepass"
+            Name "DepthNormalPrepass"
 			Tags { "LightMode" = "DepthNormalPrepass" }
-			ColorMask 0
             ZWrite On
             Cull[_Cull]
 
 			HLSLPROGRAM
             #pragma shader_feature_local _ALPHATEST_ON
 			#pragma enable_d3d11_debug_symbols
-			#pragma vertex DepthOnlyVertex
-			#pragma fragment DepthOnlyFragment
+			#pragma vertex DepthNormalVertex
+			#pragma fragment DepthNormalFragment
             #pragma multi_compile_instancing
 			#include "LitInput.hlsl"
-			#include "DepthOnlyPass.hlsl"
+			#include "DepthNormalPass.hlsl"
 			
 			ENDHLSL
 		}
@@ -78,15 +77,15 @@
 		Pass
 		{
 			Name "ShadowCaster"
-			Tags{"LightMode" = "ShadowCaster"}
-            ColorMask [_ColorMaskShadow]
+			Tags {"LightMode" = "ShadowCaster"}
+            ColorMask 0//[_ColorMaskShadow]
 			ZWrite On
 			ZTest LEqual
 			Cull[_Cull]
 
 			HLSLPROGRAM
 			// Required to compile gles 2.0 with standard srp library
-            #pragma multi_compile _ALPHATEST_ON
+            #pragma multi_compile_fragment _ALPHATEST_ON
 			#pragma enable_d3d11_debug_symbols
 			#pragma multi_compile _ _ADAPTIVE_SHADOW_BIAS
             #pragma multi_compile _ _SHADOW_VSM
@@ -94,7 +93,6 @@
 			//#pragma prefer_hlslcc gles
 			//#pragma exclude_renderers d3d11_9x
 			#pragma target 3.0
-
 
 			//--------------------------------------
 			// GPU Instancing

@@ -77,6 +77,7 @@ namespace Insanity
                                     ctx.renderContext.DrawShadows(ref data.shadowDrawSettings);
                                 }
                                 ctx.renderContext.ExecuteCommandBuffer(ctx.cmd);
+                                ctx.cmd.Clear();
                             }
                             );
                         
