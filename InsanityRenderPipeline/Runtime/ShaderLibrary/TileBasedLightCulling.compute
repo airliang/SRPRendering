@@ -8,8 +8,8 @@ StructuredBuffer<LightData> _LightBuffer;
 RWStructuredBuffer<int> _LightVisibilityIndexBuffer; //tile nums * MAX_LIGHT_NUM_PER_TILE
 StructuredBuffer<TileFrustum> _TileFrustums;
 Texture2D _DepthTexture;
-float4x4 _ViewMatrix;
-float4x4 _ProjInverse;
+float4x4 _ViewMatrix;   //platform unrelative matrix
+float4x4 _ProjInverse;  //platform unrelative matrix
 uint2 _ScreenSize;
 uint2 _TileNumber;
 uint _TotalLightNum;

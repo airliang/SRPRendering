@@ -1,6 +1,8 @@
 #ifndef SHADOW_CASTER_ONLY_PASS_INCLUDED
 #define SHADOW_CASTER_ONLY_PASS_INCLUDED
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Version.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 #include "Shadow/Shadows.hlsl"
 
@@ -15,7 +17,9 @@ struct Attributes
 
 struct Varyings
 {
-    float2 uv           : TEXCOORD0;
+    #if defined(_ALPHATEST_ON)
+        float2 uv       : TEXCOORD0;
+    #endif
     float4 positionCS   : SV_POSITION;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
@@ -45,10 +49,11 @@ float4 GetShadowPositionHClip(Attributes input)
 
 Varyings ShadowPassVertex(Attributes input)
 {
-    Varyings output = (Varyings)0;
+    Varyings output;
     UNITY_SETUP_INSTANCE_ID(input);
-    UNITY_TRANSFER_INSTANCE_ID(input, output);
-    output.uv = input.texcoord;
+#if defined(_ALPHATEST_ON)
+    output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+#endif
     output.positionCS = GetShadowPositionHClip(input);//TransformObjectToHClip(input.position.xyz);
     return output;
 }
@@ -56,8 +61,10 @@ Varyings ShadowPassVertex(Attributes input)
 half4 ShadowPassFragment(Varyings input) : SV_TARGET
 {
     UNITY_SETUP_INSTANCE_ID(input);
+#if defined(_ALPHATEST_ON)
     half4 albedoAlpha = SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap));
     Alpha(albedoAlpha.a, _BaseColor, _Cutoff);
+#endif
 #if defined(_SHADOW_VSM) || defined(_SHADOW_EVSM)
     float depth = input.positionCS.z;
 #if UNITY_REVERSED_Z

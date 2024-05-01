@@ -78,14 +78,14 @@
 		{
 			Name "ShadowCaster"
 			Tags {"LightMode" = "ShadowCaster"}
-            ColorMask 0//[_ColorMaskShadow]
+            ColorMask 0
 			ZWrite On
 			ZTest LEqual
 			Cull[_Cull]
 
 			HLSLPROGRAM
 			// Required to compile gles 2.0 with standard srp library
-            #pragma multi_compile_fragment _ALPHATEST_ON
+            #pragma shader_feature_local _ _ALPHATEST_ON
 			#pragma enable_d3d11_debug_symbols
 			#pragma multi_compile _ _ADAPTIVE_SHADOW_BIAS
             #pragma multi_compile _ _SHADOW_VSM

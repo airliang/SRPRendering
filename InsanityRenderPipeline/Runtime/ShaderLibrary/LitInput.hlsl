@@ -39,9 +39,7 @@ CBUFFER_START(UnityPerMaterial)
 float4 _BaseMap_ST;
 half4 _BaseColor;
 half _Cutoff;
-#ifdef _NORMALMAP
 half _NormalScale;
-#endif
 half _Metallic;
 half _Smoothness;
 CBUFFER_END
