@@ -241,7 +241,7 @@ namespace Insanity
             {
                 LightCulling.Instance.SetupAdditionalLights(cullResults.visibleLights, renderingData.cameraData);
                 LightCulling.Instance.SetupTiles((int)GlobalRenderSettings.screenResolution.width, (int)GlobalRenderSettings.screenResolution.height,
-                    m_RendererData.TileSize);
+                    InsanityPipeline.asset.TileSize);
             }
 
 

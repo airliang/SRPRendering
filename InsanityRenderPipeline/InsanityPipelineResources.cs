@@ -42,6 +42,7 @@ namespace Insanity
         public sealed class InternalTextures
         {
             public Texture BRDFLut;
+            public Texture SSAONoiseTexture;
         }
 
         public ShaderResources shaders;

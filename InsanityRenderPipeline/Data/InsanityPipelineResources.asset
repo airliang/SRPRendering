@@ -27,3 +27,4 @@ MonoBehaviour:
     PhysicalBaseSky: {fileID: 2100000, guid: 5a36ff6ec0205ac45a2fde5da7c0ac1d, type: 2}
   internalTextures:
     BRDFLut: {fileID: 2800000, guid: 6331a1448b54e584f9a1a1f745876a58, type: 3}
+    SSAONoiseTexture: {fileID: 2800000, guid: 87a16bd5d6c80e34b9f1e3c1b9494043, type: 3}

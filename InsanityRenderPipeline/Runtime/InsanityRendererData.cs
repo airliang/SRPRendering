@@ -16,14 +16,14 @@ namespace Insanity
             UnityEditor.AssetDatabase.CreateAsset(instance, "Assets/SRPPipeline/data/RendererData.asset");
         }
 
-        [UnityEditor.MenuItem("Assets/Create/Render Pipeline/RendererDataResources", priority = 1)]
-        static void CreateRendererDataResources()
-        {
-            var newAsset = CreateInstance<RendererDataResources>();
-            string pathName = AssetDatabase.GetAssetPath(Selection.activeObject) + "/RendererDataResources.asset";
-            newAsset.name = Path.GetFileName(pathName);
-            UnityEditor.AssetDatabase.CreateAsset(newAsset, pathName);
-        }
+        //[UnityEditor.MenuItem("Assets/Create/Render Pipeline/RendererDataResources", priority = 1)]
+        //static void CreateRendererDataResources()
+        //{
+        //    var newAsset = CreateInstance<RendererDataResources>();
+        //    string pathName = AssetDatabase.GetAssetPath(Selection.activeObject) + "/RendererDataResources.asset";
+        //    newAsset.name = Path.GetFileName(pathName);
+        //    UnityEditor.AssetDatabase.CreateAsset(newAsset, pathName);
+        //}
 #endif
         public enum eRenderingPath
         {
@@ -47,12 +47,6 @@ namespace Insanity
         {
             get { return m_RenderingPath; }
             set { m_RenderingPath = value; }
-        }
-
-        public int TileSize
-        {
-            get { return m_TileSize; }
-            set { m_TileSize = value; }
         }
 
         //public bool AdditionalLightEnable

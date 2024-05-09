@@ -55,6 +55,7 @@ namespace UnityEditor.Insanity
             public static GUIContent supportAdditionalLightsText = EditorGUIUtility.TrTextContent("Support additional lights");
             public static GUIContent additionalLightCullingText = EditorGUIUtility.TrTextContent("Additional Light Culling Function");
             public static string[] additonalLightCullingOptions = { "Default", "Tile Based", "Cluster Based" };
+            public static GUIContent lightTileSizeText = EditorGUIUtility.TrTextContent("Tile Size");
 
             public static GUIContent atmosphereSettingsText = EditorGUIUtility.TrTextContent("Atmosphere");
             public static GUIContent atmosphereResourcesText = EditorGUIUtility.TrTextContent("Atmosphere setting resources", "Atmosphere setting resources");
@@ -115,6 +116,7 @@ namespace UnityEditor.Insanity
         SavedBool m_LightingSettingsFoldout;
         SerializedProperty m_AdditionalLightEnable;
         SerializedProperty m_AdditionalLightCullingFunction;
+        SerializedProperty m_LightTileSizeProp;
 
         SavedBool m_ResourcesSettingsFoldout;
         SerializedProperty m_PipelineResources;
@@ -184,6 +186,7 @@ namespace UnityEditor.Insanity
             m_LightingSettingsFoldout = new SavedBool($"{target.GetType()}.LightingSettingsFoldout", false);
             m_AdditionalLightEnable = serializedObject.FindProperty("m_AdditionalLightEnable");
             m_AdditionalLightCullingFunction = serializedObject.FindProperty("m_AdditionalLightCulling");
+            m_LightTileSizeProp = serializedObject.FindProperty("m_TileSize");
 
             m_AtmosphereSettingsFoldout = new SavedBool($"{target.GetType()}.AtmosphereSettingsFoldout", false);
             m_AtmosphereResources = serializedObject.FindProperty("m_AtmosphereResources");
@@ -306,6 +309,10 @@ namespace UnityEditor.Insanity
                 if (m_AdditionalLightEnable.boolValue)
                 {
                     CoreEditorUtils.DrawPopup(Styles.additionalLightCullingText, m_AdditionalLightCullingFunction, Styles.additonalLightCullingOptions);
+                    if (m_AdditionalLightCullingFunction.intValue == (int)eAdditionalLightCullingFunction.TileBased)
+                    {
+                        m_LightTileSizeProp.intValue = EditorGUILayout.IntField(Styles.lightTileSizeText, m_LightTileSizeProp.intValue);
+                    }
                 }
                 EditorGUI.indentLevel--;
                 EditorGUILayout.Space();

@@ -332,6 +332,7 @@ namespace Insanity
         #region Lighting
         [SerializeField] bool m_AdditionalLightEnable = true;
         [SerializeField] eAdditionalLightCullingFunction m_AdditionalLightCulling = eAdditionalLightCullingFunction.Default;
+        [SerializeField] int m_TileSize = 16;
         public bool AdditionalLightEnable
         {
             get { return m_AdditionalLightEnable; }
@@ -343,6 +344,9 @@ namespace Insanity
             set { m_AdditionalLightCulling = value; }
             get { return m_AdditionalLightCulling; }
         }
+
+        public int TileSize
+        { get { return m_TileSize; } set { m_TileSize = value; } }
         #endregion
 
         #region Atmosphere scattring

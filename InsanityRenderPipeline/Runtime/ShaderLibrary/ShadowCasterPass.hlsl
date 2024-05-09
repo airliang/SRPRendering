@@ -1,8 +1,6 @@
 #ifndef SHADOW_CASTER_ONLY_PASS_INCLUDED
 #define SHADOW_CASTER_ONLY_PASS_INCLUDED
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Version.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 #include "Shadow/Shadows.hlsl"
 
@@ -17,9 +15,9 @@ struct Attributes
 
 struct Varyings
 {
-    #if defined(_ALPHATEST_ON)
-        float2 uv       : TEXCOORD0;
-    #endif
+#if defined(_ALPHATEST_ON)
+    float2 uv       : TEXCOORD0;
+#endif
     float4 positionCS   : SV_POSITION;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
@@ -51,6 +49,7 @@ Varyings ShadowPassVertex(Attributes input)
 {
     Varyings output;
     UNITY_SETUP_INSTANCE_ID(input);
+    UNITY_TRANSFER_INSTANCE_ID(input, output);
 #if defined(_ALPHATEST_ON)
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
 #endif
