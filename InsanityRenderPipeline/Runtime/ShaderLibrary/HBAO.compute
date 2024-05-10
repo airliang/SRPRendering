@@ -11,11 +11,12 @@ Texture2D _DepthTexture;
 float4x4 _ViewMatrix;  //platform unrelative matrix
 float4x4 _ProjInverse; //platform unrelative matrix
 float4 _HBAOParams;   
-float2 _AOMaskSize;
-float2 _ScreenSize;
-#define RADIUS _HBAOParams.x    //radius in texture space
+uint2 _AOMaskSize;
+uint2 _ScreenSize;
+#define RADIUS _HBAOParams.x    //radius in practice
 #define BIAS   _HBAOParams.y
-#define RADIUSINVSQR _HBAOParams.z
+#define RADIUSINVSQR _HBAOParams.z  
+#define RADIUSINPIXEL_FARPLANE _HBAOParams.w
 #define SAMPLE_COUNT 8
 
 static const float2 SPIRAL_KERNEL[SAMPLE_COUNT] =
@@ -73,6 +74,10 @@ float ComputeAO(float3 P, float3 N, float3 S)
 [numthreads(8,8,1)]
 void HBAO (uint3 id : SV_DispatchThreadID)
 {
+    if (id.x >= _AOMaskSize.x || id.y >= _AOMaskSize.y)
+    {
+        return;
+    }
     // TODO: insert actual code here!
     float2 uv = (float2) id.xy / _AOMaskSize;
     float noise = InterleavedGradientNoise((float2) id.xy, 0);
