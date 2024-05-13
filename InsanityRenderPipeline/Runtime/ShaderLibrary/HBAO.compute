@@ -5,7 +5,7 @@
 
 #define PI 3.14159265358979323846
 
-RWTexture2D<float4> _AOMask;
+RWTexture2D<float> _AOMask;
 Texture2D<float4> _NormalTexture;
 Texture2D _DepthTexture;
 float4x4 _ViewMatrix;  //platform unrelative matrix
@@ -16,7 +16,7 @@ uint2 _ScreenSize;
 #define RADIUS _HBAOParams.x    //radius in practice
 #define BIAS   _HBAOParams.y
 #define RADIUSINVSQR _HBAOParams.z  
-#define RADIUSINPIXEL_FARPLANE _HBAOParams.w
+#define RADIUSINPIXEL _HBAOParams.w
 #define SAMPLE_COUNT 8
 
 static const float2 SPIRAL_KERNEL[SAMPLE_COUNT] =
@@ -42,11 +42,11 @@ float GetPlatformDepth(float depth)
 
 float3 UVtoViewPos(float2 uv)
 {
-    float2 ndc = uv * 2.0 - 1.0;
+    float2 clippos = uv * 2.0 - 1.0;
     int2 screenCoord = _ScreenSize * uv;
     float depth = _DepthTexture.Load(int3(screenCoord, 0));
     depth = GetPlatformDepth(depth);
-    float4 posView = mul(_ProjInverse, float4(ndc, depth, 1));
+    float4 posView = mul(_ProjInverse, float4(clippos, depth, 1));
     posView /= posView.w;
     return posView.xyz;
 }
@@ -93,15 +93,20 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     int2 screenCoord = _ScreenSize * uv;
     //float depth = _DepthTexture.Load(int3(screenCoord, 0));
     float3 normal = _NormalTexture.Load(int3(screenCoord, 0));
+    normal = 2.0 * normal - 1.0;
     float3 screenPosVS = UVtoViewPos(uv);
+    float3 normalVS = mul((float3x3) _ProjInverse, normal);
+    normalVS = normalize(normalVS);
 
     float AOIntegrate = 0;
     for (int i = 0; i < SAMPLE_COUNT; ++i)
     {
-        float2 samplePoint = mul(rotation, SPIRAL_KERNEL[i] * RADIUS) + uv;
+        float2 samplePoint = mul(rotation, SPIRAL_KERNEL[i]) * RADIUSINPIXEL + uv;
         float3 samplePointVS = UVtoViewPos(samplePoint);
-
-        float3 honrizonDir = samplePointVS - screenPosVS;
+        
+        AOIntegrate += ComputeAO(screenPosVS, normalVS, samplePointVS);
     }
+
+    _AOMask[id.xy] = saturate(1.0 - AOIntegrate);
 
 }

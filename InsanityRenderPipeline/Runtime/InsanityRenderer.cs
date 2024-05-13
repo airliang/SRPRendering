@@ -20,6 +20,7 @@ namespace Insanity
         int m_mainLightIndex = -1;
         RendererData m_RendererData;
         public InsanityPipeline currentPipeline = null;
+        public SSAOSettings m_ssaoSettings = new SSAOSettings();
 
         internal class FrameRenderSets
         {
@@ -60,6 +61,8 @@ namespace Insanity
             m_debugViewBlitMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.DebugViewBlit);
             m_copyDepthMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.CopyDepth);
             m_tilebasedLightCulling = InsanityPipeline.asset.InsanityPipelineResources.shaders.TileBasedLightCulling;
+            m_ssaoSettings.ssao = InsanityPipeline.asset.InsanityPipelineResources.shaders.HBAO;
+            m_ssaoSettings.blur = InsanityPipeline.asset.InsanityPipelineResources.shaders.Blur;
         }
 
         void CreateFrameRenderSets(RenderGraph renderGraph, ScriptableRenderContext context, RenderingData renderingData)
@@ -108,6 +111,8 @@ namespace Insanity
             };
 
             InsanityPipelineAsset asset = InsanityPipeline.asset;
+            m_ssaoSettings.halfResolution = true;
+            m_ssaoSettings.radius = asset.SSAORadius;
             RenderingEventManager.BeforeExecuteRenderGraph(renderingData.renderGraph, renderingData.cameraData.camera);
             using (renderingData.renderGraph.RecordAndExecute(rgParams))
             {

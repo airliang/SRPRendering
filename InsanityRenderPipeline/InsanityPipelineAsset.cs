@@ -135,6 +135,7 @@ namespace Insanity
         [SerializeField] bool m_UseSRPBatcher = true;
         [SerializeField] MsaaQuality m_MSAASamples = MsaaQuality.Disabled;
         [SerializeField] bool m_SSAOEnable = false;
+        [SerializeField] float m_SSAORadius = 1.0f;
 
         public bool HDREnable
         {
@@ -170,6 +171,12 @@ namespace Insanity
         {
             get { return m_SSAOEnable; }
             set { m_SSAOEnable = value;}
+        }
+
+        public float SSAORadius
+        {
+            get { return m_SSAORadius; }
+            set { m_SSAORadius = value;}
         }
         #endregion
 

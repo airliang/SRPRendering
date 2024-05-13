@@ -23,6 +23,7 @@ namespace Insanity
         public static int _HBAOParams;
         public static int _AOMaskSize;
         public static int _ScreenSize;
+        public static int _ProjInverse;
         public static int _HBAOKernel = -1;
     }
 
@@ -36,6 +37,7 @@ namespace Insanity
             public Vector4 HBAOParams;
             public Vector2 AOMaskSize;
             public Vector2 ScreenSize;
+            public Matrix4x4 projInverse;
             public ComputeShader cs;
             public int kernel;
         }
@@ -49,6 +51,7 @@ namespace Insanity
             HBAOShaderParams._HBAOParams = Shader.PropertyToID("_HBAOParams");
             HBAOShaderParams._AOMaskSize = Shader.PropertyToID("_AOMaskSize");
             HBAOShaderParams._ScreenSize = Shader.PropertyToID("_ScreenSize");
+            HBAOShaderParams._ProjInverse = Shader.PropertyToID("_ProjInverse");
         }
 
         private static TextureHandle CreateAOMaskTexture(RenderGraph graph, int width, int height)
@@ -89,6 +92,10 @@ namespace Insanity
                 float projScale = (float)AOMaskHeight / (Mathf.Tan(renderingData.cameraData.camera.fieldOfView * 0.5f) * 2.0f);
                 passData.HBAOParams.w = projScale * ssaoSettings.radius * 0.5f;
 
+                Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix; 
+                proj = proj * Matrix4x4.Scale(new Vector3(1, 1, -1));
+                passData.projInverse = proj.inverse;
+
                 passData.ao = builder.WriteTexture(CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight));
 
                 //Builder
@@ -100,6 +107,7 @@ namespace Insanity
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._HBAOParams, data.HBAOParams);
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._AOMaskSize, data.AOMaskSize);
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._ScreenSize, data.ScreenSize);
+                    context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ProjInverse, data.projInverse);
 
                     int groupX = Mathf.CeilToInt((float)data.ScreenSize.x / 8);
                     int groupY = Mathf.CeilToInt(data.ScreenSize.y / 8);
