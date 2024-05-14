@@ -1,0 +1,18 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel VerticleBlur
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float> _AOMask;
+
+[numthreads(8,8,1)]
+void VerticleBlur(uint3 id : SV_DispatchThreadID)
+{
+    
+}
+
+[numthreads(8, 8, 1)]
+void HorizontalBlur(uint3 id : SV_DispatchThreadID)
+{
+    
+}

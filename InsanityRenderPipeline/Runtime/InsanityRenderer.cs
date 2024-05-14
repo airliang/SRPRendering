@@ -63,6 +63,7 @@ namespace Insanity
             m_tilebasedLightCulling = InsanityPipeline.asset.InsanityPipelineResources.shaders.TileBasedLightCulling;
             m_ssaoSettings.ssao = InsanityPipeline.asset.InsanityPipelineResources.shaders.HBAO;
             m_ssaoSettings.blur = InsanityPipeline.asset.InsanityPipelineResources.shaders.Blur;
+            RenderPasses.InitializeSSAOShaderParameters();
         }
 
         void CreateFrameRenderSets(RenderGraph renderGraph, ScriptableRenderContext context, RenderingData renderingData)
@@ -111,8 +112,7 @@ namespace Insanity
             };
 
             InsanityPipelineAsset asset = InsanityPipeline.asset;
-            m_ssaoSettings.halfResolution = true;
-            m_ssaoSettings.radius = asset.SSAORadius;
+            
             RenderingEventManager.BeforeExecuteRenderGraph(renderingData.renderGraph, renderingData.cameraData.camera);
             using (renderingData.renderGraph.RecordAndExecute(rgParams))
             {
@@ -173,6 +173,13 @@ namespace Insanity
                                 ShadowManager.Instance.Render_ScreenSpaceShadow(renderingData.renderGraph, renderingData.cameraData.camera, shadowmap, m_FrameRenderSets.cameraDepthResolved);
                             }
                         }
+                    }
+
+                    if (asset.SSAOEnable)
+                    {
+                        m_ssaoSettings.halfResolution = true;
+                        m_ssaoSettings.radius = asset.SSAORadius;
+                        RenderPasses.Render_HBAOPass(renderingData, m_FrameRenderSets.cameraDepthResolved, m_FrameRenderSets.cameraNormal, m_ssaoSettings);
                     }
 
                     ForwardPassData forwardPassData = RenderPasses.Render_OpaqueFowardPass(renderingData, m_FrameRenderSets.cameraDepth, m_FrameRenderSets.cameraColor, shadowmap);

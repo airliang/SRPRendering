@@ -43,7 +43,7 @@ namespace Insanity
         }
         static ProfilingSampler s_HBAOPassProfiler = new ProfilingSampler("HBAO Pass Profiler");
 
-        public static void InitializeShaderParameters()
+        public static void InitializeSSAOShaderParameters()
         {
             HBAOShaderParams._DepthTexture = Shader.PropertyToID("_DepthTexture");
             HBAOShaderParams._NormalTexture = Shader.PropertyToID("_NormalTexture");
@@ -70,7 +70,7 @@ namespace Insanity
             return graph.CreateTexture(textureRTDesc);
         }
 
-        void Render_HBAOPass(RenderingData renderingData, TextureHandle depth, TextureHandle normal, SSAOSettings ssaoSettings)
+        public static void Render_HBAOPass(RenderingData renderingData, TextureHandle depth, TextureHandle normal, SSAOSettings ssaoSettings)
         {
             if (HBAOShaderParams._HBAOKernel == -1)
             {
