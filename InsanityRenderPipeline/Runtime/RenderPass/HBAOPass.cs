@@ -95,6 +95,7 @@ namespace Insanity
                 passData.ScreenSize.z = 1.0f / passData.ScreenSize.x;
                 passData.ScreenSize.w = 1.0f / passData.ScreenSize.y;
                 float projScale = (float)AOMaskHeight / (Mathf.Tan(renderingData.cameraData.camera.fieldOfView * Mathf.Deg2Rad * 0.5f) * 2.0f);
+                passData.HBAOParams.z = -1.0f / ssaoSettings.radius * ssaoSettings.radius;
                 passData.HBAOParams.w = projScale * ssaoSettings.radius * 0.5f;
 
                 Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix; 

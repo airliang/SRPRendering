@@ -345,6 +345,8 @@ namespace Insanity
                 passData.depthTexture = builder.ReadTexture(depthTexture);
                 passData.tileNumbers = m_CurrentTileNumbers;
                 passData.tileSize = m_tileSize;
+                //camera.projectMatrix transform the view space position to the NDC position and flip the z direction
+                //NDC position means all the values are between [-1, 1]. Notice that the z is also transform to [-1, 1]
                 Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix * Matrix4x4.Scale(new Vector3(1, 1, -1)); //GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false);
                 passData.projInverse = proj.inverse;//renderingData.cameraData.camera.projectionMatrix.inverse;
                 passData.screenSize = new Vector2(Screen.width, Screen.height);

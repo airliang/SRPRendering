@@ -16,7 +16,7 @@ uint2 _AOMaskSize;
 float4 _ScreenSize;    //xy width and height, zw 1/width and 1/height
 #define RADIUS _HBAOParams.x    //radius in practice
 #define BIAS   _HBAOParams.y
-#define RADIUSINVSQR _HBAOParams.z  
+#define NEG_RADIUSINVSQR _HBAOParams.z  
 #define RADIUSINPIXEL _HBAOParams.w
 #define SAMPLE_COUNT 8
 
@@ -50,7 +50,7 @@ float3 UVtoViewPos(float2 uv)
 
 float DistanceFalloff(float distanceSqr)
 {
-    return distanceSqr * RADIUSINVSQR + 1.0;
+    return distanceSqr * NEG_RADIUSINVSQR + 1.0;
 }
 
 //----------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     normalVS = normalize(normalVS);
 
     float AOIntegrate = 0;
-    float radiusPixel = RADIUSINPIXEL * screenPosVS.z;
+    float radiusPixel = RADIUSINPIXEL / screenPosVS.z;
     for (int i = 0; i < SAMPLE_COUNT; ++i)
     {
         float2 samplePoint = mul(rotation, SPIRAL_KERNEL[i]) * radiusPixel * _ScreenSize.zw + uv;
