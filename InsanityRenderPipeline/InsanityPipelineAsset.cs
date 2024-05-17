@@ -136,6 +136,7 @@ namespace Insanity
         [SerializeField] MsaaQuality m_MSAASamples = MsaaQuality.Disabled;
         [SerializeField] bool m_SSAOEnable = false;
         [SerializeField] float m_SSAORadius = 1.0f;
+        [SerializeField] float m_HBAOHorizonBias = 0.0f;
 
         public bool HDREnable
         {
@@ -177,6 +178,12 @@ namespace Insanity
         {
             get { return m_SSAORadius; }
             set { m_SSAORadius = value;}
+        }
+
+        public float HBAOHorizonBias
+        {
+            get { return m_HBAOHorizonBias; }
+            set { m_HBAOHorizonBias = value; }
         }
         #endregion
 

@@ -23,6 +23,7 @@ namespace UnityEditor.Insanity
             public static GUIContent msaaText = EditorGUIUtility.TrTextContent("MSAA", "Controls the global anti aliasing settings");
             public static GUIContent ssaoText = EditorGUIUtility.TrTextContent("SSAO", "Enable Screen Space Ambient Occlusion.");
             public static GUIContent ssaoRadiusText = EditorGUIUtility.TrTextContent("SSAO Radius", "SSAO Radius.");
+            public static GUIContent hbaoHorizonBiasText = EditorGUIUtility.TrTextContent("Horizontal Bias(in degree)");
             public static string[] msaaOptions = { "Disabled", "2x", "4x", "8x" };
 
             public static GUIContent shadowSettingsText = EditorGUIUtility.TrTextContent("Shadows");
@@ -87,6 +88,7 @@ namespace UnityEditor.Insanity
         SerializedProperty m_MSAAProp;
         SerializedProperty m_SSAOProp;
         SerializedProperty m_SSAORadiusProp;
+        SerializedProperty m_HBAOHorizonBiasProp;
 
         SavedBool m_ShadowSettingsFoldout;
 
@@ -159,6 +161,7 @@ namespace UnityEditor.Insanity
             m_MSAAProp = serializedObject.FindProperty("m_MSAASamples");
             m_SSAOProp = serializedObject.FindProperty("m_SSAOEnable");
             m_SSAORadiusProp = serializedObject.FindProperty("m_SSAORadius");
+            m_HBAOHorizonBiasProp = serializedObject.FindProperty("m_HBAOHorizonBias");
 
             m_ShadowSettingsFoldout = new SavedBool($"{target.GetType()}.ShadowSettingsFoldout", false);
 
@@ -227,6 +230,7 @@ namespace UnityEditor.Insanity
                 if (m_SSAOProp.boolValue)
                 {
                     m_SSAORadiusProp.floatValue = EditorGUILayout.Slider(Styles.ssaoRadiusText, m_SSAORadiusProp.floatValue, 0, 10.0f);
+                    m_HBAOHorizonBiasProp.floatValue = EditorGUILayout.Slider(Styles.hbaoHorizonBiasText, m_HBAOHorizonBiasProp.floatValue, 0, 90.0f);
                 }
             }
             EditorGUILayout.EndFoldoutHeaderGroup();

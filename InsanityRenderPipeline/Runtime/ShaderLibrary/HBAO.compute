@@ -48,9 +48,16 @@ float3 UVtoViewPos(float2 uv)
     return posView.xyz;
 }
 
+float HorizontalFalloff(float3 normal, float3 horizonVec)
+{
+    float NdotV = dot(normal, horizonVec);
+    return saturate(NdotV - BIAS);
+
+}
+
 float DistanceFalloff(float distanceSqr)
 {
-    return distanceSqr * NEG_RADIUSINVSQR + 1.0;
+    return saturate(distanceSqr * NEG_RADIUSINVSQR + 1.0);
 }
 
 //----------------------------------------------------------------------------------
@@ -62,10 +69,10 @@ float ComputeAO(float3 P, float3 N, float3 S)
 {
     float3 V = S - P;
     float VdotV = dot(V, V);
-    float NdotV = dot(N, V) * 1.0 / sqrt(VdotV);
+    //float NdotV = dot(N, V) * 1.0 / sqrt(VdotV);
 
     // Use saturate(x) instead of max(x,0.f) because that is faster on Kepler
-    return clamp(NdotV - BIAS, 0, 1) * clamp(DistanceFalloff(VdotV), 0, 1);
+    return HorizontalFalloff(N, normalize(V)) * DistanceFalloff(VdotV);
 }
 
 [numthreads(8,8,1)]
