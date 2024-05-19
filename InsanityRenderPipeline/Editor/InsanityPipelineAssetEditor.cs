@@ -21,9 +21,7 @@ namespace UnityEditor.Insanity
             public static GUIContent screenPercentageText = EditorGUIUtility.TrTextContent("Screen Resolution Percentage", "Controls the global screen resolution settings.");
             public static GUIContent srpBatcherText = EditorGUIUtility.TrTextContent("SRP Batcher", "Controls the global SRP Batcher settings.");
             public static GUIContent msaaText = EditorGUIUtility.TrTextContent("MSAA", "Controls the global anti aliasing settings");
-            public static GUIContent ssaoText = EditorGUIUtility.TrTextContent("SSAO", "Enable Screen Space Ambient Occlusion.");
-            public static GUIContent ssaoRadiusText = EditorGUIUtility.TrTextContent("SSAO Radius", "SSAO Radius.");
-            public static GUIContent hbaoHorizonBiasText = EditorGUIUtility.TrTextContent("Horizontal Bias(in degree)");
+            
             public static string[] msaaOptions = { "Disabled", "2x", "4x", "8x" };
 
             public static GUIContent shadowSettingsText = EditorGUIUtility.TrTextContent("Shadows");
@@ -75,9 +73,14 @@ namespace UnityEditor.Insanity
             public static GUIContent renderDataText = EditorGUIUtility.TrTextContent("Renderer Data",
                     "Renderer Data defines which render path should be used in the render pipeline.");
 
+            public static GUIContent ssaoSettingsText = EditorGUIUtility.TrTextContent("SSAO", "SSAO");
+            public static GUIContent ssaoText = EditorGUIUtility.TrTextContent("SSAO Enable", "Enable Screen Space Ambient Occlusion.");
+            public static GUIContent ssaoRadiusText = EditorGUIUtility.TrTextContent("SSAO Radius", "SSAO Radius.");
+            public static GUIContent hbaoHorizonBiasText = EditorGUIUtility.TrTextContent("Horizontal Bias");
+            public static GUIContent ssaoHalfResolutionText = EditorGUIUtility.TrTextContent("Half Resolution");
 
             public static GUIContent debugViewSettingsText = EditorGUIUtility.TrTextContent("DebugView", "DebugView to display the rendering results in the pipeline");
-            public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "TriangleOverdraw" };
+            public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "SSAO", "TriangleOverdraw" };
 
         }
         SavedBool m_RenderSettingsFoldout;
@@ -86,9 +89,7 @@ namespace UnityEditor.Insanity
         SerializedProperty m_ScreenResolutionProp;
         SerializedProperty m_SRPBatcherProp;
         SerializedProperty m_MSAAProp;
-        SerializedProperty m_SSAOProp;
-        SerializedProperty m_SSAORadiusProp;
-        SerializedProperty m_HBAOHorizonBiasProp;
+        
 
         SavedBool m_ShadowSettingsFoldout;
 
@@ -135,6 +136,13 @@ namespace UnityEditor.Insanity
         SerializedProperty m_SunLightColor;
         //SerializedProperty m_MultipleScatteringOrder;
 
+        
+        SavedBool m_SSAOSettingFoldout;
+        SerializedProperty m_SSAOProp;
+        SerializedProperty m_SSAORadiusProp;
+        SerializedProperty m_HBAOHorizonBiasProp;
+        SerializedProperty m_SSAOHalfResolutionProp;
+
         SavedBool m_DebugViewSettingFoldout;
         SerializedProperty m_DebugViewSettingsMode;
              
@@ -147,6 +155,7 @@ namespace UnityEditor.Insanity
             DrawShadowSettings();
             DrawLightingSettings();
             DrawAtmosphereScatteringSettings();
+            DrawSSAOSetting();
             DrawDebugViewSetting();
             serializedObject.ApplyModifiedProperties();
         }
@@ -159,9 +168,7 @@ namespace UnityEditor.Insanity
             m_ScreenResolutionProp = serializedObject.FindProperty("m_ResolutionRate");
             m_SRPBatcherProp = serializedObject.FindProperty("m_UseSRPBatcher");
             m_MSAAProp = serializedObject.FindProperty("m_MSAASamples");
-            m_SSAOProp = serializedObject.FindProperty("m_SSAOEnable");
-            m_SSAORadiusProp = serializedObject.FindProperty("m_SSAORadius");
-            m_HBAOHorizonBiasProp = serializedObject.FindProperty("m_HBAOHorizonBias");
+            
 
             m_ShadowSettingsFoldout = new SavedBool($"{target.GetType()}.ShadowSettingsFoldout", false);
 
@@ -205,6 +212,12 @@ namespace UnityEditor.Insanity
 
             m_ResourcesSettingsFoldout = new SavedBool($"{target.GetType()}.ResourcesSettingsFoldout", false);
 
+            m_SSAOSettingFoldout = new SavedBool($"{target.GetType()}.SSAOSettingFoldout", false);
+            m_SSAOProp = serializedObject.FindProperty("m_SSAOEnable");
+            m_SSAORadiusProp = serializedObject.FindProperty("m_SSAORadius");
+            m_HBAOHorizonBiasProp = serializedObject.FindProperty("m_HBAOHorizonBias");
+            m_SSAOHalfResolutionProp = serializedObject.FindProperty("m_AOHalfResolution");
+
             m_DebugViewSettingFoldout = new SavedBool($"{target.GetType()}.DebugViewSettingFoldout", false);
             m_DebugViewSettingsMode = serializedObject.FindProperty("m_DebugViewMode");
         }
@@ -226,12 +239,7 @@ namespace UnityEditor.Insanity
 
                 m_SRPBatcherProp.boolValue = EditorGUILayout.Toggle(Styles.srpBatcherText, m_SRPBatcherProp.boolValue);
                 EditorGUILayout.PropertyField(m_MSAAProp, Styles.msaaText);
-                m_SSAOProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoText, m_SSAOProp.boolValue);
-                if (m_SSAOProp.boolValue)
-                {
-                    m_SSAORadiusProp.floatValue = EditorGUILayout.Slider(Styles.ssaoRadiusText, m_SSAORadiusProp.floatValue, 0, 10.0f);
-                    m_HBAOHorizonBiasProp.floatValue = EditorGUILayout.Slider(Styles.hbaoHorizonBiasText, m_HBAOHorizonBiasProp.floatValue, 0, 90.0f);
-                }
+                
             }
             EditorGUILayout.EndFoldoutHeaderGroup();
         }
@@ -351,6 +359,26 @@ namespace UnityEditor.Insanity
                     //m_MultipleScatteringOrder.intValue = EditorGUILayout.IntSlider(Styles.multipleScatteringOrderText, m_MultipleScatteringOrder.intValue, 0, 50);
                 }
                 EditorGUI.indentLevel--;
+                EditorGUILayout.Space();
+                EditorGUILayout.Space();
+            }
+            EditorGUILayout.EndFoldoutHeaderGroup();
+        }
+
+        void DrawSSAOSetting()
+        {
+            m_SSAOSettingFoldout.value = EditorGUILayout.BeginFoldoutHeaderGroup(m_SSAOSettingFoldout.value, Styles.ssaoSettingsText);
+            if (m_SSAOSettingFoldout.value)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUI.indentLevel--;
+                m_SSAOProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoText, m_SSAOProp.boolValue);
+                if (m_SSAOProp.boolValue)
+                {
+                    m_SSAORadiusProp.floatValue = EditorGUILayout.Slider(Styles.ssaoRadiusText, m_SSAORadiusProp.floatValue, 0, 10.0f);
+                    m_HBAOHorizonBiasProp.floatValue = EditorGUILayout.Slider(Styles.hbaoHorizonBiasText, m_HBAOHorizonBiasProp.floatValue, 0, 1.0f);
+                    m_SSAOHalfResolutionProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoHalfResolutionText, m_SSAOHalfResolutionProp.boolValue);
+                }
                 EditorGUILayout.Space();
                 EditorGUILayout.Space();
             }

@@ -30,6 +30,8 @@ Shader "Insanity/DebugViewBlit"
             SAMPLER(sampler_DepthTexture);
             TEXTURE2D(_NormalTexture);
             SAMPLER(sampler_NormalTexture);
+            TEXTURE2D(_AOMask);
+            SAMPLER(sampler_AOMask);
             StructuredBuffer<int> _LightVisibilityIndexBuffer;
 
             static const uint nbColours = 10;
@@ -89,6 +91,11 @@ Shader "Insanity/DebugViewBlit"
                     float4 viewPos = mul(_ProjInverse, clipPos);
                     viewPos /= viewPos.w;
                     col = half4(viewPos.z, viewPos.z, viewPos.z, 1);
+                }
+                else if (_DebugViewMode == DebugSSAO)
+                {
+                    half ao = SAMPLE_TEXTURE2D(_AOMask, s_point_clamp_sampler, input.uv).r;
+                    col = half4(ao, ao, ao, 1);
                 }
                 else if (_DebugViewMode == DebugNormal)
                 {

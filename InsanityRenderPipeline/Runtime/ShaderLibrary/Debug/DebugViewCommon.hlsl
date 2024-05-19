@@ -7,7 +7,8 @@
 #define DebugDepth                  2
 #define DebugLinearDepth 3
 #define DebugNormal                 4
-#define DebugOverdraw               5
+#define DebugSSAO 5
+#define DebugOverdraw               6
 
 CBUFFER_START(DebugViewVariables)
 int _DebugViewMode;

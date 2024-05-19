@@ -64,6 +64,7 @@ namespace Insanity
         Depth,
         LinearDepth,
         Normal,
+        SSAO,
         TriangleOverdraw
     }
 
@@ -134,9 +135,7 @@ namespace Insanity
         [SerializeField] float m_ResolutionRate = 1.0f;
         [SerializeField] bool m_UseSRPBatcher = true;
         [SerializeField] MsaaQuality m_MSAASamples = MsaaQuality.Disabled;
-        [SerializeField] bool m_SSAOEnable = false;
-        [SerializeField] float m_SSAORadius = 1.0f;
-        [SerializeField] float m_HBAOHorizonBias = 0.0f;
+        
 
         public bool HDREnable
         {
@@ -168,23 +167,7 @@ namespace Insanity
             set { m_MSAASamples = value; }
         }
 
-        public bool SSAOEnable
-        {
-            get { return m_SSAOEnable; }
-            set { m_SSAOEnable = value;}
-        }
-
-        public float SSAORadius
-        {
-            get { return m_SSAORadius; }
-            set { m_SSAORadius = value;}
-        }
-
-        public float HBAOHorizonBias
-        {
-            get { return m_HBAOHorizonBias; }
-            set { m_HBAOHorizonBias = value; }
-        }
+        
         #endregion
 
         #region Shadowmap
@@ -399,6 +382,36 @@ namespace Insanity
             }
         }
 
+        #endregion
+
+        #region SSAO
+        [SerializeField] bool m_SSAOEnable = false;
+        [SerializeField] float m_SSAORadius = 1.0f;
+        [SerializeField] float m_HBAOHorizonBias = 0.0f;
+        [SerializeField] bool m_AOHalfResolution = true;
+        public bool SSAOEnable
+        {
+            get { return m_SSAOEnable; }
+            set { m_SSAOEnable = value; }
+        }
+
+        public float SSAORadius
+        {
+            get { return m_SSAORadius; }
+            set { m_SSAORadius = value; }
+        }
+
+        public float HBAOHorizonBias
+        {
+            get { return m_HBAOHorizonBias; }
+            set { m_HBAOHorizonBias = value; }
+        }
+
+        public bool AOHalfResolution
+        {
+            get { return m_AOHalfResolution; }
+            set { m_AOHalfResolution = value;}
+        }
         #endregion
 
         #region Debug View

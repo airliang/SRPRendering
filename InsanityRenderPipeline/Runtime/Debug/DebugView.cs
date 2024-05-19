@@ -16,6 +16,7 @@ namespace Insanity
             Depth,
             LinearDepth,
             WorldSpaceNormal,
+            SSAO,
             TriangleOverDraw,
         }
 
@@ -73,6 +74,7 @@ namespace Insanity
             //public TextureHandle m_TileVisibleLightCount;
             public TextureHandle m_Normal;
             public TextureHandle m_Overdraw;
+            public TextureHandle m_SSAO;
             public ComputeBuffer m_LightVisibilityIndexBuffer;
         }
 
@@ -84,6 +86,7 @@ namespace Insanity
             public ComputeBuffer m_LightVisibilityIndexBuffer;
             public TextureHandle m_Normal;
             public TextureHandle m_Overdraw;
+            public TextureHandle m_SSAO;
             public bool flip;
             public Material m_finalBlitMaterial;
             public int m_DebugViewMode;
@@ -108,6 +111,10 @@ namespace Insanity
                     passData.m_Normal = builder.ReadTexture(debugViewTextures.m_Normal);
                     //passData.m_Overdraw = builder.ReadTexture(debugViewTextures.m_Overdraw);
                 }
+                else if (debugViewType == DebugViewType.SSAO)
+                {
+                    passData.m_SSAO = builder.ReadTexture(debugViewTextures.m_SSAO);
+                }
                 //else if (debugViewType == DebugViewType.TileBasedCullingResult)
                 {
                     passData.m_LightVisibilityIndexBuffer = debugViewTextures.m_LightVisibilityIndexBuffer;
@@ -117,6 +124,7 @@ namespace Insanity
                 passData.m_finalBlitMaterial = finalBlitMaterial;
                 passData.m_finalBlitMaterial.SetInt("_FlipY", passData.flip ? 1 : 0);
                 passData.m_DebugViewMode = debugViewMode;
+                
 
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc((DebugViewBlitPassData data, RenderGraphContext context) =>
@@ -125,6 +133,7 @@ namespace Insanity
                     context.cmd.SetGlobalTexture("_DepthTexture", data.m_Depth);
                     context.cmd.SetGlobalBuffer("_LightVisibilityIndexBuffer", data.m_LightVisibilityIndexBuffer);
                     data.m_finalBlitMaterial.SetTexture("_NormalTexture", data.m_Normal);
+                    data.m_finalBlitMaterial.SetTexture("_AOMask", data.m_SSAO);
                     context.cmd.SetRenderTarget(data.m_Dest);
                     
                     //context.cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);

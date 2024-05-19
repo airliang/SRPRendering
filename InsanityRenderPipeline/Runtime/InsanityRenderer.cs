@@ -40,6 +40,8 @@ namespace Insanity
             internal TextureHandle additionalShadowsTexture;
             internal TextureHandle screenSpaceShadowTexture;
 
+            internal TextureHandle ssaoMask;
+
             // gbuffer targets
             internal TextureHandle[] gbuffer;
 
@@ -179,7 +181,9 @@ namespace Insanity
                     {
                         m_ssaoSettings.halfResolution = true;
                         m_ssaoSettings.radius = asset.SSAORadius;
-                        RenderPasses.Render_HBAOPass(renderingData, m_FrameRenderSets.cameraDepthResolved, m_FrameRenderSets.cameraNormal, m_ssaoSettings);
+                        m_ssaoSettings.horizonBias = asset.HBAOHorizonBias;
+                        m_ssaoSettings.halfResolution = asset.AOHalfResolution;
+                        RenderPasses.Render_HBAOPass(renderingData, m_FrameRenderSets.cameraDepthResolved, m_FrameRenderSets.cameraNormal, out m_FrameRenderSets.ssaoMask, m_ssaoSettings);
                     }
 
                     ForwardPassData forwardPassData = RenderPasses.Render_OpaqueFowardPass(renderingData, m_FrameRenderSets.cameraDepth, m_FrameRenderSets.cameraColor, shadowmap);
@@ -205,6 +209,7 @@ namespace Insanity
                         textures.m_Depth = m_FrameRenderSets.cameraDepthResolved;
                         textures.m_LightVisibilityIndexBuffer = lightCullingData != null ? lightCullingData.lightVisibilityIndexBuffer : LightCulling.Instance.LightsVisibilityIndexBuffer;
                         textures.m_Normal = m_FrameRenderSets.cameraNormal;
+                        textures.m_SSAO = m_FrameRenderSets.ssaoMask;
                         DebugView.ShowDebugPass(renderingData, ref textures, m_FrameRenderSets.backBufferColor, m_debugViewBlitMaterial, (int)DebugView.debugViewType);
                     }
                     else

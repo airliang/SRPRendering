@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -10,6 +11,7 @@ namespace Insanity
     public class SSAOSettings
     {
         public float radius;
+        public float horizonBias = 0;
         public bool halfResolution = true;
         public ComputeShader ssao;
         public ComputeShader blur;
@@ -25,6 +27,7 @@ namespace Insanity
         public static int _ScreenSize;
         public static int _ProjInverse;
         public static int _ViewMatrix;
+        public static int _HalfResolution;
         public static int _HBAOKernel = -1;
     }
 
@@ -40,6 +43,7 @@ namespace Insanity
             public Vector4 ScreenSize;
             public Matrix4x4 projInverse;
             public Matrix4x4 view;
+            public float HalfResolution;
             public ComputeShader cs;
             public int kernel;
         }
@@ -55,6 +59,7 @@ namespace Insanity
             HBAOShaderParams._ScreenSize = Shader.PropertyToID("_ScreenSize");
             HBAOShaderParams._ProjInverse = Shader.PropertyToID("_ProjInverse");
             HBAOShaderParams._ViewMatrix = Shader.PropertyToID("_ViewMatrix");
+            HBAOShaderParams._HalfResolution = Shader.PropertyToID("_HalfResolution");
         }
 
         private static TextureHandle CreateAOMaskTexture(RenderGraph graph, int width, int height)
@@ -65,15 +70,15 @@ namespace Insanity
             textureRTDesc.depthBufferBits = 0;
             textureRTDesc.msaaSamples = MSAASamples.None;
             textureRTDesc.enableRandomWrite = true;
-            textureRTDesc.clearBuffer = true;
-            textureRTDesc.clearColor = Color.black;
+            //textureRTDesc.clearBuffer = true;
+            //textureRTDesc.clearColor = Color.black;
             textureRTDesc.name = "SSAOMask";
             textureRTDesc.filterMode = FilterMode.Point;
 
             return graph.CreateTexture(textureRTDesc);
         }
 
-        public static void Render_HBAOPass(RenderingData renderingData, TextureHandle depth, TextureHandle normal, SSAOSettings ssaoSettings)
+        public static void Render_HBAOPass(RenderingData renderingData, TextureHandle depth, TextureHandle normal, out TextureHandle ssaoMask, SSAOSettings ssaoSettings)
         {
             if (HBAOShaderParams._HBAOKernel == -1)
             {
@@ -95,14 +100,34 @@ namespace Insanity
                 passData.ScreenSize.z = 1.0f / passData.ScreenSize.x;
                 passData.ScreenSize.w = 1.0f / passData.ScreenSize.y;
                 float projScale = (float)AOMaskHeight / (Mathf.Tan(renderingData.cameraData.camera.fieldOfView * Mathf.Deg2Rad * 0.5f) * 2.0f);
+                passData.HBAOParams.y = ssaoSettings.horizonBias;
                 passData.HBAOParams.z = -1.0f / ssaoSettings.radius * ssaoSettings.radius;
                 passData.HBAOParams.w = projScale * ssaoSettings.radius * 0.5f;
+                passData.HalfResolution = ssaoSettings.halfResolution ? 1.0f : 0;
 
                 Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix; 
                 proj = proj * Matrix4x4.Scale(new Vector3(1, 1, -1));
                 passData.projInverse = proj.inverse;
                 passData.view = renderingData.cameraData.camera.transform.worldToLocalMatrix;
-                passData.ao = builder.WriteTexture(CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight));
+                ssaoMask = CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight);
+                passData.ao = builder.WriteTexture(ssaoMask);
+
+                //for test
+                Camera camera = renderingData.cameraData.camera;
+                Vector3 viewPos = camera.ScreenToWorldPoint(Vector3.zero);
+                Ray ray = camera.ScreenPointToRay(Vector3.zero);
+                RaycastHit hitInfo;
+                Physics.Raycast(ray, out hitInfo);
+                viewPos = passData.view.MultiplyPoint(hitInfo.point);
+                Vector3 normalView = passData.view.MultiplyVector(hitInfo.normal).normalized;
+
+                Ray ray11 = camera.ScreenPointToRay(new Vector3(1, 1, 0));
+                Physics.Raycast(ray11, out hitInfo);
+                Vector3 viewPos11 = passData.view.MultiplyPoint(hitInfo.point);
+
+                Vector3 horizonDir = viewPos11 - viewPos;
+                float hFalloff = Vector3.Dot(horizonDir.normalized, normalView);
+                //end test
 
                 //Builder
                 builder.SetRenderFunc((HBAOPassData data, RenderGraphContext context) =>
@@ -115,9 +140,10 @@ namespace Insanity
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._ScreenSize, data.ScreenSize);
                     context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ProjInverse, data.projInverse);
                     context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ViewMatrix, data.view);
+                    context.cmd.SetComputeFloatParam(data.cs, HBAOShaderParams._HalfResolution, data.HalfResolution);
 
-                    int groupX = Mathf.CeilToInt((float)data.ScreenSize.x / 8);
-                    int groupY = Mathf.CeilToInt(data.ScreenSize.y / 8);
+                    int groupX = Mathf.CeilToInt((float)data.AOMaskSize.x / 8);
+                    int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);
                     context.cmd.DispatchCompute(data.cs, data.kernel, groupX, groupY, 1);
                 });
             }
