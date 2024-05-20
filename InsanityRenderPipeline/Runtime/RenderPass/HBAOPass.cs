@@ -28,6 +28,7 @@ namespace Insanity
         public static int _ProjInverse;
         public static int _ViewMatrix;
         public static int _HalfResolution;
+        public static int _ProjectionParams;
         public static int _HBAOKernel = -1;
     }
 
@@ -44,6 +45,7 @@ namespace Insanity
             public Matrix4x4 projInverse;
             public Matrix4x4 view;
             public float HalfResolution;
+            public Vector4 projectionParams;
             public ComputeShader cs;
             public int kernel;
         }
@@ -60,6 +62,7 @@ namespace Insanity
             HBAOShaderParams._ProjInverse = Shader.PropertyToID("_ProjInverse");
             HBAOShaderParams._ViewMatrix = Shader.PropertyToID("_ViewMatrix");
             HBAOShaderParams._HalfResolution = Shader.PropertyToID("_HalfResolution");
+            HBAOShaderParams._ProjectionParams = Shader.PropertyToID("_ProjectionParams");
         }
 
         private static TextureHandle CreateAOMaskTexture(RenderGraph graph, int width, int height)
@@ -99,7 +102,7 @@ namespace Insanity
                 passData.ScreenSize.y = GlobalRenderSettings.screenResolution.height;
                 passData.ScreenSize.z = 1.0f / passData.ScreenSize.x;
                 passData.ScreenSize.w = 1.0f / passData.ScreenSize.y;
-                float projScale = (float)AOMaskHeight / (Mathf.Tan(renderingData.cameraData.camera.fieldOfView * Mathf.Deg2Rad * 0.5f) * 2.0f);
+                float projScale = GlobalRenderSettings.screenResolution.height / (Mathf.Tan(renderingData.cameraData.camera.fieldOfView * Mathf.Deg2Rad * 0.5f) * 2.0f);
                 passData.HBAOParams.y = ssaoSettings.horizonBias;
                 passData.HBAOParams.z = -1.0f / ssaoSettings.radius * ssaoSettings.radius;
                 passData.HBAOParams.w = projScale * ssaoSettings.radius * 0.5f;
@@ -111,6 +114,7 @@ namespace Insanity
                 passData.view = renderingData.cameraData.camera.transform.worldToLocalMatrix;
                 ssaoMask = CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight);
                 passData.ao = builder.WriteTexture(ssaoMask);
+                passData.projectionParams = new Vector4(proj.m00, proj.m11, 1.0f / proj.m00, 1.0f / proj.m11);
 
                 //for test
                 Camera camera = renderingData.cameraData.camera;
@@ -141,6 +145,7 @@ namespace Insanity
                     context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ProjInverse, data.projInverse);
                     context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ViewMatrix, data.view);
                     context.cmd.SetComputeFloatParam(data.cs, HBAOShaderParams._HalfResolution, data.HalfResolution);
+                    context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._ProjectionParams, data.projectionParams);
 
                     int groupX = Mathf.CeilToInt((float)data.AOMaskSize.x / 8);
                     int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);

@@ -15,6 +15,7 @@ float4 _HBAOParams;
 uint2 _AOMaskSize;
 float4 _ScreenSize;    //xy width and height, zw 1/width and 1/height
 float _HalfResolution;
+float2 _ProjectionParams;
 #define RADIUS _HBAOParams.x    //radius in practice
 #define BIAS   _HBAOParams.y
 #define NEG_RADIUSINVSQR _HBAOParams.z  
@@ -74,8 +75,8 @@ float ComputeAO(float3 P, float3 N, float3 S)
 {
     float3 V = S - P;
     float VdotV = dot(V, V);
-    if (VdotV < 0.01)
-        return 0;
+    //if (VdotV < 0.01)
+    //    return 0;
     //float NdotV = dot(N, V) * 1.0 / sqrt(VdotV);
 
     // Use saturate(x) instead of max(x,0.f) because that is faster on Kepler
