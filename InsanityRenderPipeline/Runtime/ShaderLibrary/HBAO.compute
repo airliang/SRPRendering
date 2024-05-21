@@ -12,7 +12,7 @@ float4x4 _ViewMatrix;  //platform unrelative matrix
 float4x4 _ProjInverse; //platform unrelative matrix
 float4x4 _ViewInverse; //use for test
 float4 _HBAOParams;   
-uint2 _AOMaskSize;
+float4 _AOMaskSize;
 float4 _ScreenSize;    //xy width and height, zw 1/width and 1/height
 float _HalfResolution;
 float2 _ProjectionParams;
@@ -86,7 +86,7 @@ float ComputeAO(float3 P, float3 N, float3 S)
 [numthreads(8,8,1)]
 void HBAO (uint3 id : SV_DispatchThreadID)
 {
-    if (id.x >= _AOMaskSize.x || id.y >= _AOMaskSize.y)
+    if (id.x >= (uint) _AOMaskSize.x || id.y >= (uint) _AOMaskSize.y)
     {
         return;
     }

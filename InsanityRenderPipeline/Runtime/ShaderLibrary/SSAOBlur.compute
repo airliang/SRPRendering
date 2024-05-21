@@ -3,16 +3,66 @@
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
-RWTexture2D<float> _AOMask;
+Texture2D<float> _AOMask;
+RWTexture2D<float> _AOOutput;
+float4 _AOMaskSize;
+SamplerState s_point_clamp_sampler;
+
+// https://software.intel.com/content/www/us/en/develop/blogs/an-investigation-of-fast-real-time-gpu-based-image-blur-algorithms.html
+half GaussianBlur(half2 uv, half2 pixelOffset)
+{
+    half colOut = 0;
+
+    // Kernel width 7 x 7
+    const int stepCount = 2;
+
+    const half gWeights[stepCount] =
+    {
+        0.44908,
+        0.05092
+    };
+    const half gOffsets[stepCount] =
+    {
+        0.53805,
+        2.06278
+    };
+
+    for (int i = 0; i < stepCount; i++)
+    {
+        half2 texCoordOffset = gOffsets[i] * pixelOffset;
+        half4 p1 = _AOMask.SampleLevel(s_point_clamp_sampler, uv + texCoordOffset, 0);
+        half4 p2 = _AOMask.SampleLevel(s_point_clamp_sampler, uv - texCoordOffset, 0);
+        half col = p1.r + p2.r;
+        colOut += gWeights[i] * col;
+    }
+
+    return colOut;
+}
 
 [numthreads(8,8,1)]
 void VerticleBlur(uint3 id : SV_DispatchThreadID)
 {
+    if (id.x >= (uint) _AOMaskSize.x || id.y >= (uint) _AOMaskSize.y)
+    {
+        return;
+    }
     
+    half2 uv = ((half2) id.xy + 0.5) / _AOMaskSize.xy;
+    half2 delta = half2(_AOMaskSize.z, 0);
+
+    _AOOutput[id.xy] = GaussianBlur(uv, delta);
 }
 
 [numthreads(8, 8, 1)]
 void HorizontalBlur(uint3 id : SV_DispatchThreadID)
 {
+    if (id.x >= (uint) _AOMaskSize.x || id.y >= (uint) _AOMaskSize.y)
+    {
+        return;
+    }
     
+    half2 uv = ((half2) id.xy + 0.5) / _AOMaskSize.xy;
+    half2 delta = half2(_AOMaskSize.z, 0);
+
+    _AOOutput[id.xy] = GaussianBlur(uv, delta);
 }

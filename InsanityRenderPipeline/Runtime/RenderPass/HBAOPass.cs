@@ -40,7 +40,7 @@ namespace Insanity
             public TextureHandle normal;
             public TextureHandle ao;
             public Vector4 HBAOParams;
-            public Vector2 AOMaskSize;
+            public Vector4 AOMaskSize;
             public Vector4 ScreenSize;
             public Matrix4x4 projInverse;
             public Matrix4x4 view;
@@ -94,10 +94,9 @@ namespace Insanity
                 passData.kernel = HBAOShaderParams._HBAOKernel;
                 passData.depth = builder.ReadTexture(depth);
                 passData.normal = builder.ReadTexture(normal);
-                int AOMaskWidth = ssaoSettings.halfResolution ? (int)(GlobalRenderSettings.screenResolution.width * 0.5f) : (int)GlobalRenderSettings.screenResolution.width;
-                int AOMaskHeight = ssaoSettings.halfResolution ? (int)(GlobalRenderSettings.screenResolution.height * 0.5f) : (int)GlobalRenderSettings.screenResolution.height;
-                passData.AOMaskSize.x = AOMaskWidth;
-                passData.AOMaskSize.y = AOMaskHeight;
+                float AOMaskWidth = ssaoSettings.halfResolution ? (GlobalRenderSettings.screenResolution.width * 0.5f) : GlobalRenderSettings.screenResolution.width;
+                float AOMaskHeight = ssaoSettings.halfResolution ? (GlobalRenderSettings.screenResolution.height * 0.5f) : GlobalRenderSettings.screenResolution.height;
+                passData.AOMaskSize = new Vector4(AOMaskWidth, AOMaskHeight, 1.0f / AOMaskWidth, 1.0f / AOMaskHeight);
                 passData.ScreenSize.x = GlobalRenderSettings.screenResolution.width;
                 passData.ScreenSize.y = GlobalRenderSettings.screenResolution.height;
                 passData.ScreenSize.z = 1.0f / passData.ScreenSize.x;
@@ -112,7 +111,7 @@ namespace Insanity
                 proj = proj * Matrix4x4.Scale(new Vector3(1, 1, -1));
                 passData.projInverse = proj.inverse;
                 passData.view = renderingData.cameraData.camera.transform.worldToLocalMatrix;
-                ssaoMask = CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight);
+                ssaoMask = CreateAOMaskTexture(renderingData.renderGraph, (int)AOMaskWidth, (int)AOMaskHeight);
                 passData.ao = builder.WriteTexture(ssaoMask);
                 passData.projectionParams = new Vector4(proj.m00, proj.m11, 1.0f / proj.m00, 1.0f / proj.m11);
 
