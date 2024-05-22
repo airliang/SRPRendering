@@ -389,6 +389,7 @@ namespace Insanity
         [SerializeField] float m_SSAORadius = 1.0f;
         [SerializeField] float m_HBAOHorizonBias = 0.0f;
         [SerializeField] bool m_AOHalfResolution = true;
+        [SerializeField] float m_AOIntensity = 1.0f;
         public bool SSAOEnable
         {
             get { return m_SSAOEnable; }
@@ -411,6 +412,12 @@ namespace Insanity
         {
             get { return m_AOHalfResolution; }
             set { m_AOHalfResolution = value;}
+        }
+
+        public float AOIntensity
+        {
+            get { return m_AOIntensity; }
+            set { m_AOIntensity = value; }
         }
         #endregion
 

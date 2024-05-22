@@ -78,6 +78,7 @@ namespace UnityEditor.Insanity
             public static GUIContent ssaoRadiusText = EditorGUIUtility.TrTextContent("SSAO Radius", "SSAO Radius.");
             public static GUIContent hbaoHorizonBiasText = EditorGUIUtility.TrTextContent("Horizontal Bias");
             public static GUIContent ssaoHalfResolutionText = EditorGUIUtility.TrTextContent("Half Resolution");
+            public static GUIContent ssaoIntensityText = EditorGUIUtility.TrTextContent("AO Intensity");
 
             public static GUIContent debugViewSettingsText = EditorGUIUtility.TrTextContent("DebugView", "DebugView to display the rendering results in the pipeline");
             public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "SSAO", "TriangleOverdraw" };
@@ -142,6 +143,7 @@ namespace UnityEditor.Insanity
         SerializedProperty m_SSAORadiusProp;
         SerializedProperty m_HBAOHorizonBiasProp;
         SerializedProperty m_SSAOHalfResolutionProp;
+        SerializedProperty m_SSAOIntensityProp;
 
         SavedBool m_DebugViewSettingFoldout;
         SerializedProperty m_DebugViewSettingsMode;
@@ -217,6 +219,7 @@ namespace UnityEditor.Insanity
             m_SSAORadiusProp = serializedObject.FindProperty("m_SSAORadius");
             m_HBAOHorizonBiasProp = serializedObject.FindProperty("m_HBAOHorizonBias");
             m_SSAOHalfResolutionProp = serializedObject.FindProperty("m_AOHalfResolution");
+            m_SSAOIntensityProp = serializedObject.FindProperty("m_AOIntensity");
 
             m_DebugViewSettingFoldout = new SavedBool($"{target.GetType()}.DebugViewSettingFoldout", false);
             m_DebugViewSettingsMode = serializedObject.FindProperty("m_DebugViewMode");
@@ -378,6 +381,7 @@ namespace UnityEditor.Insanity
                     m_SSAORadiusProp.floatValue = EditorGUILayout.Slider(Styles.ssaoRadiusText, m_SSAORadiusProp.floatValue, 0, 10.0f);
                     m_HBAOHorizonBiasProp.floatValue = EditorGUILayout.Slider(Styles.hbaoHorizonBiasText, m_HBAOHorizonBiasProp.floatValue, 0, 1.0f);
                     m_SSAOHalfResolutionProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoHalfResolutionText, m_SSAOHalfResolutionProp.boolValue);
+                    m_SSAOIntensityProp.floatValue = EditorGUILayout.Slider(Styles.ssaoIntensityText, m_SSAOIntensityProp.floatValue, 0, 2.0f);
                 }
                 EditorGUILayout.Space();
                 EditorGUILayout.Space();

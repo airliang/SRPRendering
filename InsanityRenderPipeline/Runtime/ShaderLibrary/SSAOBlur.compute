@@ -1,9 +1,10 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel VerticleBlur
+#pragma kernel HorizontalBlur
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
-Texture2D<float> _AOMask;
+Texture2D<float> _AOInput;
 RWTexture2D<float> _AOOutput;
 float4 _AOMaskSize;
 SamplerState s_point_clamp_sampler;
@@ -30,8 +31,8 @@ half GaussianBlur(half2 uv, half2 pixelOffset)
     for (int i = 0; i < stepCount; i++)
     {
         half2 texCoordOffset = gOffsets[i] * pixelOffset;
-        half4 p1 = _AOMask.SampleLevel(s_point_clamp_sampler, uv + texCoordOffset, 0);
-        half4 p2 = _AOMask.SampleLevel(s_point_clamp_sampler, uv - texCoordOffset, 0);
+        half4 p1 = _AOInput.SampleLevel(s_point_clamp_sampler, uv + texCoordOffset, 0);
+        half4 p2 = _AOInput.SampleLevel(s_point_clamp_sampler, uv - texCoordOffset, 0);
         half col = p1.r + p2.r;
         colOut += gWeights[i] * col;
     }

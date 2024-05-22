@@ -130,6 +130,7 @@
             #pragma multi_compile _ _SHADOW_EVSM
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _TILEBASED_LIGHT_CULLING
+            #pragma multi_compile _ _SSAO_ENABLE
             #pragma shader_feature_local _NORMALMAP
 			
 			#include "LitInput.hlsl"
