@@ -59,6 +59,15 @@ struct LightingData
     half roughness2MinusOne;
 };
 
+#ifdef _SSAO_ENABLE
+TEXTURE2D(_AOMask);
+
+half GetScreenSpaceAmbientOcclusion(float2 normalizedScreenSpaceUV)
+{
+    return SAMPLE_TEXTURE2D(_AOMask, sampler_LinearClamp, normalizedScreenSpaceUV).x;
+}
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////
 //                        Attenuation Functions                               /
 ///////////////////////////////////////////////////////////////////////////////
@@ -661,6 +670,10 @@ half4 FragmentPBR(InputData inputData, SurfaceData surface, ShadowSampleCoords s
     InitializeBRDFData(surface.albedo, surface.metallic, surface.specular, surface.smoothness, surface.alpha, brdfData);
 
     Light mainLight = GetMainLight(shadowSample);
+    
+#if _SSAO_ENABLE
+    surface.occlusion = GetScreenSpaceAmbientOcclusion(inputData.positionSS);
+#endif
 
     half3 color = GlobalIllumination(brdfData, inputData.bakedGI, surface.occlusion, inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS);
     color += LightingPhysicallyBased(brdfData, mainLight, inputData.normalWS, inputData.viewDirectionWS);

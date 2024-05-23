@@ -94,7 +94,7 @@ Shader "Insanity/DebugViewBlit"
                 }
                 else if (_DebugViewMode == DebugSSAO)
                 {
-                    half ao = SAMPLE_TEXTURE2D(_AOMask, s_point_clamp_sampler, input.uv).r;
+                    half ao = SAMPLE_TEXTURE2D(_AOMask, s_linear_clamp_sampler, input.uv).r;
                     col = half4(ao, ao, ao, 1);
                 }
                 else if (_DebugViewMode == DebugNormal)

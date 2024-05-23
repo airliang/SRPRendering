@@ -381,7 +381,7 @@ namespace UnityEditor.Insanity
                     m_SSAORadiusProp.floatValue = EditorGUILayout.Slider(Styles.ssaoRadiusText, m_SSAORadiusProp.floatValue, 0, 10.0f);
                     m_HBAOHorizonBiasProp.floatValue = EditorGUILayout.Slider(Styles.hbaoHorizonBiasText, m_HBAOHorizonBiasProp.floatValue, 0, 1.0f);
                     m_SSAOHalfResolutionProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoHalfResolutionText, m_SSAOHalfResolutionProp.boolValue);
-                    m_SSAOIntensityProp.floatValue = EditorGUILayout.Slider(Styles.ssaoIntensityText, m_SSAOIntensityProp.floatValue, 0, 2.0f);
+                    m_SSAOIntensityProp.floatValue = EditorGUILayout.Slider(Styles.ssaoIntensityText, m_SSAOIntensityProp.floatValue, 0, 4.0f);
                 }
                 EditorGUILayout.Space();
                 EditorGUILayout.Space();

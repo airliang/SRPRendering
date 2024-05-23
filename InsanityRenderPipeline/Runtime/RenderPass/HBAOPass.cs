@@ -173,6 +173,7 @@ namespace Insanity
                     context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ViewMatrix, data.view);
                     context.cmd.SetComputeFloatParam(data.cs, HBAOShaderParams._HalfResolution, data.HalfResolution);
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._ProjectionParams, data.projectionParams);
+                    context.cmd.SetGlobalTexture(HBAOShaderParams._AOMask, data.ao);
 
                     int groupX = Mathf.CeilToInt((float)data.AOMaskSize.x / 8);
                     int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);

@@ -35,10 +35,6 @@ TEXTURE2D(_NormalMap);
 SAMPLER(sampler_NormalMap);
 #endif
 
-#ifdef _SSAO_ENABLE
-TEXTURE2D(_AOMask);
-#endif
-
 CBUFFER_START(UnityPerMaterial)
 float4 _BaseMap_ST;
 half4 _BaseColor;

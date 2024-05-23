@@ -186,6 +186,7 @@ namespace Insanity
                         m_ssaoSettings.intensity = asset.AOIntensity;
                         RenderPasses.Render_HBAOPass(renderingData, m_FrameRenderSets.cameraDepthResolved, m_FrameRenderSets.cameraNormal, out m_FrameRenderSets.ssaoMask, m_ssaoSettings);
                     }
+                    CoreUtils.SetKeyword(cmdRG, "_SSAO_ENABLE", asset.SSAOEnable);
 
                     ForwardPassData forwardPassData = RenderPasses.Render_OpaqueFowardPass(renderingData, m_FrameRenderSets.cameraDepth, m_FrameRenderSets.cameraColor, shadowmap);
                     Atmosphere atmosphere = Atmosphere.Instance;
