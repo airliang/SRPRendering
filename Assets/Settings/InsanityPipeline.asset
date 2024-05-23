@@ -39,10 +39,16 @@ MonoBehaviour:
   m_LightBleedingReduction: 0.5
   m_AdditionalLightEnable: 1
   m_AdditionalLightCulling: 1
+  m_TileSize: 16
   m_AtmosphereResources: {fileID: 11400000, guid: c30c5a287b3154b428069571e2d497fe,
     type: 2}
   m_SunLightColor: {r: 2.9960785, g: 2.9960785, b: 2.9960785, a: 1}
   m_physicalBasedSky: 1
+  m_SSAOEnable: 1
+  m_SSAORadius: 1.94
+  m_HBAOHorizonBias: 0.113
+  m_AOHalfResolution: 1
+  m_AOIntensity: 2.61
   m_DebugViewMode: 0
   m_PipelineResources: {fileID: 11400000, guid: e267fa520b4e57140aaa0481ee785b42,
     type: 2}
