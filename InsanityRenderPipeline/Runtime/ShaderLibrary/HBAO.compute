@@ -4,9 +4,11 @@
 #pragma kernel HBAO
 #pragma enable_d3d11_debug_symbols
 #define PI 3.14159265358979323846
+#define TWO_PI 6.28318530717958647693
 
 RWTexture2D<float> _AOMask;
 Texture2D<float4> _NormalTexture;
+Texture2D<float> _NoiseTexture;
 Texture2D _DepthTexture;
 float4x4 _ViewMatrix;  //platform unrelative matrix
 float4x4 _ProjInverse; //platform unrelative matrix
@@ -23,9 +25,12 @@ float2 _ProjectionParams;
 #define RADIUSINPIXEL _HBAOParams.w
 #define SAMPLE_COUNT 8
 #define IS_HALF_RESOLUTION _HalfResolution > 0
-#define AO_INTENSITY _HBAOParams2.x
+#define AO_INTENSITY _HBAOParams.x
+#define NOISE_OFFSET _HBAOParams2.xy
+#define NOISE_SCALE  _HBAOParams2.zw
 
 SamplerState s_point_clamp_sampler;
+SamplerState s_point_repeat_sampler;
 SamplerState s_linear_clamp_sampler;
 
 static const float SKY_DEPTH_VALUE = 0.00001;
@@ -97,9 +102,9 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     float2 uvScreen = uv + _ScreenSize.zw * 0.5 * _HalfResolution;
     
     float noise = InterleavedGradientNoise((float2)id.xy, 0);
-    //float noise2 = InterleavedGradientNoise((float2) id.xy, 1);
+    //noise = _NoiseTexture.SampleLevel(s_point_repeat_sampler, uvScreen * NOISE_SCALE, 0);
     
-    float theta = PI * 2.0 * noise;
+    float theta = TWO_PI * noise;
     float cosTheta = cos(theta);
     float sinTheta = sin(theta);
     float2x2 rotation = float2x2(cosTheta, -sinTheta,

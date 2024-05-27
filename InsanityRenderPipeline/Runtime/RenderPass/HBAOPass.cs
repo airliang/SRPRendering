@@ -16,6 +16,7 @@ namespace Insanity
         public float intensity = 1;
         public ComputeShader ssao;
         public ComputeShader blur;
+        public Texture blueNoiseTexture;
     }
 
     public class HBAOShaderParams
@@ -23,6 +24,7 @@ namespace Insanity
         public static int _DepthTexture;
         public static int _NormalTexture;
         public static int _AOMask;
+        public static int _NoiseTexture;
         public static int _HBAOParams;
         public static int _HBAOParams2;
         public static int _AOMaskSize;
@@ -45,6 +47,7 @@ namespace Insanity
             public TextureHandle depth;
             public TextureHandle normal;
             public TextureHandle ao;
+            public Texture noise;
             public Vector4 HBAOParams;
             public Vector4 HBAOParams2;
             public Vector4 AOMaskSize;
@@ -76,6 +79,7 @@ namespace Insanity
             HBAOShaderParams._DepthTexture = Shader.PropertyToID("_DepthTexture");
             HBAOShaderParams._NormalTexture = Shader.PropertyToID("_NormalTexture");
             HBAOShaderParams._AOMask = Shader.PropertyToID("_AOMask");
+            HBAOShaderParams._NoiseTexture = Shader.PropertyToID("_NoiseTexture");
             HBAOShaderParams._HBAOParams = Shader.PropertyToID("_HBAOParams");
             HBAOShaderParams._HBAOParams2 = Shader.PropertyToID("_HBAOParams2");
             HBAOShaderParams._AOMaskSize = Shader.PropertyToID("_AOMaskSize");
@@ -121,6 +125,7 @@ namespace Insanity
                 passData.kernel = HBAOShaderParams._HBAOKernel;
                 passData.depth = builder.ReadTexture(depth);
                 passData.normal = builder.ReadTexture(normal);
+                passData.noise = ssaoSettings.blueNoiseTexture;
 
                 passData.AOMaskSize = AOMaskSize;
                 passData.ScreenSize.x = GlobalRenderSettings.screenResolution.width;
@@ -128,11 +133,15 @@ namespace Insanity
                 passData.ScreenSize.z = 1.0f / passData.ScreenSize.x;
                 passData.ScreenSize.w = 1.0f / passData.ScreenSize.y;
                 float projScale = GlobalRenderSettings.screenResolution.height / (Mathf.Tan(renderingData.cameraData.camera.fieldOfView * Mathf.Deg2Rad * 0.5f) * 2.0f);
+                passData.HBAOParams.x = ssaoSettings.intensity;
                 passData.HBAOParams.y = ssaoSettings.horizonBias;
                 passData.HBAOParams.z = -1.0f / ssaoSettings.radius * ssaoSettings.radius;
                 passData.HBAOParams.w = projScale * ssaoSettings.radius * 0.5f;
                 passData.HalfResolution = ssaoSettings.halfResolution ? 1.0f : 0;
-                passData.HBAOParams2.x = ssaoSettings.intensity;
+                passData.HBAOParams2.x = UnityEngine.Random.value;
+                passData.HBAOParams2.y = UnityEngine.Random.value;
+                passData.HBAOParams2.z = GlobalRenderSettings.screenResolution.width / ssaoSettings.blueNoiseTexture.width;
+                passData.HBAOParams2.w = GlobalRenderSettings.screenResolution.height / ssaoSettings.blueNoiseTexture.height;
 
                 Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix;
                 proj = proj * Matrix4x4.Scale(new Vector3(1, 1, -1));
@@ -165,6 +174,7 @@ namespace Insanity
                     context.cmd.SetComputeTextureParam(data.cs, passData.kernel, HBAOShaderParams._DepthTexture, data.depth);
                     context.cmd.SetComputeTextureParam(data.cs, passData.kernel, HBAOShaderParams._NormalTexture, data.normal);
                     context.cmd.SetComputeTextureParam(data.cs, passData.kernel, HBAOShaderParams._AOMask, data.ao);
+                    context.cmd.SetComputeTextureParam(data.cs, passData.kernel, HBAOShaderParams._NoiseTexture, data.noise);
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._HBAOParams, data.HBAOParams);
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._HBAOParams2, data.HBAOParams2);
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._AOMaskSize, data.AOMaskSize);
