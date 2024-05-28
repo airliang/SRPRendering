@@ -18,6 +18,7 @@ float4 _AOMaskSize;
 float4 _ScreenSize;    //xy width and height, zw 1/width and 1/height
 float _HalfResolution;
 float4 _HBAOParams2;
+float4 _NoiseParam;
 float2 _ProjectionParams;
 #define RADIUS _HBAOParams.x    //radius in practice
 #define BIAS   _HBAOParams.y
@@ -26,8 +27,8 @@ float2 _ProjectionParams;
 #define SAMPLE_COUNT 8
 #define IS_HALF_RESOLUTION _HalfResolution > 0
 #define AO_INTENSITY _HBAOParams.x
-#define NOISE_OFFSET _HBAOParams2.xy
-#define NOISE_SCALE  _HBAOParams2.zw
+#define NOISE_OFFSET _NoiseParam.xy
+#define NOISE_SCALE  _NoiseParam.zw
 
 SamplerState s_point_clamp_sampler;
 SamplerState s_point_repeat_sampler;
@@ -98,10 +99,10 @@ void HBAO (uint3 id : SV_DispatchThreadID)
         return;
     }
     // TODO: insert actual code here!
-    float2 uv = (float2) id.xy / _AOMaskSize;
+    float2 uv = (float2) id.xy * _AOMaskSize.zw;
     float2 uvScreen = uv + _ScreenSize.zw * 0.5 * _HalfResolution;
-    
-    float noise = InterleavedGradientNoise((float2)id.xy, 0);
+
+    float noise = InterleavedGradientNoise((float2) id.xy, 0);
     //noise = _NoiseTexture.SampleLevel(s_point_repeat_sampler, uvScreen * NOISE_SCALE, 0);
     
     float theta = TWO_PI * noise;
@@ -131,9 +132,13 @@ void HBAO (uint3 id : SV_DispatchThreadID)
 
     float AOIntegrate = 0;
     float radiusPixel = RADIUSINPIXEL / screenPosVS.z;
+    float minLength = length(_ScreenSize.zw);
     for (int i = 0; i < SAMPLE_COUNT; ++i)
     {
-        float2 samplePoint = mul(rotation, SPIRAL_KERNEL[i]) * radiusPixel * _ScreenSize.zw + uvScreen;
+        float2 samplePointVec = mul(rotation, SPIRAL_KERNEL[i]) * radiusPixel * _ScreenSize.zw;
+        if (length(samplePointVec) < minLength)
+            continue;
+        float2 samplePoint = samplePointVec + uvScreen;
         //screenCoord = _ScreenSize * samplePoint;
         float depthSample = IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_linear_clamp_sampler, samplePoint, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //_DepthTexture.Load(int3(screenCoord, 0));
         depthSample = GetPlatformDepth(depthSample);

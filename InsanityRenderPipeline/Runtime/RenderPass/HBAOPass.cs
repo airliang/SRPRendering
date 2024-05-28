@@ -27,6 +27,7 @@ namespace Insanity
         public static int _NoiseTexture;
         public static int _HBAOParams;
         public static int _HBAOParams2;
+        public static int _NoiseParam;
         public static int _AOMaskSize;
         public static int _ScreenSize;
         public static int _ProjInverse;
@@ -50,6 +51,7 @@ namespace Insanity
             public Texture noise;
             public Vector4 HBAOParams;
             public Vector4 HBAOParams2;
+            public Vector4 NoiseParams;
             public Vector4 AOMaskSize;
             public Vector4 ScreenSize;
             public Matrix4x4 projInverse;
@@ -82,6 +84,7 @@ namespace Insanity
             HBAOShaderParams._NoiseTexture = Shader.PropertyToID("_NoiseTexture");
             HBAOShaderParams._HBAOParams = Shader.PropertyToID("_HBAOParams");
             HBAOShaderParams._HBAOParams2 = Shader.PropertyToID("_HBAOParams2");
+            HBAOShaderParams._NoiseParam = Shader.PropertyToID("_NoiseParam");
             HBAOShaderParams._AOMaskSize = Shader.PropertyToID("_AOMaskSize");
             HBAOShaderParams._ScreenSize = Shader.PropertyToID("_ScreenSize");
             HBAOShaderParams._ProjInverse = Shader.PropertyToID("_ProjInverse");
@@ -138,10 +141,10 @@ namespace Insanity
                 passData.HBAOParams.z = -1.0f / ssaoSettings.radius * ssaoSettings.radius;
                 passData.HBAOParams.w = projScale * ssaoSettings.radius * 0.5f;
                 passData.HalfResolution = ssaoSettings.halfResolution ? 1.0f : 0;
-                passData.HBAOParams2.x = UnityEngine.Random.value;
-                passData.HBAOParams2.y = UnityEngine.Random.value;
-                passData.HBAOParams2.z = GlobalRenderSettings.screenResolution.width / ssaoSettings.blueNoiseTexture.width;
-                passData.HBAOParams2.w = GlobalRenderSettings.screenResolution.height / ssaoSettings.blueNoiseTexture.height;
+                passData.NoiseParams.x = UnityEngine.Random.value;
+                passData.NoiseParams.y = UnityEngine.Random.value;
+                passData.NoiseParams.z = GlobalRenderSettings.screenResolution.width / ssaoSettings.blueNoiseTexture.width;
+                passData.NoiseParams.w = GlobalRenderSettings.screenResolution.height / ssaoSettings.blueNoiseTexture.height;
 
                 Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix;
                 proj = proj * Matrix4x4.Scale(new Vector3(1, 1, -1));
