@@ -5,7 +5,6 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
-using UnityEditor.VersionControl;
 
 namespace Insanity
 {

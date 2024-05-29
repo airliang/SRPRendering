@@ -100,7 +100,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     }
     // TODO: insert actual code here!
     float2 uv = (float2) id.xy * _AOMaskSize.zw;
-    float2 uvScreen = uv + _ScreenSize.zw * 0.5 * _HalfResolution;
+    float2 uvScreen = uv + _ScreenSize.zw * 0.5/* * (_HalfResolution + 1)*/;
 
     float noise = InterleavedGradientNoise((float2) id.xy, 0);
     //noise = _NoiseTexture.SampleLevel(s_point_repeat_sampler, uvScreen * NOISE_SCALE, 0);
@@ -132,11 +132,12 @@ void HBAO (uint3 id : SV_DispatchThreadID)
 
     float AOIntegrate = 0;
     float radiusPixel = RADIUSINPIXEL / screenPosVS.z;
-    float minLength = length(_ScreenSize.zw);
+    //float minLength = length(_ScreenSize.zw);
+    float pixelSizeSS2 = dot(_ScreenSize.zw, _ScreenSize.zw);
     for (int i = 0; i < SAMPLE_COUNT; ++i)
     {
         float2 samplePointVec = mul(rotation, SPIRAL_KERNEL[i]) * radiusPixel * _ScreenSize.zw;
-        if (length(samplePointVec) < minLength)
+        if (dot(samplePointVec, samplePointVec) < pixelSizeSS2)
             continue;
         float2 samplePoint = samplePointVec + uvScreen;
         //screenCoord = _ScreenSize * samplePoint;
