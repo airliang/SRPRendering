@@ -100,9 +100,9 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     }
     // TODO: insert actual code here!
     float2 uv = (float2) id.xy * _AOMaskSize.zw;
-    float2 uvScreen = uv + _ScreenSize.zw * 0.5/* * (_HalfResolution + 1)*/;
+    float2 uvScreen = uv + _ScreenSize.zw * 0.5 * (_HalfResolution + 1);
 
-    float noise = InterleavedGradientNoise((float2) id.xy, 0);
+    float noise = InterleavedGradientNoise((float2) id.xy, id.y);
     //noise = _NoiseTexture.SampleLevel(s_point_repeat_sampler, uvScreen * NOISE_SCALE, 0);
     
     float theta = TWO_PI * noise;
@@ -113,7 +113,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     
     
     //int2 screenCoord = _ScreenSize * uv;
-    float depth = IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_linear_clamp_sampler, uvScreen, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_DepthTexture.Load(int3(screenCoord, 0));
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_DepthTexture.Load(int3(screenCoord, 0));
     if (depth < SKY_DEPTH_VALUE)
     {
         _AOMask[id.xy] = 1;
@@ -123,7 +123,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     
     
     //float depth = _DepthTexture.Load(int3(screenCoord, 0));
-    float3 normal = IS_HALF_RESOLUTION ? _NormalTexture.SampleLevel(s_linear_clamp_sampler, uvScreen, 0) : _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_NormalTexture.Load(int3(screenCoord, 0));
+    float3 normal = _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //IS_HALF_RESOLUTION ? _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0) : _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_NormalTexture.Load(int3(screenCoord, 0));
     normal = 2.0 * normal - 1.0;
     
     float3 screenPosVS = UVtoViewPos(uvScreen, depth);
@@ -141,7 +141,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
             continue;
         float2 samplePoint = samplePointVec + uvScreen;
         //screenCoord = _ScreenSize * samplePoint;
-        float depthSample = IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_linear_clamp_sampler, samplePoint, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //_DepthTexture.Load(int3(screenCoord, 0));
+        float depthSample = _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //_DepthTexture.Load(int3(screenCoord, 0));
         depthSample = GetPlatformDepth(depthSample);
         float3 samplePointVS = UVtoViewPos(samplePoint, depthSample);
         
