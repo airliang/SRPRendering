@@ -100,7 +100,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     }
     // TODO: insert actual code here!
     float2 uv = (float2) id.xy * _AOMaskSize.zw;
-    float2 uvScreen = uv + _ScreenSize.zw * 0.5 * (_HalfResolution + 1);
+    float2 uvScreen = (float2) (id.xy + 0.5) * _AOMaskSize.zw; //uv + _ScreenSize.zw * 0.5 * (_HalfResolution + 1);
 
     float noise = InterleavedGradientNoise((float2) id.xy, id.y);
     //noise = _NoiseTexture.SampleLevel(s_point_repeat_sampler, uvScreen * NOISE_SCALE, 0);
@@ -113,7 +113,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     
     
     //int2 screenCoord = _ScreenSize * uv;
-    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_DepthTexture.Load(int3(screenCoord, 0));
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_linear_clamp_sampler, uvScreen, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_DepthTexture.Load(int3(screenCoord, 0));
     if (depth < SKY_DEPTH_VALUE)
     {
         _AOMask[id.xy] = 1;
@@ -123,7 +123,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     
     
     //float depth = _DepthTexture.Load(int3(screenCoord, 0));
-    float3 normal = _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //IS_HALF_RESOLUTION ? _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0) : _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_NormalTexture.Load(int3(screenCoord, 0));
+    float3 normal = _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //IS_HALF_RESOLUTION ? _NormalTexture.SampleLevel(s_linear_clamp_sampler, uvScreen, 0) : _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_NormalTexture.Load(int3(screenCoord, 0));
     normal = 2.0 * normal - 1.0;
     
     float3 screenPosVS = UVtoViewPos(uvScreen, depth);
@@ -133,19 +133,21 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     float AOIntegrate = 0;
     float radiusPixel = RADIUSINPIXEL / screenPosVS.z;
     //float minLength = length(_ScreenSize.zw);
-    float pixelSizeSS2 = dot(_ScreenSize.zw, _ScreenSize.zw);
+    //float pixelSizeSS2 = dot(_ScreenSize.zw, _ScreenSize.zw);
     for (int i = 0; i < SAMPLE_COUNT; ++i)
     {
         float2 samplePointVec = mul(rotation, SPIRAL_KERNEL[i]) * radiusPixel * _ScreenSize.zw;
-        if (dot(samplePointVec, samplePointVec) < pixelSizeSS2)
-            continue;
+        //if (dot(samplePointVec, samplePointVec) < pixelSizeSS2)
+        //    continue;
         float2 samplePoint = samplePointVec + uvScreen;
+        int2 samplePointPixel = (int2) (samplePoint * _ScreenSize.xy);
         //screenCoord = _ScreenSize * samplePoint;
-        float depthSample = _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //_DepthTexture.Load(int3(screenCoord, 0));
+        float depthSample = _DepthTexture.Load(int3(samplePointPixel, 0)); //_DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_linear_clamp_sampler, samplePoint, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //_DepthTexture.Load(int3(screenCoord, 0));
         depthSample = GetPlatformDepth(depthSample);
-        float3 samplePointVS = UVtoViewPos(samplePoint, depthSample);
-        
-        AOIntegrate += ComputeAO(screenPosVS, normalVS, samplePointVS) * AO_INTENSITY;
+        float2 adjustSamplePoint = ((float2) samplePointPixel + 0.5) * _ScreenSize.zw;
+        float3 samplePointVS = UVtoViewPos(adjustSamplePoint, depthSample);
+        int2 samplePointAOCoord = adjustSamplePoint * _AOMaskSize.xy;
+        AOIntegrate += samplePointAOCoord == id.xy ? 0 : ComputeAO(screenPosVS, normalVS, samplePointVS) * AO_INTENSITY;
     }
     AOIntegrate /= SAMPLE_COUNT;
 
