@@ -79,6 +79,7 @@ namespace UnityEditor.Insanity
             public static GUIContent hbaoHorizonBiasText = EditorGUIUtility.TrTextContent("Horizontal Bias");
             public static GUIContent ssaoHalfResolutionText = EditorGUIUtility.TrTextContent("Half Resolution");
             public static GUIContent ssaoIntensityText = EditorGUIUtility.TrTextContent("AO Intensity");
+            public static GUIContent ssaoFadeDistanceText = EditorGUIUtility.TrTextContent("AO Fade Distance Range");
 
             public static GUIContent debugViewSettingsText = EditorGUIUtility.TrTextContent("DebugView", "DebugView to display the rendering results in the pipeline");
             public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "SSAO", "TriangleOverdraw" };
@@ -144,6 +145,8 @@ namespace UnityEditor.Insanity
         SerializedProperty m_HBAOHorizonBiasProp;
         SerializedProperty m_SSAOHalfResolutionProp;
         SerializedProperty m_SSAOIntensityProp;
+        SerializedProperty m_SSAOFadeDistanceStartProp;
+        SerializedProperty m_SSAOFadeDistanceEndProp;
 
         SavedBool m_DebugViewSettingFoldout;
         SerializedProperty m_DebugViewSettingsMode;
@@ -220,6 +223,8 @@ namespace UnityEditor.Insanity
             m_HBAOHorizonBiasProp = serializedObject.FindProperty("m_HBAOHorizonBias");
             m_SSAOHalfResolutionProp = serializedObject.FindProperty("m_AOHalfResolution");
             m_SSAOIntensityProp = serializedObject.FindProperty("m_AOIntensity");
+            m_SSAOFadeDistanceStartProp = serializedObject.FindProperty("m_AOFadeDistanceStart");
+            m_SSAOFadeDistanceEndProp = serializedObject.FindProperty("m_AOFadeDistanceEnd");
 
             m_DebugViewSettingFoldout = new SavedBool($"{target.GetType()}.DebugViewSettingFoldout", false);
             m_DebugViewSettingsMode = serializedObject.FindProperty("m_DebugViewMode");
@@ -382,6 +387,11 @@ namespace UnityEditor.Insanity
                     m_HBAOHorizonBiasProp.floatValue = EditorGUILayout.Slider(Styles.hbaoHorizonBiasText, m_HBAOHorizonBiasProp.floatValue, 0, 1.0f);
                     m_SSAOHalfResolutionProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoHalfResolutionText, m_SSAOHalfResolutionProp.boolValue);
                     m_SSAOIntensityProp.floatValue = EditorGUILayout.Slider(Styles.ssaoIntensityText, m_SSAOIntensityProp.floatValue, 0, 4.0f);
+                    float fadeStart = m_SSAOFadeDistanceStartProp.floatValue;
+                    float fadeEnd = m_SSAOFadeDistanceEndProp.floatValue;
+                    EditorGUILayout.MinMaxSlider(Styles.ssaoFadeDistanceText, ref fadeStart, ref fadeEnd, 0, 100.0f);
+                    m_SSAOFadeDistanceStartProp.floatValue = fadeStart;
+                    m_SSAOFadeDistanceEndProp.floatValue = fadeEnd;
                 }
                 EditorGUILayout.Space();
                 EditorGUILayout.Space();

@@ -14,6 +14,8 @@ namespace Insanity
         public float horizonBias = 0;
         public bool halfResolution = true;
         public float intensity = 1;
+        public float aoFadeStart = 0;
+        public float aoFadeEnd = 100.0f;
         public ComputeShader ssao;
         public ComputeShader blur;
         public Texture blueNoiseTexture;
@@ -145,6 +147,11 @@ namespace Insanity
                 passData.NoiseParams.y = UnityEngine.Random.value;
                 passData.NoiseParams.z = GlobalRenderSettings.screenResolution.width / ssaoSettings.blueNoiseTexture.width;
                 passData.NoiseParams.w = GlobalRenderSettings.screenResolution.height / ssaoSettings.blueNoiseTexture.height;
+                //make a linear equation to calculate the ao fade.
+                //y = ax + b  y is ao fade, x is distance
+                //a = 1.0 / (fadeStart - fadeEnd); b = fadeEnd / (fadeEnd - fadeStart)
+                passData.HBAOParams2.x = 1.0f / (ssaoSettings.aoFadeStart - ssaoSettings.aoFadeEnd);
+                passData.HBAOParams2.y = ssaoSettings.aoFadeEnd / (ssaoSettings.aoFadeEnd - ssaoSettings.aoFadeStart);
 
                 Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix;
                 proj = proj * Matrix4x4.Scale(new Vector3(1, 1, -1));

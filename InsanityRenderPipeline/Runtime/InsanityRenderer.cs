@@ -204,6 +204,8 @@ namespace Insanity
                     m_ssaoSettings.horizonBias = asset.HBAOHorizonBias;
                     m_ssaoSettings.halfResolution = asset.AOHalfResolution;
                     m_ssaoSettings.intensity = asset.AOIntensity;
+                    m_ssaoSettings.aoFadeStart = asset.AOFadeStart;
+                    m_ssaoSettings.aoFadeEnd = asset.AOFadeEnd;
                     RenderPasses.Render_HBAOPass(renderingData, m_FrameRenderSets.cameraDepthResolved, m_FrameRenderSets.cameraNormal, out m_FrameRenderSets.ssaoMask, m_ssaoSettings);
                 }
                 CoreUtils.SetKeyword(cmdRG, "_SSAO_ENABLE", asset.SSAOEnable);
