@@ -8,6 +8,8 @@ Texture2D<float> _AOInput;
 RWTexture2D<float> _AOOutput;
 float4 _AOMaskSize;
 SamplerState s_linear_clamp_sampler;
+SamplerState s_point_clamp_sampler;
+#define GAUSSIAN_BLUR 1
 
 // https://software.intel.com/content/www/us/en/develop/blogs/an-investigation-of-fast-real-time-gpu-based-image-blur-algorithms.html
 half GaussianBlur(half2 uv, half2 pixelOffset)
@@ -40,6 +42,36 @@ half GaussianBlur(half2 uv, half2 pixelOffset)
     return colOut;
 }
 
+// ------------------------------------------------------------------
+// Bilateral Blur
+// ------------------------------------------------------------------
+
+//bilateral filter
+half BilateralBlur(const half2 uv, const half2 delta)
+{
+    half p0 = _AOInput.SampleLevel(s_point_clamp_sampler, uv, 0);
+    half p1a = _AOInput.SampleLevel(s_point_clamp_sampler, uv - delta * 1.3846153846, 0);
+    half p1b = _AOInput.SampleLevel(s_point_clamp_sampler, uv + delta * 1.3846153846, 0);
+    half p2a = _AOInput.SampleLevel(s_point_clamp_sampler, uv - delta * 3.2307692308, 0);
+    half p2b = _AOInput.SampleLevel(s_point_clamp_sampler, uv + delta * 3.2307692308, 0);
+
+    half w0 = half(0.2270270270);
+    half w1a = half(0.3162162162);
+    half w1b = half(0.3162162162);
+    half w2a = half(0.0702702703);
+    half w2b = half(0.0702702703);
+
+    half s = half(0.0);
+    s += p0 * w0;
+    s += p1a * w1a;
+    s += p1b * w1b;
+    s += p2a * w2a;
+    s += p2b * w2b;
+    s *= rcp(w0 + w1a + w1b + w2a + w2b);
+
+    return s;
+}
+
 [numthreads(8,8,1)]
 void VerticleBlur(uint3 id : SV_DispatchThreadID)
 {
@@ -49,9 +81,13 @@ void VerticleBlur(uint3 id : SV_DispatchThreadID)
     }
     
     half2 uv = ((half2) id.xy + 0.5) * _AOMaskSize.zw;
-    half2 delta = half2(_AOMaskSize.z, 0);
+    half2 delta = half2(0, _AOMaskSize.w);
 
+#if GAUSSIAN_BLUR
     _AOOutput[id.xy] = GaussianBlur(uv, delta);
+#else
+    _AOOutput[id.xy] = BilateralBlur(uv, delta);
+#endif
 }
 
 [numthreads(8, 8, 1)]
@@ -63,7 +99,11 @@ void HorizontalBlur(uint3 id : SV_DispatchThreadID)
     }
     
     half2 uv = ((half2) id.xy + 0.5) * _AOMaskSize.zw;
-    half2 delta = half2(_AOMaskSize.z * 2, 0);
+    half2 delta = half2(_AOMaskSize.z, 0);
 
+#if GAUSSIAN_BLUR
     _AOOutput[id.xy] = GaussianBlur(uv, delta);
+#else
+    _AOOutput[id.xy] = BilateralBlur(uv, delta);
+#endif
 }
