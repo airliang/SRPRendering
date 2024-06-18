@@ -18,7 +18,7 @@ namespace Insanity
         public float aoFadeEnd = 100.0f;
         public ComputeShader ssao;
         public ComputeShader blur;
-        public Texture blueNoiseTexture;
+        public Texture2D blueNoiseTexture;
     }
 
     public class HBAOShaderParams
@@ -202,6 +202,7 @@ namespace Insanity
             }
 
 
+
             BlurAOPassData blurDataV;
             using (var builder = renderingData.renderGraph.AddRenderPass<BlurAOPassData>("HBAO Vertical Blur Pass", out blurDataV, s_HBAOVerticalBlurProfiler))
             {
@@ -255,6 +256,109 @@ namespace Insanity
                     context.cmd.DispatchCompute(data.cs, data.kHorizontalBlur, groupX, groupY, 1);
                 });
             }
+        }
+
+        public static void CreateNoiseTexture(out Texture2D noiseTexture)
+        {
+            noiseTexture = new Texture2D(4,4, TextureFormat.RGBA32, false, true);
+
+            int size = 4;
+
+
+            float[,] radArray = new float[4, 4];
+
+            // Init first field with base seed
+            radArray[0, 0] = 0.0f;
+
+            // Init frac levels
+            int lastFracLevel = 0;
+            int fracLevel = 1;
+
+            // Sampling pattern is a uniformly distributed spiral on 2D projected disk. Opposite direction samples are guaranteed by spiral pattern in rotation
+            // We want to maximize variance of full sampling pattern, while keeping local quad to quad variance low
+            while (fracLevel < size)
+            {
+                // Create a fractal level of swizzled rotation texture
+                int nextFracLevel = fracLevel << 1;
+                int levelSize = 1 << lastFracLevel;
+
+                // Angular step for full circle on current frac level
+                int totalRotationsLevel = nextFracLevel * nextFracLevel;
+                float levelAngleStep = 360.0f / totalRotationsLevel * Mathf.Deg2Rad;
+
+                int stepSize;
+
+                // Use dynamically created TOP LEFT quarter, rotate by 2 steps and copy into TOP RIGHT
+                stepSize = 2;
+                for (int i = 0; i < levelSize; i++)
+                {
+                    for (int j = 0; j < levelSize; j++)
+                    {
+                        radArray[fracLevel + i, j] = radArray[i, j] + (float)stepSize * levelAngleStep;
+                    }
+                }
+
+                // Use dynamically created TOP LEFT quarter, rotate by 1 step and copy into BOTTOM LEFT
+                stepSize = 1;
+                for (int i = 0; i < levelSize; i++)
+                {
+                    for (int j = 0; j < levelSize; j++)
+                    {
+                        radArray[i, fracLevel + j] = radArray[i, j] + (float)stepSize * levelAngleStep;
+                    }
+                }
+
+                // Use dynamically created TOP LEFT quarter, rotate by 3 steps and copy into BOTTOM RIGHT
+                stepSize = 3;
+                for (int i = 0; i < levelSize; i++)
+                {
+                    for (int j = 0; j < levelSize; j++)
+                    {
+                        radArray[fracLevel + i, fracLevel + j] = radArray[i, j] + stepSize * levelAngleStep;
+                    }
+                }
+
+                lastFracLevel = fracLevel;
+                fracLevel = nextFracLevel;
+            }
+
+            // fill texture with random normals
+            Vector4 normal;
+            Vector4 normalCompressed;
+            Vector4 bias = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+            Vector4 scale = new Vector4(0.5f, 0.5f, 0.5f, 0.5f);
+            Color[] colors = new Color[size * size];
+
+            for (int y = 0; y < size; ++y)
+            {
+                //curPix = curLine;
+
+                for (int x = 0; x < size; ++x)
+                {
+                    // create a rotation matrix, xy first col zw second col
+                    
+                    float sin = Mathf.Sin(radArray[x, y]);
+                    float cos = Mathf.Cos(radArray[x, y]);
+                    Vector4 rotationMatrix = new Vector4(cos, -sin,
+                                                         sin, cos);
+
+                    // rotate the normal, normalize, then scale and bias
+                    //normal = new Vector4(rotationMatrix.Get(0, 0), rotationMatrix.Get(1, 0),
+                    //    rotationMatrix.Get(0, 1), rotationMatrix.Get(1, 1));
+                    normalCompressed = (rotationMatrix + bias).Mul(scale);
+
+                    colors[y * size + x] = new Color(normalCompressed.x, normalCompressed.y, normalCompressed.z, normalCompressed.w);
+
+                    // copy normal inside the texture (format ARGB)
+                    //*curPix = color.GetAsARGB();
+                    //curPix++;
+                }
+
+                //curLine = (ubiU32*)(((ubiU8*)curLine) + lockRect.Pitch);
+            }
+
+            noiseTexture.SetPixels(colors);
+            noiseTexture.Apply(false, true);
         }
     }
 }

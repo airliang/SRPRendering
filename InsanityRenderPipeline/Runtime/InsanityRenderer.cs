@@ -66,7 +66,11 @@ namespace Insanity
             m_tilebasedLightCulling = InsanityPipeline.asset.InsanityPipelineResources.shaders.TileBasedLightCulling;
             m_ssaoSettings.ssao = InsanityPipeline.asset.InsanityPipelineResources.shaders.HBAO;
             m_ssaoSettings.blur = InsanityPipeline.asset.InsanityPipelineResources.shaders.Blur;
-            m_ssaoSettings.blueNoiseTexture = InsanityPipeline.asset.InsanityPipelineResources.internalTextures.SSAONoiseTexture;
+            //m_ssaoSettings.blueNoiseTexture = InsanityPipeline.asset.InsanityPipelineResources.internalTextures.SSAONoiseTexture;
+            if (m_ssaoSettings.blueNoiseTexture == null)
+            {
+                RenderPasses.CreateNoiseTexture(out m_ssaoSettings.blueNoiseTexture);
+            }
             RenderPasses.InitializeSSAOShaderParameters();
         }
 
