@@ -335,12 +335,12 @@ namespace Insanity
 
                 for (int x = 0; x < size; ++x)
                 {
-                    // create a rotation matrix, xy first col zw second col
+                    // create a rotation matrix, xy first row zw second row
                     
                     float sin = Mathf.Sin(radArray[x, y]);
                     float cos = Mathf.Cos(radArray[x, y]);
-                    Vector4 rotationMatrix = new Vector4(cos, -sin,
-                                                         sin, cos);
+                    Vector4 rotationMatrix = new Vector4(cos, sin,
+                                                         -sin, cos);
 
                     // rotate the normal, normalize, then scale and bias
                     //normal = new Vector4(rotationMatrix.Get(0, 0), rotationMatrix.Get(1, 0),

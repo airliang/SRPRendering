@@ -205,15 +205,22 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     float2 uv = (float2) id.xy * _AOMaskSize.zw;
     float2 uvScreen = (float2) (id.xy + 0.5) * _AOMaskSize.zw; //uv + _ScreenSize.zw * 0.5 * (_HalfResolution + 1);
 
-    int2 noiseCoord = uvScreen % int2(4, 4);
-    float noise = _NoiseTexture.Load(int3(noiseCoord, 0)).r; //InterleavedGradientNoise((float2) (id.xy + 0.5), id.x/*id.y*/);
-    //noise = _NoiseTexture.SampleLevel(s_point_repeat_sampler, uvScreen * NOISE_SCALE, 0);
+    //using noise texture approach
     
-    float theta = TWO_PI * noise;
-    float cosTheta = cos(theta);
-    float sinTheta = sin(theta);
-    float2x2 rotation = float2x2(cosTheta, -sinTheta,
-                                 sinTheta, cosTheta );
+    int2 noiseCoord = id.xy * (_HalfResolution + 1) % int2(4, 4);
+    float4 noise = _NoiseTexture.Load(int3(noiseCoord, 0));
+    float2 noiseDecompress = 2.0 * noise.zw - 1.0;
+    float2x2 rotation = float2x2(noiseDecompress.y, noiseDecompress.x,
+                                 -noiseDecompress.x, noiseDecompress.y);
+    
+    //end noise texture approach
+    
+    //float noise = InterleavedGradientNoise((float2) (id.xy + 0.5), id.x);
+    //float theta = TWO_PI * noise;
+    //float cosTheta = cos(theta);
+    //float sinTheta = sin(theta);
+    //float2x2 rotation = float2x2(cosTheta, sinTheta,
+    //                             -sinTheta, cosTheta);
     
     
     //int2 screenCoord = _ScreenSize * uv;
@@ -235,7 +242,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     normalVS = normalize(normalVS);
 
     half AOIntegrate = 0;
-    float radiusPixel = RADIUSINPIXEL / screenPosVS.z;
+    float radiusPixel = min(RADIUSINPIXEL * rcp(screenPosVS.z), 50.0);
     //float minLength = length(_ScreenSize.zw);
     //float pixelSizeSS2 = dot(_ScreenSize.zw, _ScreenSize.zw);
     float aoFade = saturate(AOFADE_PARAM1 * screenPosVS.z + AOFADE_PARAM2);
@@ -257,19 +264,6 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     }
     AOIntegrate = saturate(AOIntegrate / SAMPLE_COUNT);
     
-    #if USE_UNITY_SSAO
-    const half rcpSampleCount = half(rcp(SAMPLE_COUNT));
-    half ao = HALF_ZERO;
-    half sHalf = HALF_MINUS_ONE;
-    for (int s = 0; s < SAMPLE_COUNT; s++)
-    {
-        sHalf += HALF_ONE;
-
-        // Sample point
-        half3 v_s1 = PickSamplePoint(uvScreen * _AOMaskSize.xy, s, sHalf, rcpSampleCount, normalVS);
-        half3 vpos_s1 = half3(screenPosVS + v_s1);
-    }
-    #endif
     float fadedAO = lerp(1.0, 1.0 - AOIntegrate, aoFade);
     _AOMask[id.xy] = fadedAO;
 
