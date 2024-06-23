@@ -25,7 +25,8 @@ namespace Insanity
             [Reload("Runtime/ShaderLibrary/TileBasedLightCulling.compute")]
             public ComputeShader TileBasedLightCulling;
             public ComputeShader HBAO;
-            public ComputeShader Blur;
+            public ComputeShader SSAOBlur;
+            public ComputeShader SSAODualBlur;
             //public ComputeShader TileFrustumCompute;
         }
 

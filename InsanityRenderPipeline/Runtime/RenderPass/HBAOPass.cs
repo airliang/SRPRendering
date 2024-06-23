@@ -16,8 +16,10 @@ namespace Insanity
         public float intensity = 1;
         public float aoFadeStart = 0;
         public float aoFadeEnd = 100.0f;
+        public SSAOBlurType blurMethod = SSAOBlurType.eGaussian;
         public ComputeShader ssao;
         public ComputeShader blur;
+        public ComputeShader duarBlur;
         public Texture2D blueNoiseTexture;
     }
 
@@ -38,9 +40,12 @@ namespace Insanity
         public static int _ProjectionParams;
         public static int _AOInput;
         public static int _AOOutput;
+        public static int _OutputTexSize;
         public static int _HBAOKernel = -1;
         public static int _VerticalBlurKernel = -1;
         public static int _HorizontalBlurKernel = -1;
+        public static int _DuarBlurDownSampleKernel = -1;
+        public static int _DuarBlurUpSampleKernel = -1;
     }
 
     public partial class RenderPasses
@@ -74,9 +79,20 @@ namespace Insanity
             public int kHorizontalBlur;
         }
 
+        class DualBlurPassData
+        {
+            public TextureHandle src;
+            public TextureHandle dst;
+            public Vector4 sizeDstTexture;
+            public ComputeShader cs;
+            public int kernel;
+        }
+
         static ProfilingSampler s_HBAOPassProfiler = new ProfilingSampler("HBAO Pass Profiler");
         static ProfilingSampler s_HBAOVerticalBlurProfiler = new ProfilingSampler("Vertical Blur Pass Profiler");
         static ProfilingSampler s_HBAOHorizontalBlurProfiler = new ProfilingSampler("Horizontal Blur Pass Profiler");
+        static ProfilingSampler s_DualBlurDownProfiler = new ProfilingSampler("Duar Down Sample Pass Profiler");
+        static ProfilingSampler s_DualBlurUpProfiler = new ProfilingSampler("Duar Up Sample Pass Profiler");
 
         public static void InitializeSSAOShaderParameters()
         {
@@ -95,6 +111,7 @@ namespace Insanity
             HBAOShaderParams._ProjectionParams = Shader.PropertyToID("_ProjectionParams");
             HBAOShaderParams._AOInput = Shader.PropertyToID("_AOInput");
             HBAOShaderParams._AOOutput = Shader.PropertyToID("_AOOutput");
+            HBAOShaderParams._OutputTexSize = Shader.PropertyToID("_OutputTexSize");
         }
 
         private static TextureHandle CreateAOMaskTexture(RenderGraph graph, int width, int height, string name)
@@ -201,8 +218,14 @@ namespace Insanity
                 });
             }
 
+            if (ssaoSettings.blurMethod == SSAOBlurType.eGaussian)
+                GaussianBlurAOMask(renderingData, ssaoMask, ssaoSettings, AOMaskSize);
+            else
+                DualBlur(renderingData, ssaoMask, ssaoSettings, AOMaskSize);
+        }
 
-
+        static void GaussianBlurAOMask(RenderingData renderingData, TextureHandle ssaoMask, SSAOSettings ssaoSettings, Vector4 AOMaskSize)
+        {
             BlurAOPassData blurDataV;
             using (var builder = renderingData.renderGraph.AddRenderPass<BlurAOPassData>("HBAO Vertical Blur Pass", out blurDataV, s_HBAOVerticalBlurProfiler))
             {
@@ -215,7 +238,7 @@ namespace Insanity
                 blurDataV.cs = ssaoSettings.blur;
                 blurDataV.kVerticalBlur = HBAOShaderParams._VerticalBlurKernel;
                 blurDataV.aoInput = ssaoMask;
-                blurDataV.aoOutput = builder.WriteTexture(CreateAOMaskTexture(renderingData.renderGraph, (int)AOMaskWidth, (int)AOMaskHeight, "AOTemp"));
+                blurDataV.aoOutput = builder.WriteTexture(CreateAOMaskTexture(renderingData.renderGraph, (int)AOMaskSize.x, (int)AOMaskSize.y, "AOTemp"));
                 blurDataV.AOMaskSize = AOMaskSize;
 
                 builder.SetRenderFunc((BlurAOPassData data, RenderGraphContext context) =>
@@ -254,6 +277,71 @@ namespace Insanity
                     int groupX = Mathf.CeilToInt(data.AOMaskSize.x / 8);
                     int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);
                     context.cmd.DispatchCompute(data.cs, data.kHorizontalBlur, groupX, groupY, 1);
+                });
+            }
+        }
+
+        static void DualBlur(RenderingData renderingData, TextureHandle ssaoMask, SSAOSettings ssaoSettings, Vector4 AOMaskSize)
+        {
+            float srcWidth = AOMaskSize.x;
+            float srcHeight = AOMaskSize.y;
+            float dstWidth = srcWidth * 0.5f;
+            float dstHeight = srcHeight * 0.5f;
+            DualBlurPassData downBlurPassData = null;
+            using (var builder = renderingData.renderGraph.AddRenderPass<DualBlurPassData>("Duar DownSample Pass", out downBlurPassData, s_DualBlurDownProfiler))
+            {
+                if (HBAOShaderParams._DuarBlurDownSampleKernel == -1)
+                {
+                    HBAOShaderParams._DuarBlurDownSampleKernel = ssaoSettings.duarBlur.FindKernel("DownSample");
+                }
+
+                builder.AllowPassCulling(false);
+                downBlurPassData.cs = ssaoSettings.duarBlur;
+                downBlurPassData.kernel = HBAOShaderParams._DuarBlurDownSampleKernel;
+                downBlurPassData.src = builder.ReadTexture(ssaoMask);
+                downBlurPassData.dst = builder.WriteTexture(CreateAOMaskTexture(renderingData.renderGraph, (int)dstWidth, (int)dstHeight, "AOTemp"));
+                downBlurPassData.sizeDstTexture = new Vector4(dstWidth, dstHeight, 1.0f / dstWidth, 1.0f / dstHeight);
+
+                builder.SetRenderFunc((DualBlurPassData data, RenderGraphContext context) =>
+                {
+                    context.cmd.SetComputeTextureParam(data.cs, data.kernel, HBAOShaderParams._AOInput, data.src);
+                    context.cmd.SetComputeTextureParam(data.cs, data.kernel, HBAOShaderParams._AOOutput, data.dst);
+                    context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._OutputTexSize, data.sizeDstTexture);
+
+                    int groupX = Mathf.CeilToInt(data.sizeDstTexture.x / 8);
+                    int groupY = Mathf.CeilToInt(data.sizeDstTexture.y / 8);
+                    context.cmd.DispatchCompute(data.cs, data.kernel, groupX, groupY, 1);
+                });
+            }
+
+            using (var builder = renderingData.renderGraph.AddRenderPass<DualBlurPassData>("Duar UpSample Pass", out var passData, s_DualBlurUpProfiler))
+            {
+                if (HBAOShaderParams._DuarBlurUpSampleKernel == -1)
+                {
+                    HBAOShaderParams._DuarBlurUpSampleKernel = ssaoSettings.duarBlur.FindKernel("UpSample");
+                }
+
+                srcWidth = dstWidth;
+                srcHeight = dstHeight;
+                dstWidth = srcWidth * 2;
+                dstHeight = srcHeight * 2;
+
+                builder.AllowPassCulling(false);
+                passData.cs = ssaoSettings.duarBlur;
+                passData.kernel = HBAOShaderParams._DuarBlurUpSampleKernel;
+                passData.src = builder.ReadTexture(downBlurPassData.dst);
+                passData.dst = builder.WriteTexture(ssaoMask);
+                passData.sizeDstTexture = new Vector4(dstWidth, dstHeight, 1.0f / dstWidth, 1.0f / dstHeight);
+
+                builder.SetRenderFunc((DualBlurPassData data, RenderGraphContext context) =>
+                {
+                    context.cmd.SetComputeTextureParam(data.cs, data.kernel, HBAOShaderParams._AOInput, data.src);
+                    context.cmd.SetComputeTextureParam(data.cs, data.kernel, HBAOShaderParams._AOOutput, data.dst);
+                    context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._OutputTexSize, data.sizeDstTexture);
+
+                    int groupX = Mathf.CeilToInt(data.sizeDstTexture.x / 8);
+                    int groupY = Mathf.CeilToInt(data.sizeDstTexture.y / 8);
+                    context.cmd.DispatchCompute(data.cs, data.kernel, groupX, groupY, 1);
                 });
             }
         }

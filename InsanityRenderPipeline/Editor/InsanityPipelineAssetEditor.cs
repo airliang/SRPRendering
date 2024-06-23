@@ -80,6 +80,8 @@ namespace UnityEditor.Insanity
             public static GUIContent ssaoHalfResolutionText = EditorGUIUtility.TrTextContent("Half Resolution");
             public static GUIContent ssaoIntensityText = EditorGUIUtility.TrTextContent("AO Intensity");
             public static GUIContent ssaoFadeDistanceText = EditorGUIUtility.TrTextContent("AO Fade Distance Range");
+            public static GUIContent ssaoBlurMethodText = EditorGUIUtility.TrTextContent("Blur Method");
+            public static string[] ssaoBlurMethodOptions = { "Gaussian", "Dual" };
 
             public static GUIContent debugViewSettingsText = EditorGUIUtility.TrTextContent("DebugView", "DebugView to display the rendering results in the pipeline");
             public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "SSAO", "TriangleOverdraw" };
@@ -147,6 +149,7 @@ namespace UnityEditor.Insanity
         SerializedProperty m_SSAOIntensityProp;
         SerializedProperty m_SSAOFadeDistanceStartProp;
         SerializedProperty m_SSAOFadeDistanceEndProp;
+        SerializedProperty m_SSAOBlurMethodProp;
 
         SavedBool m_DebugViewSettingFoldout;
         SerializedProperty m_DebugViewSettingsMode;
@@ -225,6 +228,7 @@ namespace UnityEditor.Insanity
             m_SSAOIntensityProp = serializedObject.FindProperty("m_AOIntensity");
             m_SSAOFadeDistanceStartProp = serializedObject.FindProperty("m_AOFadeDistanceStart");
             m_SSAOFadeDistanceEndProp = serializedObject.FindProperty("m_AOFadeDistanceEnd");
+            m_SSAOBlurMethodProp = serializedObject.FindProperty("m_SSAOBlurType");
 
             m_DebugViewSettingFoldout = new SavedBool($"{target.GetType()}.DebugViewSettingFoldout", false);
             m_DebugViewSettingsMode = serializedObject.FindProperty("m_DebugViewMode");
@@ -392,6 +396,9 @@ namespace UnityEditor.Insanity
                     EditorGUILayout.MinMaxSlider(Styles.ssaoFadeDistanceText, ref fadeStart, ref fadeEnd, 0, 100.0f);
                     m_SSAOFadeDistanceStartProp.floatValue = fadeStart;
                     m_SSAOFadeDistanceEndProp.floatValue = fadeEnd;
+
+                    CoreEditorUtils.DrawPopup(Styles.ssaoBlurMethodText, m_SSAOBlurMethodProp, Styles.ssaoBlurMethodOptions);
+
                 }
                 EditorGUILayout.Space();
                 EditorGUILayout.Space();

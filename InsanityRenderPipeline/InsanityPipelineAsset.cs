@@ -91,6 +91,12 @@ namespace Insanity
         _8x = 8
     }
 
+    public enum SSAOBlurType
+    {
+        eGaussian,
+        eDual,
+    }
+
     [ExecuteInEditMode]
     public class InsanityPipelineAsset : RenderPipelineAsset
     {
@@ -392,6 +398,8 @@ namespace Insanity
         [SerializeField] float m_AOIntensity = 1.0f;
         [SerializeField] float m_AOFadeDistanceStart = 0;
         [SerializeField] float m_AOFadeDistanceEnd = 50;
+        [SerializeField] SSAOBlurType m_SSAOBlurType = SSAOBlurType.eGaussian;
+
         public bool SSAOEnable
         {
             get { return m_SSAOEnable; }
@@ -432,6 +440,12 @@ namespace Insanity
         {
             get { return m_AOFadeDistanceEnd; }
             set { m_AOFadeDistanceEnd = value;}
+        }
+
+        public SSAOBlurType SSAOBlurMethod
+        {
+            get { return m_SSAOBlurType; }
+            set { m_SSAOBlurType = value; }
         }
         #endregion
 

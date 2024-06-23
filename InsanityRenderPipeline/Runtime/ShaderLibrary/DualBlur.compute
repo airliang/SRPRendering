@@ -1,0 +1,43 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel DownSample
+#pragma kernel UpSample
+
+Texture2D<float> _AOInput;
+RWTexture2D<float> _AOOutput;
+float4 _InputTexSize; 
+float4 _OutputTexSize;  //xy width height zw 1/width 1/height
+SamplerState s_linear_clamp_sampler;
+
+[numthreads(8,8,1)]
+void DownSample (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    float2 uvInput = (id.xy + 0.5) * _OutputTexSize.zw;
+    float2 uvOffset = _OutputTexSize.zw * 0.5;
+    
+    _AOOutput[id.xy] = _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput, 0) * 0.5
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(-uvOffset.x, -uvOffset.y), 0) * 0.125
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(uvOffset.x, -uvOffset.y), 0) * 0.125
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(-uvOffset.x, uvOffset.y), 0) * 0.125
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(uvOffset.x, uvOffset.y), 0) * 0.125;
+
+}
+
+[numthreads(8, 8, 1)]
+void UpSample(uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    float2 uvInput = (id.xy + 0.5) * _OutputTexSize.zw;
+    float2 uvOffset = _OutputTexSize.zw * 0.5;
+    float oneDivide6 = rcp(6.0f);
+    float oneDivide12 = rcp(12.0f);
+    _AOOutput[id.xy] = _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(-uvOffset.x, -uvOffset.y) * 2.0, 0) * oneDivide6
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(uvOffset.x, -uvOffset.y) * 2.0, 0) * oneDivide6
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(-uvOffset.x, uvOffset.y) * 2.0, 0) * oneDivide6
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(uvOffset.x, uvOffset.y) * 2.0, 0) * oneDivide6
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(0, -uvOffset.y) * 4.0, 0) * oneDivide12
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(0, uvOffset.y) * 4.0, 0) * oneDivide12
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(-uvOffset.x, 0) * 4.0, 0) * oneDivide12
+                    + _AOInput.SampleLevel(s_linear_clamp_sampler, uvInput + float2(uvOffset.x, 0) * 4.0, 0) * oneDivide12;
+
+}

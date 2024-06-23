@@ -5,7 +5,6 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
-using UnityEditor.VersionControl;
 
 namespace Insanity
 {
@@ -65,12 +64,10 @@ namespace Insanity
             m_copyDepthMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.CopyDepth);
             m_tilebasedLightCulling = InsanityPipeline.asset.InsanityPipelineResources.shaders.TileBasedLightCulling;
             m_ssaoSettings.ssao = InsanityPipeline.asset.InsanityPipelineResources.shaders.HBAO;
-            m_ssaoSettings.blur = InsanityPipeline.asset.InsanityPipelineResources.shaders.Blur;
+            m_ssaoSettings.blur = InsanityPipeline.asset.InsanityPipelineResources.shaders.SSAOBlur;
+
+            m_ssaoSettings.duarBlur = InsanityPipeline.asset.InsanityPipelineResources.shaders.SSAODualBlur;
             //m_ssaoSettings.blueNoiseTexture = InsanityPipeline.asset.InsanityPipelineResources.internalTextures.SSAONoiseTexture;
-            if (m_ssaoSettings.blueNoiseTexture == null)
-            {
-                RenderPasses.CreateNoiseTexture(out m_ssaoSettings.blueNoiseTexture);
-            }
             RenderPasses.InitializeSSAOShaderParameters();
         }
 
@@ -210,6 +207,11 @@ namespace Insanity
                     m_ssaoSettings.intensity = asset.AOIntensity;
                     m_ssaoSettings.aoFadeStart = asset.AOFadeStart;
                     m_ssaoSettings.aoFadeEnd = asset.AOFadeEnd;
+                    m_ssaoSettings.blurMethod = asset.SSAOBlurMethod;
+                    if (m_ssaoSettings.blueNoiseTexture == null)
+                    {
+                        RenderPasses.CreateNoiseTexture(out m_ssaoSettings.blueNoiseTexture);
+                    }
                     RenderPasses.Render_HBAOPass(renderingData, m_FrameRenderSets.cameraDepthResolved, m_FrameRenderSets.cameraNormal, out m_FrameRenderSets.ssaoMask, m_ssaoSettings);
                 }
                 CoreUtils.SetKeyword(cmdRG, "_SSAO_ENABLE", asset.SSAOEnable);
