@@ -393,12 +393,14 @@ namespace Insanity
         #region SSAO
         [SerializeField] bool m_SSAOEnable = false;
         [SerializeField] float m_SSAORadius = 1.0f;
+        [SerializeField] float m_MaxRadiusInPixel = 30.0f;
         [SerializeField] float m_HBAOHorizonBias = 0.0f;
         [SerializeField] bool m_AOHalfResolution = true;
         [SerializeField] float m_AOIntensity = 1.0f;
         [SerializeField] float m_AOFadeDistanceStart = 0;
         [SerializeField] float m_AOFadeDistanceEnd = 50;
         [SerializeField] SSAOBlurType m_SSAOBlurType = SSAOBlurType.eGaussian;
+        [SerializeField] bool m_EnableTemperalFilter = false;
 
         public bool SSAOEnable
         {
@@ -410,6 +412,12 @@ namespace Insanity
         {
             get { return m_SSAORadius; }
             set { m_SSAORadius = value; }
+        }
+
+        public float MaxRadiusInPixel
+        {
+            get { return m_MaxRadiusInPixel; }
+            set { m_MaxRadiusInPixel = value; }
         }
 
         public float HBAOHorizonBias
@@ -446,6 +454,12 @@ namespace Insanity
         {
             get { return m_SSAOBlurType; }
             set { m_SSAOBlurType = value; }
+        }
+
+        public bool EnableTemperalFilter
+        {
+            get { return m_EnableTemperalFilter; }
+            set { m_EnableTemperalFilter = value;}
         }
         #endregion
 

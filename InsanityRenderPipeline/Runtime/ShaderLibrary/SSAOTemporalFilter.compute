@@ -1,0 +1,72 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel TemporalFilter
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+Texture2D<float> _CurrentHistory;
+Texture2D<float> _PreviousHistory;
+RWTexture2D<float> _AOOutput;
+Texture2D _DepthTexture;
+float4x4 _PreProjInverse;
+float4x4 _ProjInverse;
+float4x4 _PreProj;
+float4 _AOMaskSize;
+
+SamplerState s_point_clamp_sampler;
+SamplerState s_point_repeat_sampler;
+SamplerState s_linear_clamp_sampler;
+
+float3 UVtoViewPosCurFrame(float2 uv, float depth)
+{
+    float2 clippos = uv * 2.0 - 1.0;
+    
+    float4 posView = mul(_ProjInverse, float4(clippos, 2.0 * depth - 1.0, 1));
+    posView /= posView.w;
+    return posView.xyz;
+}
+
+float3 UVtoViewPosPreFrame(float2 uv, float depth)
+{
+    float2 clippos = uv * 2.0 - 1.0;
+    
+    float4 posView = mul(_PreProjInverse, float4(clippos, 2.0 * depth - 1.0, 1));
+    posView /= posView.w;
+    return posView.xyz;
+}
+
+float GetPlatformDepth(float depth)
+{
+    return 1.0 - depth;
+}
+
+[numthreads(8,8,1)]
+void TemporalFilter (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    half2 uv = ((half2)id.xy + 0.5) * _AOMaskSize.zw;
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uv, 0);
+    depth = GetPlatformDepth(depth);
+    
+    float3 viewPosCur = UVtoViewPosCurFrame(uv, depth);
+    float4 projPosCur = float4(2.0 * uv - 1, depth * 2.0 - 1, 1);
+    float4 weightViewPos = mul(_PreProjInverse, projPosCur);
+    weightViewPos /= weightViewPos.w;
+    
+    float3 viewPosPre = UVtoViewPosPreFrame(uv, depth);
+    float4 projPosPre = mul(_PreProj, float4(viewPosPre, 1));
+    //projPosPre /= projPosPre.w;
+    float4 viewPosPreReal = mul(_PreProjInverse, projPosPre);
+    viewPosPreReal /= viewPosPreReal.z;
+
+    float weightCur = weightViewPos.z;
+    float weightPre = viewPosPreReal.z;
+
+    float ao = _CurrentHistory[id.xy];
+    if (abs(1.0 - weightCur / weightPre) < 0.1)
+    {
+        float aoPre = _PreviousHistory[id.xy];
+        ao = (ao + aoPre) * 0.5;
+    }
+    _AOOutput[id.xy] = ao;
+
+}

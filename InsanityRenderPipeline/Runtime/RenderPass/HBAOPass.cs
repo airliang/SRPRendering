@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
@@ -11,15 +12,18 @@ namespace Insanity
     public class SSAOSettings
     {
         public float radius;
+        public float maxRadiusInPixel;
         public float horizonBias = 0;
         public bool halfResolution = true;
         public float intensity = 1;
         public float aoFadeStart = 0;
         public float aoFadeEnd = 100.0f;
+        public bool enableTemporalFilter = false;
         public SSAOBlurType blurMethod = SSAOBlurType.eGaussian;
         public ComputeShader ssao;
         public ComputeShader blur;
         public ComputeShader duarBlur;
+        public ComputeShader temporalFilter;
         public Texture2D blueNoiseTexture;
     }
 
@@ -41,11 +45,34 @@ namespace Insanity
         public static int _AOInput;
         public static int _AOOutput;
         public static int _OutputTexSize;
+        public static int _CurrentHistory;
+        public static int _PreviousHistory;
+        public static int _PreProjInverse;
+        public static int _PreProj;
         public static int _HBAOKernel = -1;
         public static int _VerticalBlurKernel = -1;
         public static int _HorizontalBlurKernel = -1;
         public static int _DuarBlurDownSampleKernel = -1;
         public static int _DuarBlurUpSampleKernel = -1;
+    }
+
+    public class AOHistoryData
+    {
+        const int MAX_AO_HISTORY_RT_NUM = 2;
+        public RTHandle[] m_AOHistoryRT = new RTHandle[MAX_AO_HISTORY_RT_NUM];
+        public Matrix4x4 m_PreViewMatrix;
+        public Matrix4x4 m_PreProjMatrix;
+        public Matrix4x4 m_PreProjMatrixInverse;
+        public bool m_IsFirstFrame = true;
+
+        public void SwapHistoryRTs()
+        {
+            var nextFirst = m_AOHistoryRT[m_AOHistoryRT.Length - 1];
+            for (int i = 0, c = m_AOHistoryRT.Length - 1; i < c; ++i)
+                m_AOHistoryRT[i + 1] = m_AOHistoryRT[i];
+            m_AOHistoryRT[0] = nextFirst;
+        }
+
     }
 
     public partial class RenderPasses
@@ -94,6 +121,10 @@ namespace Insanity
         static ProfilingSampler s_DualBlurDownProfiler = new ProfilingSampler("Duar Down Sample Pass Profiler");
         static ProfilingSampler s_DualBlurUpProfiler = new ProfilingSampler("Duar Up Sample Pass Profiler");
 
+        
+        private static float m_AmbientOcclusionResolutionScale = 1.0f;
+        private static AOHistoryData m_AOHistoryData = new AOHistoryData();
+
         public static void InitializeSSAOShaderParameters()
         {
             HBAOShaderParams._DepthTexture = Shader.PropertyToID("_DepthTexture");
@@ -112,6 +143,10 @@ namespace Insanity
             HBAOShaderParams._AOInput = Shader.PropertyToID("_AOInput");
             HBAOShaderParams._AOOutput = Shader.PropertyToID("_AOOutput");
             HBAOShaderParams._OutputTexSize = Shader.PropertyToID("_OutputTexSize");
+            HBAOShaderParams._CurrentHistory = Shader.PropertyToID("_CurrentHistory");
+            HBAOShaderParams._PreviousHistory = Shader.PropertyToID("_PreviousHistory");
+            HBAOShaderParams._PreProjInverse = Shader.PropertyToID("_PreProjInverse");
+            HBAOShaderParams._PreProj = Shader.PropertyToID("_PreProj");
         }
 
         private static TextureHandle CreateAOMaskTexture(RenderGraph graph, int width, int height, string name)
@@ -169,6 +204,7 @@ namespace Insanity
                 //a = 1.0 / (fadeStart - fadeEnd); b = fadeEnd / (fadeEnd - fadeStart)
                 passData.HBAOParams2.x = 1.0f / (ssaoSettings.aoFadeStart - ssaoSettings.aoFadeEnd);
                 passData.HBAOParams2.y = ssaoSettings.aoFadeEnd / (ssaoSettings.aoFadeEnd - ssaoSettings.aoFadeStart);
+                passData.HBAOParams2.z = ssaoSettings.maxRadiusInPixel;
 
                 Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix;
                 proj = proj * Matrix4x4.Scale(new Vector3(1, 1, -1));
@@ -218,10 +254,20 @@ namespace Insanity
                 });
             }
 
+            TextureHandle currentHistory = ssaoSettings.enableTemporalFilter ? renderingData.renderGraph.ImportTexture(m_AOHistoryData.m_AOHistoryRT[0]) : ssaoMask;
             if (ssaoSettings.blurMethod == SSAOBlurType.eGaussian)
-                GaussianBlurAOMask(renderingData, ssaoMask, ssaoSettings, AOMaskSize);
+                GaussianBlurAOMask(renderingData, currentHistory, ssaoSettings, AOMaskSize);
             else
-                DualBlur(renderingData, ssaoMask, ssaoSettings, AOMaskSize);
+                DualBlur(renderingData, currentHistory, ssaoSettings, AOMaskSize);
+
+            if (ssaoSettings.enableTemporalFilter)
+            {
+                SwapHistoryRTs();
+                AllocateAOHistoryRT(ssaoSettings.halfResolution ? 0.5f : 1.0f);
+                
+                TextureHandle previousHistory = renderingData.renderGraph.ImportTexture(m_AOHistoryData.m_AOHistoryRT[1]);
+                TemporalFilterAO(renderingData, currentHistory, previousHistory);
+            }
         }
 
         static void GaussianBlurAOMask(RenderingData renderingData, TextureHandle ssaoMask, SSAOSettings ssaoSettings, Vector4 AOMaskSize)
@@ -346,6 +392,26 @@ namespace Insanity
             }
         }
 
+        static void UpdateAOHistoryData(RenderingData renderingData, HBAOPassData hbaoPassData)
+        {
+            if (m_AOHistoryData.m_IsFirstFrame)
+            {
+                Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix;
+                proj = proj * Matrix4x4.Scale(new Vector3(1, 1, -1));
+                m_AOHistoryData.m_PreProjMatrix = proj;
+                m_AOHistoryData.m_PreProjMatrixInverse = hbaoPassData.projInverse;
+                m_AOHistoryData.m_PreViewMatrix = hbaoPassData.view;
+
+            }
+
+            m_AOHistoryData.m_IsFirstFrame = false;
+        }
+
+        static void TemporalFilterAO(RenderingData renderingData, TextureHandle currentHistory, TextureHandle previousHistory)
+        {
+
+        }
+
         public static void CreateNoiseTexture(out Texture2D noiseTexture)
         {
             noiseTexture = new Texture2D(4,4, TextureFormat.RGBA32, false, true);
@@ -447,6 +513,40 @@ namespace Insanity
 
             noiseTexture.SetPixels(colors);
             noiseTexture.Apply(false, true);
+        }
+
+        static void SwapHistoryRTs()
+        {
+            m_AOHistoryData.SwapHistoryRTs();
+        }
+
+        static bool AllocateAOHistoryRT(float scaleFactor)
+        {
+            if (m_AmbientOcclusionResolutionScale != scaleFactor || m_AOHistoryData.m_AOHistoryRT[0] == null)
+            {
+                ReleaseAOHistoryRT();
+                float AOMaskWidth = GlobalRenderSettings.screenResolution.width * scaleFactor;
+                float AOMaskHeight = GlobalRenderSettings.screenResolution.height * scaleFactor;
+                RenderTextureDescriptor descriptor = new RenderTextureDescriptor((int)AOMaskWidth, (int)AOMaskHeight, RenderTextureFormat.R8, 0, 0);
+                for (int i = 0; i < m_AOHistoryData.m_AOHistoryRT.Length; ++i)
+                {
+                    RTHandleUtils.ReAllocateIfNeeded(ref m_AOHistoryData.m_AOHistoryRT[i], descriptor, FilterMode.Point, TextureWrapMode.Clamp);
+                }
+                m_AmbientOcclusionResolutionScale = scaleFactor;
+                return true;
+            }
+            return true;
+        }
+
+        static void ReleaseAOHistoryRT()
+        {
+            for (int i = 0; i < m_AOHistoryData.m_AOHistoryRT.Length; ++i)
+            {
+                if (m_AOHistoryData.m_AOHistoryRT[i] != null)
+                {
+                    m_AOHistoryData.m_AOHistoryRT[i].Release();
+                }
+            }
         }
     }
 }

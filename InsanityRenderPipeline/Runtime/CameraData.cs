@@ -72,6 +72,8 @@ namespace Insanity
 
         internal int frameIndex = 0;
 
+        internal bool isFirstFrame { get; private set; }
+
         internal CameraData(Camera cam)
         {
             camera = cam;
@@ -83,7 +85,7 @@ namespace Insanity
 
         void Reset()
         {
-
+            isFirstFrame = true;
         }
 
         public static CameraData GetOrCreate(Camera camera)
@@ -167,7 +169,18 @@ namespace Insanity
             //    noTransViewMatrix.SetColumn(3, new Vector4(0, 0, 0, 1));
             //}
             //var gpuVPNoTrans = gpuNonJitteredProj * noTransViewMatrix;
-
+            if (!isFirstFrame)
+            {
+                viewConstants.prevInvViewProjMatrix = viewConstants.invViewProjMatrix;
+                viewConstants.prevViewMatrix = viewConstants.viewMatrix;
+                viewConstants.prevViewProjMatrix = viewConstants.viewProjMatrix;
+            }
+            else
+            {
+                viewConstants.prevInvViewProjMatrix = (gpuProj * gpuView).inverse;
+                viewConstants.prevViewMatrix = gpuView;
+                viewConstants.prevViewProjMatrix = gpuProj * gpuView;
+            }
 
             viewConstants.viewMatrix = gpuView;
             viewConstants.invViewMatrix = gpuView.inverse;
@@ -234,6 +247,8 @@ namespace Insanity
                 frameIndex = 0;
 
             UpdateViewConstants();
+
+            isFirstFrame = false;
         }
 
         public void UpdateViewConstants()

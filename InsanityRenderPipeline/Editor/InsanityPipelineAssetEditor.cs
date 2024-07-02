@@ -76,12 +76,14 @@ namespace UnityEditor.Insanity
             public static GUIContent ssaoSettingsText = EditorGUIUtility.TrTextContent("SSAO", "SSAO");
             public static GUIContent ssaoText = EditorGUIUtility.TrTextContent("SSAO Enable", "Enable Screen Space Ambient Occlusion.");
             public static GUIContent ssaoRadiusText = EditorGUIUtility.TrTextContent("SSAO Radius", "SSAO Radius.");
+            public static GUIContent ssaoMaxRadiusInPixelText = EditorGUIUtility.TrTextContent("Max SSAO Radius(pixel)");
             public static GUIContent hbaoHorizonBiasText = EditorGUIUtility.TrTextContent("Horizontal Bias");
             public static GUIContent ssaoHalfResolutionText = EditorGUIUtility.TrTextContent("Half Resolution");
             public static GUIContent ssaoIntensityText = EditorGUIUtility.TrTextContent("AO Intensity");
             public static GUIContent ssaoFadeDistanceText = EditorGUIUtility.TrTextContent("AO Fade Distance Range");
             public static GUIContent ssaoBlurMethodText = EditorGUIUtility.TrTextContent("Blur Method");
             public static string[] ssaoBlurMethodOptions = { "Gaussian", "Dual" };
+            public static GUIContent ssaoEnableTemperalFilterText = EditorGUIUtility.TrTextContent("Temperal Filter");
 
             public static GUIContent debugViewSettingsText = EditorGUIUtility.TrTextContent("DebugView", "DebugView to display the rendering results in the pipeline");
             public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "SSAO", "TriangleOverdraw" };
@@ -144,12 +146,14 @@ namespace UnityEditor.Insanity
         SavedBool m_SSAOSettingFoldout;
         SerializedProperty m_SSAOProp;
         SerializedProperty m_SSAORadiusProp;
+        SerializedProperty m_MaxRadiusInPixelProp;
         SerializedProperty m_HBAOHorizonBiasProp;
         SerializedProperty m_SSAOHalfResolutionProp;
         SerializedProperty m_SSAOIntensityProp;
         SerializedProperty m_SSAOFadeDistanceStartProp;
         SerializedProperty m_SSAOFadeDistanceEndProp;
         SerializedProperty m_SSAOBlurMethodProp;
+        SerializedProperty m_SSAOTemperalFilterProp;
 
         SavedBool m_DebugViewSettingFoldout;
         SerializedProperty m_DebugViewSettingsMode;
@@ -223,12 +227,14 @@ namespace UnityEditor.Insanity
             m_SSAOSettingFoldout = new SavedBool($"{target.GetType()}.SSAOSettingFoldout", false);
             m_SSAOProp = serializedObject.FindProperty("m_SSAOEnable");
             m_SSAORadiusProp = serializedObject.FindProperty("m_SSAORadius");
+            m_MaxRadiusInPixelProp = serializedObject.FindProperty("m_MaxRadiusInPixel");
             m_HBAOHorizonBiasProp = serializedObject.FindProperty("m_HBAOHorizonBias");
             m_SSAOHalfResolutionProp = serializedObject.FindProperty("m_AOHalfResolution");
             m_SSAOIntensityProp = serializedObject.FindProperty("m_AOIntensity");
             m_SSAOFadeDistanceStartProp = serializedObject.FindProperty("m_AOFadeDistanceStart");
             m_SSAOFadeDistanceEndProp = serializedObject.FindProperty("m_AOFadeDistanceEnd");
             m_SSAOBlurMethodProp = serializedObject.FindProperty("m_SSAOBlurType");
+            m_SSAOTemperalFilterProp = serializedObject.FindProperty("m_EnableTemperalFilter");
 
             m_DebugViewSettingFoldout = new SavedBool($"{target.GetType()}.DebugViewSettingFoldout", false);
             m_DebugViewSettingsMode = serializedObject.FindProperty("m_DebugViewMode");
@@ -388,9 +394,10 @@ namespace UnityEditor.Insanity
                 if (m_SSAOProp.boolValue)
                 {
                     m_SSAORadiusProp.floatValue = EditorGUILayout.Slider(Styles.ssaoRadiusText, m_SSAORadiusProp.floatValue, 0, 10.0f);
+                    m_MaxRadiusInPixelProp.floatValue = EditorGUILayout.Slider(Styles.ssaoMaxRadiusInPixelText, m_MaxRadiusInPixelProp.floatValue, 10.0f, 100.0f);
                     m_HBAOHorizonBiasProp.floatValue = EditorGUILayout.Slider(Styles.hbaoHorizonBiasText, m_HBAOHorizonBiasProp.floatValue, 0, 1.0f);
                     m_SSAOHalfResolutionProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoHalfResolutionText, m_SSAOHalfResolutionProp.boolValue);
-                    m_SSAOIntensityProp.floatValue = EditorGUILayout.Slider(Styles.ssaoIntensityText, m_SSAOIntensityProp.floatValue, 0, 4.0f);
+                    m_SSAOIntensityProp.floatValue = EditorGUILayout.Slider(Styles.ssaoIntensityText, m_SSAOIntensityProp.floatValue, 0, 10.0f);
                     float fadeStart = m_SSAOFadeDistanceStartProp.floatValue;
                     float fadeEnd = m_SSAOFadeDistanceEndProp.floatValue;
                     EditorGUILayout.MinMaxSlider(Styles.ssaoFadeDistanceText, ref fadeStart, ref fadeEnd, 0, 100.0f);
@@ -398,7 +405,7 @@ namespace UnityEditor.Insanity
                     m_SSAOFadeDistanceEndProp.floatValue = fadeEnd;
 
                     CoreEditorUtils.DrawPopup(Styles.ssaoBlurMethodText, m_SSAOBlurMethodProp, Styles.ssaoBlurMethodOptions);
-
+                    m_SSAOTemperalFilterProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoEnableTemperalFilterText, m_SSAOTemperalFilterProp.boolValue);
                 }
                 EditorGUILayout.Space();
                 EditorGUILayout.Space();

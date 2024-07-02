@@ -67,6 +67,7 @@ namespace Insanity
             m_ssaoSettings.blur = InsanityPipeline.asset.InsanityPipelineResources.shaders.SSAOBlur;
 
             m_ssaoSettings.duarBlur = InsanityPipeline.asset.InsanityPipelineResources.shaders.SSAODualBlur;
+            m_ssaoSettings.temporalFilter = InsanityPipeline.asset.InsanityPipelineResources.shaders.SSAOTemporalFilter;
             //m_ssaoSettings.blueNoiseTexture = InsanityPipeline.asset.InsanityPipelineResources.internalTextures.SSAONoiseTexture;
             RenderPasses.InitializeSSAOShaderParameters();
         }
@@ -202,6 +203,7 @@ namespace Insanity
                 {
                     m_ssaoSettings.halfResolution = true;
                     m_ssaoSettings.radius = asset.SSAORadius;
+                    m_ssaoSettings.maxRadiusInPixel = asset.MaxRadiusInPixel;
                     m_ssaoSettings.horizonBias = asset.HBAOHorizonBias;
                     m_ssaoSettings.halfResolution = asset.AOHalfResolution;
                     m_ssaoSettings.intensity = asset.AOIntensity;

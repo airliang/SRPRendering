@@ -31,6 +31,7 @@ float2 _ProjectionParams;
 #define NOISE_SCALE _NoiseParam.zw
 #define AOFADE_PARAM1 _HBAOParams2.x
 #define AOFADE_PARAM2 _HBAOParams2.y
+#define MAX_RADIUS_IN_PIXEL _HBAOParams2.z
 //aofade = AOFADE_PARAM1 * linearDepthCS + AOFADE_PARAM2
 
 SamplerState s_point_clamp_sampler;
@@ -242,7 +243,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     normalVS = normalize(normalVS);
 
     half AOIntegrate = 0;
-    float radiusPixel = min(RADIUSINPIXEL * rcp(screenPosVS.z), 50.0);
+    float radiusPixel = min(RADIUSINPIXEL * rcp(screenPosVS.z), MAX_RADIUS_IN_PIXEL);
     //float minLength = length(_ScreenSize.zw);
     //float pixelSizeSS2 = dot(_ScreenSize.zw, _ScreenSize.zw);
     float aoFade = saturate(AOFADE_PARAM1 * screenPosVS.z + AOFADE_PARAM2);

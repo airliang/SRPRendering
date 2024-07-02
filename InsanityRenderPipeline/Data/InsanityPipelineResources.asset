@@ -24,6 +24,8 @@ MonoBehaviour:
     HBAO: {fileID: 7200000, guid: 7871f0785cc698b44a8240466310b691, type: 3}
     SSAOBlur: {fileID: 7200000, guid: f203fa3076cc0bf4c9de159e5bfd1a74, type: 3}
     SSAODualBlur: {fileID: 7200000, guid: ab48473b929f7514198bcc8c4ddaac76, type: 3}
+    SSAOTemporalFilter: {fileID: 7200000, guid: cc153e1ae3c17c34ca3e3b3537333ee0,
+      type: 3}
   materials:
     Blit: {fileID: 2100000, guid: 5738be8920d05f947b18f39c6068cc7d, type: 2}
     Skybox: {fileID: 2100000, guid: 67452d3878198b14b84d18147ea1dab2, type: 2}
