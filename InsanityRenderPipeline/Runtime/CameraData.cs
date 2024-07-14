@@ -30,6 +30,8 @@ namespace Insanity
             public Matrix4x4 prevViewProjMatrix;
             /// <summary>Non-jittered Inverse View Projection matrix from previous frame.</summary>
             public Matrix4x4 prevInvViewProjMatrix;
+            public Matrix4x4 prevProjMatrix;
+            public Matrix4x4 prevInvProjMatrix;
 
             /// <summary>Utility matrix (used by sky) to map screen position to WS view direction.</summary>
             public Matrix4x4 pixelCoordToViewDirWS;
@@ -174,12 +176,16 @@ namespace Insanity
                 viewConstants.prevInvViewProjMatrix = viewConstants.invViewProjMatrix;
                 viewConstants.prevViewMatrix = viewConstants.viewMatrix;
                 viewConstants.prevViewProjMatrix = viewConstants.viewProjMatrix;
+                viewConstants.prevProjMatrix = viewConstants.projMatrix;
+                viewConstants.prevInvProjMatrix = viewConstants.invProjMatrix;
             }
             else
             {
                 viewConstants.prevInvViewProjMatrix = (gpuProj * gpuView).inverse;
                 viewConstants.prevViewMatrix = gpuView;
                 viewConstants.prevViewProjMatrix = gpuProj * gpuView;
+                viewConstants.prevProjMatrix = gpuProj;
+                viewConstants.prevInvProjMatrix = gpuProj.inverse;
             }
 
             viewConstants.viewMatrix = gpuView;

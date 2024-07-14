@@ -1,15 +1,21 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel TemporalFilter
+#pragma enable_d3d11_debug_symbols
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
-Texture2D<float> _CurrentHistory;
-Texture2D<float> _PreviousHistory;
+Texture2D<float> _AOBlur;
+Texture2D<float4> _CurrentHistory;
+RWTexture2D<float4> _OutputHistory;
 RWTexture2D<float> _AOOutput;
 Texture2D _DepthTexture;
 float4x4 _PreProjInverse;
 float4x4 _ProjInverse;
 float4x4 _PreProj;
+float4x4 _ViewInverse;
+float4x4 _PreView;
 float4 _AOMaskSize;
 
 SamplerState s_point_clamp_sampler;
@@ -45,28 +51,46 @@ void TemporalFilter (uint3 id : SV_DispatchThreadID)
     // TODO: insert actual code here!
     half2 uv = ((half2)id.xy + 0.5) * _AOMaskSize.zw;
     float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uv, 0);
-    depth = GetPlatformDepth(depth);
+    //depth = GetPlatformDepth(depth);
     
-    float3 viewPosCur = UVtoViewPosCurFrame(uv, depth);
-    float4 projPosCur = float4(2.0 * uv - 1, depth * 2.0 - 1, 1);
-    float4 weightViewPos = mul(_PreProjInverse, projPosCur);
+    float3 viewPosCur = ComputeViewSpacePosition(uv, depth, _ProjInverse); //UVtoViewPosCurFrame(uv, depth);
+    float4 worldPosCur = mul(_ViewInverse, float4(viewPosCur, 1));
+    float4 projPosCur = float4(2.0 * uv - 1, depth, 1);
+    float4 weightViewPos = mul(_PreView, worldPosCur); //mul(_PreProjInverse, projPosCur);
+    weightViewPos.z = -weightViewPos.z;   //convert the view pos to right coordinate
     weightViewPos /= weightViewPos.w;
-    
-    float3 viewPosPre = UVtoViewPosPreFrame(uv, depth);
-    float4 projPosPre = mul(_PreProj, float4(viewPosPre, 1));
-    //projPosPre /= projPosPre.w;
-    float4 viewPosPreReal = mul(_PreProjInverse, projPosPre);
-    viewPosPreReal /= viewPosPreReal.z;
 
-    float weightCur = weightViewPos.z;
+    
+    float4 viewPosPre = weightViewPos;
+    float4 projPosPre = mul(_PreProj, viewPosPre);
+#if UNITY_UV_STARTS_AT_TOP
+    // Our world space, view space, screen space and NDC space are Y-up.
+    // Our clip space is flipped upside-down due to poor legacy Unity design.
+    // The flip is baked into the projection matrix, so we only have to flip
+    // manually when going from CS to NDC and back.
+    projPosPre.y = -projPosPre.y;
+#endif
+    projPosPre /= projPosPre.w;
+    float2 uvPre = 0.5 * projPosPre.xy + 0.5;
+    float4 aoHistory = _CurrentHistory.SampleLevel(s_point_clamp_sampler, uvPre, 0); //_CurrentHistory[id.xy];
+    float prevDepth = UnpackFloatFromR8G8(aoHistory.zw);
+    float3 viewPosPreReal = ComputeViewSpacePosition(uvPre, prevDepth, _PreProjInverse);
+
+    float weightCur = -weightViewPos.z;  //we have to convert the z to left coordinate
     float weightPre = viewPosPreReal.z;
 
-    float ao = _CurrentHistory[id.xy];
+    
+    float ao = _AOBlur[id.xy]; //aoHistory.r;
+    float aoPre = aoHistory.g;
+    float finalAO = ao;
     if (abs(1.0 - weightCur / weightPre) < 0.1)
     {
-        float aoPre = _PreviousHistory[id.xy];
-        ao = (ao + aoPre) * 0.5;
+        //float aoPre = _PreviousHistory[id.xy];
+        finalAO = (ao + aoPre) * 0.5;
     }
-    _AOOutput[id.xy] = ao;
+    float4 aoCurHistory = float4(finalAO, ao, PackFloatToR8G8(depth));
+    _OutputHistory[id.xy] = aoCurHistory;
+
+    _AOOutput[id.xy] = finalAO;
 
 }
