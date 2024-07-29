@@ -32,7 +32,7 @@ namespace Insanity
             public Matrix4x4 prevInvViewProjMatrix;
             public Matrix4x4 prevProjMatrix;
             public Matrix4x4 prevInvProjMatrix;
-
+            public Vector3 prevWorldSpaceCameraPos;
             /// <summary>Utility matrix (used by sky) to map screen position to WS view direction.</summary>
             public Matrix4x4 pixelCoordToViewDirWS;
 
@@ -42,6 +42,11 @@ namespace Insanity
             /// <summary>Offset from the main view position for stereo view constants.</summary>
             public Vector3 worldSpaceCameraPosViewOffset;
             internal float pad1;
+
+            //non camera relative matrices
+            public Matrix4x4 invViewProjMatrixOriginal;
+            public Matrix4x4 prevViewProjMatrixOriginal;
+            public Matrix4x4 viewProjMatrixOriginal;
         };
 
         /// <summary>Camera name.</summary>
@@ -173,19 +178,25 @@ namespace Insanity
             //var gpuVPNoTrans = gpuNonJitteredProj * noTransViewMatrix;
             if (!isFirstFrame)
             {
+                viewConstants.prevWorldSpaceCameraPos = viewConstants.worldSpaceCameraPos;
                 viewConstants.prevInvViewProjMatrix = viewConstants.invViewProjMatrix;
                 viewConstants.prevViewMatrix = viewConstants.viewMatrix;
                 viewConstants.prevViewProjMatrix = viewConstants.viewProjMatrix;
                 viewConstants.prevProjMatrix = viewConstants.projMatrix;
                 viewConstants.prevInvProjMatrix = viewConstants.invProjMatrix;
+                viewConstants.prevViewProjMatrixOriginal = viewConstants.viewProjMatrixOriginal;
             }
             else
             {
-                viewConstants.prevInvViewProjMatrix = (gpuProj * gpuView).inverse;
+                Vector3 cameraDisplacement = viewConstants.worldSpaceCameraPos - viewConstants.prevWorldSpaceCameraPos;
+                viewConstants.prevWorldSpaceCameraPos = cameraPosition;
                 viewConstants.prevViewMatrix = gpuView;
                 viewConstants.prevViewProjMatrix = gpuProj * gpuView;
                 viewConstants.prevProjMatrix = gpuProj;
                 viewConstants.prevInvProjMatrix = gpuProj.inverse;
+                viewConstants.prevViewProjMatrix *= Matrix4x4.Translate(cameraDisplacement);
+                viewConstants.prevInvViewProjMatrix = viewConstants.prevViewProjMatrix.inverse;
+                viewConstants.prevViewProjMatrixOriginal = gpuProj * viewMatrix;
             }
 
             viewConstants.viewMatrix = gpuView;
@@ -199,6 +210,8 @@ namespace Insanity
             viewConstants.worldSpaceCameraPosViewOffset = Vector3.zero;
             //viewConstants.viewProjectionNoCameraTrans = gpuVPNoTrans;
             viewConstants.pixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(viewConstants, screenSize);
+            viewConstants.viewProjMatrixOriginal = gpuProj * viewMatrix;
+            viewConstants.invViewProjMatrixOriginal = viewConstants.viewProjMatrixOriginal.inverse;
         }
 
         Rect GetPixelRect()

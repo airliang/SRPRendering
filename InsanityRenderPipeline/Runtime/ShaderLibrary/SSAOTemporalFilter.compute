@@ -16,8 +16,14 @@ float4x4 _ProjInverse;
 float4x4 _PreProj;
 float4x4 _ViewInverse;
 float4x4 _PreView;
+float3 _CameraDisplacement;
 float4 _AOMaskSize;
-
+//non camera relative pos
+float4x4 _ViewProjInverse;
+float4x4 _PreViewProj;
+//----
+#define SHADEROPTIONS_CAMERA_RELATIVE_RENDERING (1)
+#define MAX_FRAME_NUM 8
 SamplerState s_point_clamp_sampler;
 SamplerState s_point_repeat_sampler;
 SamplerState s_linear_clamp_sampler;
@@ -45,6 +51,23 @@ float GetPlatformDepth(float depth)
     return 1.0 - depth;
 }
 
+float2 TemporalReprojection(float2 uv, float depth, out float preViewDepth, out float preAO)
+{
+    float4 projPosCur = float4(2.0 * uv - 1, depth, 1);
+    float4 worldPos = mul(_ViewProjInverse, projPosCur);
+    float4 preProjPos = mul(_PreViewProj, worldPos);
+    preProjPos /= preProjPos.w;
+    
+    
+    float2 uvPre = 0.5 * preProjPos.xy + 0.5;
+    float4 aoHistory = _CurrentHistory.SampleLevel(s_linear_clamp_sampler, uvPre, 0); //_CurrentHistory[id.xy];
+    float prevDepth = UnpackFloatFromR8G8(aoHistory.zw);
+    float3 viewPosPreReal = ComputeViewSpacePosition(uvPre, prevDepth, _PreProjInverse);
+    preViewDepth = viewPosPreReal.z;
+    preAO = aoHistory.g;
+    return uvPre;
+}
+
 [numthreads(8,8,1)]
 void TemporalFilter (uint3 id : SV_DispatchThreadID)
 {
@@ -57,6 +80,9 @@ void TemporalFilter (uint3 id : SV_DispatchThreadID)
     float4 worldPosCur = mul(_ViewInverse, float4(viewPosCur, 1));
     float4 projPosCur = float4(2.0 * uv - 1, depth, 1);
     float4 weightViewPos = mul(_PreView, worldPosCur); //mul(_PreProjInverse, projPosCur);
+#if SHADEROPTIONS_CAMERA_RELATIVE_RENDERING == 1
+    weightViewPos.xyz += _CameraDisplacement;
+#endif
     weightViewPos.z = -weightViewPos.z;   //convert the view pos to right coordinate
     weightViewPos /= weightViewPos.w;
 
@@ -72,23 +98,41 @@ void TemporalFilter (uint3 id : SV_DispatchThreadID)
 #endif
     projPosPre /= projPosPre.w;
     float2 uvPre = 0.5 * projPosPre.xy + 0.5;
-    float4 aoHistory = _CurrentHistory.SampleLevel(s_point_clamp_sampler, uvPre, 0); //_CurrentHistory[id.xy];
+    
+    
+    
+    float4 aoHistory = _CurrentHistory.SampleLevel(s_linear_clamp_sampler, uvPre, 0);
     float prevDepth = UnpackFloatFromR8G8(aoHistory.zw);
     float3 viewPosPreReal = ComputeViewSpacePosition(uvPre, prevDepth, _PreProjInverse);
 
-    float weightCur = -weightViewPos.z;  //we have to convert the z to left coordinate
+    float weightCur = viewPosCur.z; //we have to convert the z to left coordinate
     float weightPre = viewPosPreReal.z;
 
     
-    float ao = _AOBlur[id.xy]; //aoHistory.r;
+    float ao = _AOBlur.SampleLevel(s_linear_clamp_sampler, uv, 0); //_AOBlur[id.xy]; //aoHistory.r;
     float aoPre = aoHistory.g;
     float finalAO = ao;
+    int Ncur = 1;
+    int Npre = UnpackByte(aoHistory.r);
+    //disocclusion detecting
     if (abs(1.0 - weightCur / weightPre) < 0.1)
     {
         //float aoPre = _PreviousHistory[id.xy];
-        finalAO = (ao + aoPre) * 0.5;
+        finalAO = (ao + aoPre * Npre) / (Npre + 1);
+        Ncur = min(Npre + 1, MAX_FRAME_NUM);
     }
-    float4 aoCurHistory = float4(finalAO, ao, PackFloatToR8G8(depth));
+    
+    //float curViewDepth = viewPosCur.z;
+    //float preViewDepth = 0;
+    //float preAOTest = 0;
+    //float2 uvPreTest = TemporalReprojection(uv, depth, preViewDepth, preAOTest);
+    //if (abs(1.0 - curViewDepth / preViewDepth) < 0.1)
+    //{
+    //    finalAO = (ao + aoPre * Npre) / (Npre + 1);
+    //    Ncur = min(Npre + 1, MAX_FRAME_NUM);
+    //}
+    
+    float4 aoCurHistory = float4(PackByte(Ncur), finalAO, PackFloatToR8G8(depth));
     _OutputHistory[id.xy] = aoCurHistory;
 
     _AOOutput[id.xy] = finalAO;

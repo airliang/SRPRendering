@@ -52,6 +52,9 @@ namespace Insanity
         public static int _PreProj;
         public static int _PreView;
         public static int _ViewInverse;
+        public static int _CameraDisplacement;
+        public static int _ViewProjInverse;
+        public static int _PreViewProj;
         public static int _HBAOKernel = -1;
         public static int _VerticalBlurKernel = -1;
         public static int _HorizontalBlurKernel = -1;
@@ -62,7 +65,7 @@ namespace Insanity
 
     public class AOHistoryData
     {
-        const int MAX_AO_HISTORY_RT_NUM = 2;
+        public static int MAX_AO_HISTORY_RT_NUM = 2;
         public RTHandle[] m_AOHistoryRT = new RTHandle[MAX_AO_HISTORY_RT_NUM];
         public Matrix4x4 m_PreViewMatrix;
         public Matrix4x4 m_PreProjMatrix;
@@ -134,6 +137,9 @@ namespace Insanity
             public Matrix4x4 preProjInverse;
             public Matrix4x4 preView;
             public Matrix4x4 viewInverse;
+            public Vector3 cameraDisplacement;
+            public Matrix4x4 viewProjInverse;
+            public Matrix4x4 preViewProj;
             public ComputeShader cs;
             public int kernel;
         }
@@ -173,6 +179,9 @@ namespace Insanity
             HBAOShaderParams._PreProj = Shader.PropertyToID("_PreProj");
             HBAOShaderParams._ViewInverse = Shader.PropertyToID("_ViewInverse");
             HBAOShaderParams._PreView = Shader.PropertyToID("_PreView");
+            HBAOShaderParams._CameraDisplacement = Shader.PropertyToID("_CameraDisplacement");
+            HBAOShaderParams._ViewProjInverse = Shader.PropertyToID("_ViewProjInverse");
+            HBAOShaderParams._PreViewProj = Shader.PropertyToID("_PreViewProj");
         }
 
         private static TextureHandle CreateAOMaskTexture(RenderGraph graph, int width, int height, string name)
@@ -461,6 +470,9 @@ namespace Insanity
                 passData.outputHistory = builder.WriteTexture(outputHistory);
                 passData.aoOutput = builder.WriteTexture(aoOutput);
                 passData.depth = builder.ReadTexture(depth);
+                passData.cameraDisplacement = renderingData.cameraData.mainViewConstants.worldSpaceCameraPos - renderingData.cameraData.mainViewConstants.prevWorldSpaceCameraPos;
+                passData.viewProjInverse = renderingData.cameraData.mainViewConstants.invViewProjMatrixOriginal;
+                passData.preViewProj = renderingData.cameraData.mainViewConstants.prevViewProjMatrixOriginal;
 
                 builder.SetRenderFunc((AOTemporalFilterPassData data, RenderGraphContext context) =>
                     {
@@ -476,6 +488,10 @@ namespace Insanity
                         context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ProjInverse, data.projInverse);
                         context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ViewInverse, data.viewInverse);
                         context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._PreView, data.preView);
+                        context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._CameraDisplacement, data.cameraDisplacement);
+
+                        context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ViewProjInverse, data.viewProjInverse);
+                        context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._PreViewProj, data.preViewProj);
 
                         int groupX = Mathf.CeilToInt(data.AOMaskSize.x / 8);
                         int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);
