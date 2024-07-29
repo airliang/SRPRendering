@@ -45,11 +45,16 @@ MonoBehaviour:
   m_SunLightColor: {r: 2.9960785, g: 2.9960785, b: 2.9960785, a: 1}
   m_physicalBasedSky: 1
   m_SSAOEnable: 1
-  m_SSAORadius: 1.94
-  m_HBAOHorizonBias: 0.113
+  m_SSAORadius: 1
+  m_MaxRadiusInPixel: 30
+  m_HBAOHorizonBias: 0.168
   m_AOHalfResolution: 1
-  m_AOIntensity: 2.61
-  m_DebugViewMode: 0
+  m_AOIntensity: 4
+  m_AOFadeDistanceStart: 12.83199
+  m_AOFadeDistanceEnd: 27.618622
+  m_SSAOBlurType: 1
+  m_EnableTemperalFilter: 1
+  m_DebugViewMode: 5
   m_PipelineResources: {fileID: 11400000, guid: e267fa520b4e57140aaa0481ee785b42,
     type: 2}
   m_RendererData: {fileID: 11400000, guid: dcdf5c2c88d8b374a8cecc3eb6c385b0, type: 2}

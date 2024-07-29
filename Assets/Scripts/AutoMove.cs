@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class AutoMove : MonoBehaviour
 {
-    public float speed = 0.01f;
+    public float speed = 0.5f;
     private float signDistance = 0;
     public Vector3 moveDirection = Vector3.right;
     public float changeDirectionDistance = 5;
@@ -22,7 +22,7 @@ public class AutoMove : MonoBehaviour
         bool bChangeDirection = Mathf.Abs(signDistance) > changeDirectionDistance;
         if (bChangeDirection)
             moveDirection = -moveDirection;
-        Vector3 position = gameObject.transform.position + moveDirection * speed;
+        Vector3 position = gameObject.transform.position + moveDirection * speed * Time.deltaTime;
         signDistance = (position - origPosition).magnitude * Mathf.Sign(moveDirection.x);
         gameObject.transform.position = position;
     }
