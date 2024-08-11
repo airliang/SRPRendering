@@ -206,6 +206,20 @@ float3 GetNormalVS(float2 uv)
     return normalVS;
 }
 
+float2 GetSampleDirection(uint2 screenPos, uint offset)
+{
+    float noise = InterleavedGradientNoise(screenPos.xy, 0);
+    float rotations[] = { 45.0, 315.0, 135.0, 180.0, 90.0, 0.0, 225.0, 270.0};
+
+
+    float rotation = (rotations[offset % 8] / 360.0);
+
+    noise += rotation;
+    noise *= PI;
+
+    return float2(cos(noise), sin(noise));
+}
+
 [numthreads(8,8,1)]
 void HBAO (uint3 id : SV_DispatchThreadID)
 {

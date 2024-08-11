@@ -68,6 +68,7 @@ namespace Insanity
 
             m_ssaoSettings.duarBlur = InsanityPipeline.asset.InsanityPipelineResources.shaders.SSAODualBlur;
             m_ssaoSettings.temporalFilter = InsanityPipeline.asset.InsanityPipelineResources.shaders.SSAOTemporalFilter;
+            m_ssaoSettings.upSample = InsanityPipeline.asset.InsanityPipelineResources.shaders.SSAOUpSample;
             //m_ssaoSettings.blueNoiseTexture = InsanityPipeline.asset.InsanityPipelineResources.internalTextures.SSAONoiseTexture;
             RenderPasses.InitializeSSAOShaderParameters();
         }

@@ -1,0 +1,27 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel SSAOUpSample
+#include "SSAOCommon.hlsl"
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float> _AOOutput;
+Texture2D<float> _AOInput;
+Texture2D _DepthTexture;
+float4 _AOMaskSize;
+
+[numthreads(8,8,1)]
+void SSAOUpSample(uint3 id : SV_DispatchThreadID)
+{
+    half2 uv = ((half2) id.xy + 0.5) * _AOMaskSize.zw;
+    float4 UnpackedAOs, UnpackedDepths;
+    GatherAOData(_AOInput, uv, UnpackedAOs, UnpackedDepths);
+    int2 OutST = id.xy << 1;
+
+    //float4 aoHistory = _AOInput[id.xy];
+    //float ao = aoHistory.g;
+    float depth = _DepthTexture[id.xy];
+    float boxBlurPackAO = dot(0.25, UnpackedAOs);
+    _AOOutput[OutST + int2(0, -1)] = boxBlurPackAO;
+    _AOOutput[OutST] = boxBlurPackAO;
+    _AOOutput[OutST + int2(-1, -1)] = boxBlurPackAO;
+    _AOOutput[OutST + int2(-1, 0)] = boxBlurPackAO;
+}

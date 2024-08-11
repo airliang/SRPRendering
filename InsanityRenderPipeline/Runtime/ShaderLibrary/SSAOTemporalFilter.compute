@@ -1,8 +1,9 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel TemporalFilter
 #pragma enable_d3d11_debug_symbols
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
+#pragma multi_compile _ HALF_RES
+
+#include "SSAOCommon.hlsl"
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
@@ -18,15 +19,14 @@ float4x4 _ViewInverse;
 float4x4 _PreView;
 float3 _CameraDisplacement;
 float4 _AOMaskSize;
+float _FrameTime;
 //non camera relative pos
 float4x4 _ViewProjInverse;
 float4x4 _PreViewProj;
 //----
 #define SHADEROPTIONS_CAMERA_RELATIVE_RENDERING (1)
 #define MAX_FRAME_NUM 8
-SamplerState s_point_clamp_sampler;
-SamplerState s_point_repeat_sampler;
-SamplerState s_linear_clamp_sampler;
+
 
 float3 UVtoViewPosCurFrame(float2 uv, float depth)
 {
@@ -113,28 +113,30 @@ void TemporalFilter (uint3 id : SV_DispatchThreadID)
     float aoPre = aoHistory.g;
     float finalAO = ao;
     int Ncur = 1;
-    int Npre = UnpackByte(aoHistory.r);
-    //disocclusion detecting
-    if (abs(1.0 - weightCur / weightPre) < 0.1)
-    {
-        //float aoPre = _PreviousHistory[id.xy];
-        finalAO = (ao + aoPre * Npre) / (Npre + 1);
-        Ncur = min(Npre + 1, MAX_FRAME_NUM);
-    }
-    
-    //float curViewDepth = viewPosCur.z;
-    //float preViewDepth = 0;
-    //float preAOTest = 0;
-    //float2 uvPreTest = TemporalReprojection(uv, depth, preViewDepth, preAOTest);
-    //if (abs(1.0 - curViewDepth / preViewDepth) < 0.1)
+    //int Npre = UnpackByte(aoHistory.r);
+    ////disocclusion detecting
+    //if (abs(1.0 - weightCur / weightPre) < 0.1)
     //{
+    //    //float aoPre = _PreviousHistory[id.xy];
     //    finalAO = (ao + aoPre * Npre) / (Npre + 1);
     //    Ncur = min(Npre + 1, MAX_FRAME_NUM);
     //}
     
+    float fWeight = distance(viewPosPreReal, viewPosCur) * 9.0;
+
+    ////////////////////////////////
+    // And weight based on how different the amount of AO is (removes trailing artifact)
+    // Only works if both fAO and fPrevFrameAO is blurred
+    fWeight += abs(aoPre - ao) * 5.0;
+    fWeight = clamp(fWeight, _FrameTime, 1.0);
+    finalAO = lerp(aoPre, ao, fWeight);
+    
     float4 aoCurHistory = float4(PackByte(Ncur), finalAO, PackFloatToR8G8(depth));
     _OutputHistory[id.xy] = aoCurHistory;
 
+#ifdef HALF_RES
+    _AOOutput[id.xy] = PackAOOutput(finalAO, depth);
+#else
     _AOOutput[id.xy] = finalAO;
-
+#endif
 }
