@@ -45,14 +45,15 @@ MonoBehaviour:
   m_SunLightColor: {r: 2.9960785, g: 2.9960785, b: 2.9960785, a: 1}
   m_physicalBasedSky: 1
   m_SSAOEnable: 1
-  m_SSAORadius: 1
-  m_MaxRadiusInPixel: 30
-  m_HBAOHorizonBias: 0.168
+  m_SSAORadius: 0.3
+  m_MaxRadiusInPixel: 59.5
+  m_HBAOHorizonBias: 0.171
   m_AOHalfResolution: 1
-  m_AOIntensity: 4
+  m_AOIntensity: 4.24
   m_AOFadeDistanceStart: 12.83199
   m_AOFadeDistanceEnd: 27.618622
-  m_SSAOBlurType: 1
+  m_SelfOcclusionBias: 0.004
+  m_SSAOBlurType: 2
   m_EnableTemperalFilter: 1
   m_DebugViewMode: 5
   m_PipelineResources: {fileID: 11400000, guid: e267fa520b4e57140aaa0481ee785b42,
