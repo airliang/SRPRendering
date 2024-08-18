@@ -93,6 +93,7 @@ namespace Insanity
 
     public enum SSAOBlurType
     {
+        eNone,
         eGaussian,
         eDual,
     }
@@ -399,6 +400,7 @@ namespace Insanity
         [SerializeField] float m_AOIntensity = 1.0f;
         [SerializeField] float m_AOFadeDistanceStart = 0;
         [SerializeField] float m_AOFadeDistanceEnd = 50;
+        [SerializeField] float m_SelfOcclusionBias = 0.001f;
         [SerializeField] SSAOBlurType m_SSAOBlurType = SSAOBlurType.eGaussian;
         [SerializeField] bool m_EnableTemperalFilter = false;
 
@@ -448,6 +450,12 @@ namespace Insanity
         {
             get { return m_AOFadeDistanceEnd; }
             set { m_AOFadeDistanceEnd = value;}
+        }
+
+        public float AOSelfOcclusionBias
+        {
+            get { return m_SelfOcclusionBias; }
+            set { m_SelfOcclusionBias = value; }
         }
 
         public SSAOBlurType SSAOBlurMethod

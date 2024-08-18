@@ -432,7 +432,7 @@ namespace Insanity
 
         TextureHandle GetShadowMap(RenderGraph renderGraph, eShadowType shadowType)
         {
-            //return renderGraph.CreateTexture(GetShadowMapTextureDesc());
+            return renderGraph.CreateTexture(GetShadowMapTextureDesc(shadowType));
             renderGraph.CreateTextureIfInvalid(GetShadowMapTextureDesc(shadowType), ref m_ShadowMap);
             //m_ShadowMap = renderGraph.CreateTexture(GetShadowMapTextureDesc(shadowType));
             return m_ShadowMap;

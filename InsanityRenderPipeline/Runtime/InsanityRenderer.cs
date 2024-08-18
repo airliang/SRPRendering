@@ -210,6 +210,7 @@ namespace Insanity
                     m_ssaoSettings.intensity = asset.AOIntensity;
                     m_ssaoSettings.aoFadeStart = asset.AOFadeStart;
                     m_ssaoSettings.aoFadeEnd = asset.AOFadeEnd;
+                    m_ssaoSettings.selfOcclusionBiasViewSpace = asset.AOSelfOcclusionBias;
                     m_ssaoSettings.blurMethod = asset.SSAOBlurMethod;
                     m_ssaoSettings.enableTemporalFilter = asset.EnableTemperalFilter;
                     if (m_ssaoSettings.blueNoiseTexture == null)

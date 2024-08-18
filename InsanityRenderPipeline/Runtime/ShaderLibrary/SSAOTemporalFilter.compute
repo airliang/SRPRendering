@@ -7,7 +7,7 @@
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
-Texture2D<float> _AOBlur;
+Texture2D<float> _AOInput;
 Texture2D<float4> _CurrentHistory;
 RWTexture2D<float4> _OutputHistory;
 RWTexture2D<float> _AOOutput;
@@ -109,16 +109,17 @@ void TemporalFilter (uint3 id : SV_DispatchThreadID)
     float weightPre = viewPosPreReal.z;
 
     
-    float ao = _AOBlur.SampleLevel(s_linear_clamp_sampler, uv, 0); //_AOBlur[id.xy]; //aoHistory.r;
+    float ao = _AOInput.SampleLevel(s_linear_clamp_sampler, uv, 0); //_AOBlur[id.xy]; //aoHistory.r;
     float aoPre = aoHistory.g;
     float finalAO = ao;
     int Ncur = 1;
-    //int Npre = UnpackByte(aoHistory.r);
-    ////disocclusion detecting
+    int Npre = UnpackByte(aoHistory.r);
+    //disocclusion detecting
     //if (abs(1.0 - weightCur / weightPre) < 0.1)
     //{
     //    //float aoPre = _PreviousHistory[id.xy];
-    //    finalAO = (ao + aoPre * Npre) / (Npre + 1);
+    //    float weight = (float) Npre / (Npre + 1);
+    //    finalAO = lerp(ao, aoPre, weight); //(ao + aoPre * Npre) / (Npre + 1);
     //    Ncur = min(Npre + 1, MAX_FRAME_NUM);
     //}
     

@@ -24,7 +24,7 @@ float2 _ProjectionParams;
 #define RADIUS _HBAOParams.x    //radius in practice
 #define BIAS   _HBAOParams.y
 #define NEG_RADIUSINVSQR _HBAOParams.z  
-#define RADIUSINPIXEL _HBAOParams.w
+#define RADIUSINWORLD _HBAOParams.w
 #define SAMPLE_COUNT 8
 #define IS_HALF_RESOLUTION _HalfResolution > 0
 #define AO_INTENSITY _HBAOParams.x
@@ -32,7 +32,8 @@ float2 _ProjectionParams;
 #define NOISE_SCALE _NoiseParam.zw
 #define AOFADE_PARAM1 _HBAOParams2.x
 #define AOFADE_PARAM2 _HBAOParams2.y
-#define MAX_RADIUS_IN_PIXEL _HBAOParams2.z
+#define MAX_RADIUS_IN_NDC _HBAOParams2.z
+#define SELF_OCCLUSION_DEPTH_BIAS _HBAOParams2.w
 //aofade = AOFADE_PARAM1 * linearDepthCS + AOFADE_PARAM2
 
 SamplerState s_point_clamp_sampler;
@@ -198,7 +199,7 @@ float ComputeAO(float3 P, float3 N, float3 S)
 
 float3 GetNormalVS(float2 uv)
 {
-    float3 normal = _NormalTexture.SampleLevel(s_point_clamp_sampler, uv, 0); //IS_HALF_RESOLUTION ? _NormalTexture.SampleLevel(s_linear_clamp_sampler, uvScreen, 0) : _NormalTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_NormalTexture.Load(int3(screenCoord, 0));
+    float3 normal = _NormalTexture.SampleLevel(s_point_clamp_sampler, uv, 0); //_NormalTexture.Load(int3(uv, 0)); 
     normal = 2.0 * normal - 1.0;
     float3 normalVS = mul((float3x3) _ViewMatrix, normal);
     normalVS = normalize(normalVS);
@@ -230,7 +231,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     // TODO: insert actual code here!
     //float2 uv = (float2) id.xy * _AOMaskSize.zw;
     float2 uvScreen = (float2) (id.xy + 0.5) * _AOMaskSize.zw; //uv + _ScreenSize.zw * 0.5 * (_HalfResolution + 1);
-
+    uint2 fullScreenPos = id.xy * ((int)_HalfResolution + 1);
     //using noise texture approach
     
     int2 noiseCoord = id.xy * (_HalfResolution + 1) % int2(4, 4);
@@ -241,16 +242,16 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     
     //end noise texture approach
     
-    //float noise = InterleavedGradientNoise((float2) (id.xy + 0.5), id.x);
-    //float theta = TWO_PI * noise;
+    //float noise1 = InterleavedGradientNoise((float2) (id.xy + 0.5), id.x);
+    //float theta = TWO_PI * noise1;
     //float cosTheta = cos(theta);
     //float sinTheta = sin(theta);
-    //float2x2 rotation = float2x2(cosTheta, sinTheta,
+    //rotation = float2x2(cosTheta, sinTheta,
     //                             -sinTheta, cosTheta);
     
     
     //int2 screenCoord = _ScreenSize * uv;
-    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_linear_clamp_sampler, uvScreen, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0); //_DepthTexture.Load(int3(screenCoord, 0));
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0);
     if (depth < SKY_DEPTH_VALUE)
     {
         _AOMask[id.xy] = 1;
@@ -264,25 +265,26 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     float3 normalVS = GetNormalVS(uvScreen);
 
     half AOIntegrate = 0;
-    float radiusPixel = min(RADIUSINPIXEL * rcp(screenPosVS.z), MAX_RADIUS_IN_PIXEL);
+    float radiusSS = min(RADIUSINWORLD * rcp(screenPosVS.z), MAX_RADIUS_IN_NDC);
+    float2 scalingFactorSS = _ProjectionParams * radiusSS;  //remap the radius to ndc space
     //float minLength = length(_ScreenSize.zw);
     //float pixelSizeSS2 = dot(_ScreenSize.zw, _ScreenSize.zw);
     float aoFade = saturate(AOFADE_PARAM1 * screenPosVS.z + AOFADE_PARAM2);
     const float2 halfTexelOffset = float2(-0.5f, -0.5f) * _AOMaskSize.zw;
     for (int i = 0; i < SAMPLE_COUNT; ++i)
     {
-        float2 samplePointVec = mul(rotation, SPIRAL_KERNEL[i]) * radiusPixel * _ScreenSize.zw;
-        //if (dot(samplePointVec, samplePointVec) < pixelSizeSS2)
-        //    continue;
+        float2 samplePointVec = mul(rotation, SPIRAL_KERNEL[i]) * scalingFactorSS; /* * _ScreenSize.zw*/;
+
         float2 samplePoint = samplePointVec + uvScreen;
         int2 samplePointPixel = (int2) (samplePoint * _ScreenSize.xy);
         //screenCoord = _ScreenSize * samplePoint;
         float depthSample = _DepthTexture.Load(int3(samplePointPixel, 0)); //_DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_linear_clamp_sampler, samplePoint, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //_DepthTexture.Load(int3(screenCoord, 0));
         //depthSample = GetPlatformDepth(depthSample);
         float2 adjustSamplePoint = ((float2) samplePointPixel + 0.5) * _ScreenSize.zw;
-        float3 samplePointVS = ComputeViewSpacePosition(adjustSamplePoint, depthSample, _ProjInverse); //UVtoViewPos(adjustSamplePoint, depthSample);
+        float3 samplePointVS = ComputeViewSpacePosition(samplePoint, depthSample, _ProjInverse); //UVtoViewPos(adjustSamplePoint, depthSample);
+        samplePointVS.z += SELF_OCCLUSION_DEPTH_BIAS;
         int2 samplePointAOCoord = adjustSamplePoint * _AOMaskSize.xy;
-        AOIntegrate += samplePointAOCoord == id.xy ? 0 : ComputeAO(screenPosVS, normalVS, samplePointVS) * AO_INTENSITY;
+        AOIntegrate += /*samplePointAOCoord == id.xy ? 0 :*/ ComputeAO(screenPosVS, normalVS, samplePointVS) * AO_INTENSITY;
     }
     AOIntegrate = saturate(AOIntegrate / SAMPLE_COUNT);
     

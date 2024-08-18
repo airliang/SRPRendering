@@ -81,8 +81,9 @@ namespace UnityEditor.Insanity
             public static GUIContent ssaoHalfResolutionText = EditorGUIUtility.TrTextContent("Half Resolution");
             public static GUIContent ssaoIntensityText = EditorGUIUtility.TrTextContent("AO Intensity");
             public static GUIContent ssaoFadeDistanceText = EditorGUIUtility.TrTextContent("AO Fade Distance Range");
+            public static GUIContent ssaoSelfOcclusionBiasText = EditorGUIUtility.TrTextContent("AO Self Occlusion Depth Bias(View Space)");
             public static GUIContent ssaoBlurMethodText = EditorGUIUtility.TrTextContent("Blur Method");
-            public static string[] ssaoBlurMethodOptions = { "Gaussian", "Dual" };
+            public static string[] ssaoBlurMethodOptions = { "None", "Gaussian", "Dual" };
             public static GUIContent ssaoEnableTemperalFilterText = EditorGUIUtility.TrTextContent("Temperal Filter");
 
             public static GUIContent debugViewSettingsText = EditorGUIUtility.TrTextContent("DebugView", "DebugView to display the rendering results in the pipeline");
@@ -152,6 +153,7 @@ namespace UnityEditor.Insanity
         SerializedProperty m_SSAOIntensityProp;
         SerializedProperty m_SSAOFadeDistanceStartProp;
         SerializedProperty m_SSAOFadeDistanceEndProp;
+        SerializedProperty m_SSAOSelfOcclusionBiasProp;
         SerializedProperty m_SSAOBlurMethodProp;
         SerializedProperty m_SSAOTemperalFilterProp;
 
@@ -233,6 +235,7 @@ namespace UnityEditor.Insanity
             m_SSAOIntensityProp = serializedObject.FindProperty("m_AOIntensity");
             m_SSAOFadeDistanceStartProp = serializedObject.FindProperty("m_AOFadeDistanceStart");
             m_SSAOFadeDistanceEndProp = serializedObject.FindProperty("m_AOFadeDistanceEnd");
+            m_SSAOSelfOcclusionBiasProp = serializedObject.FindProperty("m_SelfOcclusionBias");
             m_SSAOBlurMethodProp = serializedObject.FindProperty("m_SSAOBlurType");
             m_SSAOTemperalFilterProp = serializedObject.FindProperty("m_EnableTemperalFilter");
 
@@ -403,6 +406,7 @@ namespace UnityEditor.Insanity
                     EditorGUILayout.MinMaxSlider(Styles.ssaoFadeDistanceText, ref fadeStart, ref fadeEnd, 0, 100.0f);
                     m_SSAOFadeDistanceStartProp.floatValue = fadeStart;
                     m_SSAOFadeDistanceEndProp.floatValue = fadeEnd;
+                    m_SSAOSelfOcclusionBiasProp.floatValue = EditorGUILayout.Slider(Styles.ssaoSelfOcclusionBiasText, m_SSAOSelfOcclusionBiasProp.floatValue, 0, 0.1f);
 
                     CoreEditorUtils.DrawPopup(Styles.ssaoBlurMethodText, m_SSAOBlurMethodProp, Styles.ssaoBlurMethodOptions);
                     m_SSAOTemperalFilterProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoEnableTemperalFilterText, m_SSAOTemperalFilterProp.boolValue);
