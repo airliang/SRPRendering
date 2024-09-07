@@ -2,6 +2,7 @@
 #pragma kernel TemporalFilter
 #pragma enable_d3d11_debug_symbols
 #pragma multi_compile _ HALF_RES
+#pragma multi_compile _ NEED_PACK_AO
 
 #include "SSAOCommon.hlsl"
 
@@ -73,8 +74,22 @@ void TemporalFilter (uint3 id : SV_DispatchThreadID)
 {
     // TODO: insert actual code here!
     half2 uv = ((half2)id.xy + 0.5) * _AOMaskSize.zw;
-    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uv, 0);
+#ifdef NEED_PACK_AO
+    float aoPack = _AOInput[id.xy];
+    float ao = 0;
+    float depth = 0;
+    UnpackData(aoPack, ao, depth);
+
+    float depthFromDepth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uv, 0);
+    if (abs(depth - depthFromDepth) > 0.5)
+    {
+        depth = depthFromDepth;
+    }
     //depth = GetPlatformDepth(depth);
+#else
+    float ao = _AOInput.SampleLevel(s_linear_clamp_sampler, uv, 0);
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uv, 0);
+#endif
     
     float3 viewPosCur = ComputeViewSpacePosition(uv, depth, _ProjInverse); //UVtoViewPosCurFrame(uv, depth);
     float4 worldPosCur = mul(_ViewInverse, float4(viewPosCur, 1));
@@ -109,7 +124,7 @@ void TemporalFilter (uint3 id : SV_DispatchThreadID)
     float weightPre = viewPosPreReal.z;
 
     
-    float ao = _AOInput.SampleLevel(s_linear_clamp_sampler, uv, 0); //_AOBlur[id.xy]; //aoHistory.r;
+    //float ao = _AOInput.SampleLevel(s_linear_clamp_sampler, uv, 0); //_AOBlur[id.xy]; //aoHistory.r;
     float aoPre = aoHistory.g;
     float finalAO = ao;
     int Ncur = 1;

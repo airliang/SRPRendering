@@ -16,13 +16,13 @@ MonoBehaviour:
   m_Exposure: 1.5
   m_ResolutionRate: 1
   m_UseSRPBatcher: 1
-  m_MSAASamples: 1
+  m_MSAASamples: 4
   m_ShadowDistance: 50
   m_ShadowCascades: 1
   m_Cascade2Split: 0.25
   m_Cascade4Split: {x: 0.067, y: 0.2, z: 0.467}
   m_ShadowDepthBias: 1
-  m_ShadowNormalBias: 0.75
+  m_ShadowNormalBias: 0.23
   m_AdaptiveShadowBias: 0
   m_EnableCSMBlend: 1
   m_CSMBlendDistance: 0.212
@@ -45,16 +45,17 @@ MonoBehaviour:
   m_SunLightColor: {r: 2.9960785, g: 2.9960785, b: 2.9960785, a: 1}
   m_physicalBasedSky: 1
   m_SSAOEnable: 1
-  m_SSAORadius: 0.3
-  m_MaxRadiusInPixel: 59.5
+  m_SSAORadius: 0.5
+  m_MaxRadiusInPixel: 40.3
   m_HBAOHorizonBias: 0.171
   m_AOHalfResolution: 1
   m_AOIntensity: 4.24
   m_AOFadeDistanceStart: 12.83199
   m_AOFadeDistanceEnd: 27.618622
-  m_SelfOcclusionBias: 0.004
-  m_SSAOBlurType: 2
+  m_SelfOcclusionBias: 0.0089
+  m_SSAOBlurType: 3
   m_EnableTemperalFilter: 1
+  m_BilateralAggressiveness: 0.007
   m_DebugViewMode: 5
   m_PipelineResources: {fileID: 11400000, guid: e267fa520b4e57140aaa0481ee785b42,
     type: 2}

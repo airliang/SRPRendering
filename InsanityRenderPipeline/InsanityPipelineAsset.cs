@@ -96,6 +96,7 @@ namespace Insanity
         eNone,
         eGaussian,
         eDual,
+        eBilateral
     }
 
     [ExecuteInEditMode]
@@ -403,6 +404,8 @@ namespace Insanity
         [SerializeField] float m_SelfOcclusionBias = 0.001f;
         [SerializeField] SSAOBlurType m_SSAOBlurType = SSAOBlurType.eGaussian;
         [SerializeField] bool m_EnableTemperalFilter = false;
+        [SerializeField] float m_BilateralAggressiveness = 0;
+        [SerializeField] bool m_SSAOUpSample = false;
 
         public bool SSAOEnable
         {
@@ -468,6 +471,18 @@ namespace Insanity
         {
             get { return m_EnableTemperalFilter; }
             set { m_EnableTemperalFilter = value;}
+        }
+
+        public float BilateralAggressiveness
+        {
+            get { return m_BilateralAggressiveness; }
+            set { m_BilateralAggressiveness = value; }
+        }
+
+        public bool SSAOUpSample
+        {
+            get { return m_SSAOUpSample; }
+            set { m_SSAOUpSample = value; }
         }
         #endregion
 

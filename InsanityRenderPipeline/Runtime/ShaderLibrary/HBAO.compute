@@ -1,9 +1,11 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Macros.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Random.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "SSAOCommon.hlsl"
 
 #pragma kernel HBAO
 #pragma enable_d3d11_debug_symbols
+#pragma multi_compile _ NEED_PACK_AO
 #define PI 3.14159265358979323846
 #define TWO_PI 6.28318530717958647693
 
@@ -35,10 +37,6 @@ float2 _ProjectionParams;
 #define MAX_RADIUS_IN_NDC _HBAOParams2.z
 #define SELF_OCCLUSION_DEPTH_BIAS _HBAOParams2.w
 //aofade = AOFADE_PARAM1 * linearDepthCS + AOFADE_PARAM2
-
-SamplerState s_point_clamp_sampler;
-SamplerState s_point_repeat_sampler;
-SamplerState s_linear_clamp_sampler;
 
 //for test
 #define USE_UNITY_SSAO 1
@@ -254,7 +252,11 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0);
     if (depth < SKY_DEPTH_VALUE)
     {
+#if NEED_PACKAO
+        _AOMask[id.xy] = PackAOOutput(1, depth);
+        #else
         _AOMask[id.xy] = 1;
+        #endif
         return;
     }
     //depth = GetPlatformDepth(depth);
@@ -289,6 +291,11 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     AOIntegrate = saturate(AOIntegrate / SAMPLE_COUNT);
     
     float fadedAO = lerp(1.0, 1.0 - AOIntegrate, aoFade);
+#if NEED_PACK_AO
+    float pack = PackAOOutput(fadedAO, depth);
+    _AOMask[id.xy] = pack;
+#else
     _AOMask[id.xy] = fadedAO;
+#endif
 
 }

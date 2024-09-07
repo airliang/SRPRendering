@@ -20,6 +20,7 @@ namespace Insanity
         public float aoFadeEnd = 100.0f;
         public bool enableTemporalFilter = false;
         public SSAOBlurType blurMethod = SSAOBlurType.eGaussian;
+        public float bilateralAggressiveness = 0.0f;
         public float selfOcclusionBiasViewSpace = 0.0f;
         public ComputeShader ssao;
         public ComputeShader blur;
@@ -27,6 +28,8 @@ namespace Insanity
         public ComputeShader temporalFilter;
         public ComputeShader upSample;
         public Texture2D blueNoiseTexture;
+        public bool needPackAO = false;
+        public bool needUpSample = false;
     }
 
     public class HBAOShaderParams
@@ -58,6 +61,8 @@ namespace Insanity
         public static int _FrameTime;
         public static int _ViewProjInverse;
         public static int _PreViewProj;
+        public static int _AOSpatialBilateralAggressiveness;
+        public static int _ZBufferParams;
         public static int _HBAOKernel = -1;
         public static int _VerticalBlurKernel = -1;
         public static int _HorizontalBlurKernel = -1;
@@ -65,6 +70,7 @@ namespace Insanity
         public static int _DuarBlurUpSampleKernel = -1;
         public static int _TemporalFilterKernel = -1;
         public static int _UpSampleAOKernel = -1;
+        public static int _BilateralBlurKernel = -1;
     }
 
     public class AOHistoryData
@@ -150,6 +156,7 @@ namespace Insanity
             public Matrix4x4 view;
             public float HalfResolution;
             public Vector4 projectionParams;
+            public bool needPackOutputAO;
             public ComputeShader cs;
             public int kernel;
         }
@@ -159,9 +166,13 @@ namespace Insanity
             public TextureHandle aoInput;
             public TextureHandle aoOutput;
             public Vector4 AOMaskSize;
+            public Vector4 zBufferParams;
+            public float aoSpatialBilateralAggressiveness;
+            public bool needPackOutputAO;
             public ComputeShader cs;
             public int kVerticalBlur;
             public int kHorizontalBlur;
+            public int kBilateralBlur;
         }
 
         class DualBlurPassData
@@ -191,6 +202,8 @@ namespace Insanity
             public Vector3 cameraDisplacement;
             public float frameTime;
             public bool halfRes;
+            public bool needUpSample;
+            public bool AOInputPacked;
             public Matrix4x4 viewProjInverse;
             public Matrix4x4 preViewProj;
             public ComputeShader cs;
@@ -204,7 +217,8 @@ namespace Insanity
         static ProfilingSampler s_DualBlurUpProfiler = new ProfilingSampler("Duar Up Sample Pass Profiler");
         static ProfilingSampler s_TemporalFilterProfiler = new ProfilingSampler("Temporal Filter Pass Profiler");
         static ProfilingSampler s_UpSampleAOProfiler = new ProfilingSampler("Up Sample AO Pass Profiler");
-
+        static ProfilingSampler s_BilateralBlurProfiler = new ProfilingSampler("Bilateral Blur Pass Profiler");
+        static ProfilingSampler s_SetAOMaskProfiler = new ProfilingSampler("Set AO Mask Texture Profiler");
 
 
         public static void InitializeSSAOShaderParameters()
@@ -236,13 +250,15 @@ namespace Insanity
             HBAOShaderParams._FrameTime = Shader.PropertyToID("_FrameTime");
             HBAOShaderParams._ViewProjInverse = Shader.PropertyToID("_ViewProjInverse");
             HBAOShaderParams._PreViewProj = Shader.PropertyToID("_PreViewProj");
+            HBAOShaderParams._AOSpatialBilateralAggressiveness = Shader.PropertyToID("_AOSpatialBilateralAggressiveness");
+            HBAOShaderParams._ZBufferParams = Shader.PropertyToID("_ZBufferParams");
         }
 
-        private static TextureHandle CreateAOMaskTexture(RenderGraph graph, int width, int height, string name)
+        private static TextureHandle CreateAOMaskTexture(RenderGraph graph, int width, int height, string name, RenderTextureFormat format = RenderTextureFormat.R8)
         {
             //Texture description
             TextureDesc textureRTDesc = new TextureDesc(width, height);
-            textureRTDesc.colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.R8, false);
+            textureRTDesc.colorFormat = GraphicsFormatUtility.GetGraphicsFormat(format, false);
             textureRTDesc.depthBufferBits = 0;
             textureRTDesc.msaaSamples = MSAASamples.None;
             textureRTDesc.enableRandomWrite = true;
@@ -271,8 +287,8 @@ namespace Insanity
 
         public static void Render_HBAOPass(RenderingData renderingData, TextureHandle depth, TextureHandle normal, out TextureHandle ssaoMask, SSAOSettings ssaoSettings)
         {
-            int AOMaskWidth = (int)(ssaoSettings.halfResolution ? (GlobalRenderSettings.screenResolution.width * 0.5f) : GlobalRenderSettings.screenResolution.width);
-            int AOMaskHeight = (int)(ssaoSettings.halfResolution ? (GlobalRenderSettings.screenResolution.height * 0.5f) : GlobalRenderSettings.screenResolution.height);
+            int AOMaskWidth = (int)(ssaoSettings.halfResolution ? Mathf.RoundToInt(GlobalRenderSettings.screenResolution.width * 0.5f) : GlobalRenderSettings.screenResolution.width);
+            int AOMaskHeight = (int)(ssaoSettings.halfResolution ? Mathf.RoundToInt(GlobalRenderSettings.screenResolution.height * 0.5f) : GlobalRenderSettings.screenResolution.height);
             Vector4 AOMaskSize = new Vector4(AOMaskWidth, AOMaskHeight, 1.0f / AOMaskWidth, 1.0f / AOMaskHeight);
             AOHistoryData aoHistoryData = AOHistoryData.GetOrCreate(renderingData.cameraData.camera);
             if (ssaoSettings.enableTemporalFilter)
@@ -281,7 +297,11 @@ namespace Insanity
                 aoHistoryData.SwapHistoryRTs();
                 aoHistoryData.AllocateAOHistoryRT(ssaoSettings.halfResolution ? 0.5f : 1.0f);
             }
-            ssaoMask = CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight, "SSAOMask");
+
+            ssaoSettings.needPackAO = /*ssaoSettings.enableTemporalFilter && */ssaoSettings.blurMethod == SSAOBlurType.eBilateral;
+
+            RenderTextureFormat aoMaskFormat = ssaoSettings.needPackAO ? RenderTextureFormat.RFloat : RenderTextureFormat.R8;
+            ssaoMask = CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight, "SSAOMask", aoMaskFormat);
             using (var builder = renderingData.renderGraph.AddRenderPass<HBAOPassData>("HBAO Pass", out var passData, s_HBAOPassProfiler))
             {
                 if (HBAOShaderParams._HBAOKernel == -1)
@@ -326,6 +346,8 @@ namespace Insanity
                 passData.ao = builder.WriteTexture(ssaoMask);
                 passData.projectionParams = new Vector4(proj.m00, proj.m11, 1.0f / proj.m00, 1.0f / proj.m11);
 
+                passData.needPackOutputAO = ssaoSettings.needPackAO;
+
                 //for test
                 Camera camera = renderingData.cameraData.camera;
                 Vector3 viewPos = camera.ScreenToWorldPoint(Vector3.zero);
@@ -359,6 +381,10 @@ namespace Insanity
                     context.cmd.SetComputeFloatParam(data.cs, HBAOShaderParams._HalfResolution, data.HalfResolution);
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._ProjectionParams, data.projectionParams);
                     context.cmd.SetGlobalTexture(HBAOShaderParams._AOMask, data.ao);
+                    if (passData.needPackOutputAO)
+                        context.cmd.EnableShaderKeyword("NEED_PACK_AO");
+                    else
+                        context.cmd.DisableShaderKeyword("NEED_PACK_AO");
 
                     int groupX = Mathf.CeilToInt((float)data.AOMaskSize.x / 8);
                     int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);
@@ -368,28 +394,34 @@ namespace Insanity
 
             
             TextureHandle currentHistory = ssaoSettings.enableTemporalFilter ? renderingData.renderGraph.ImportTexture(aoHistoryData.m_AOHistoryRT[0]) : ssaoMask;
-            TextureHandle blurOutput = (ssaoSettings.enableTemporalFilter && ssaoSettings.blurMethod != SSAOBlurType.eNone) ? CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight, "AOBlur") : ssaoMask;
+            TextureHandle blurOutput = ssaoMask;
             if (ssaoSettings.blurMethod == SSAOBlurType.eGaussian)
                 GaussianBlurAOMask(renderingData, ssaoMask, blurOutput, ssaoSettings, AOMaskSize);
             else if (ssaoSettings.blurMethod == SSAOBlurType.eDual)
                 DualBlur(renderingData, ssaoMask, blurOutput, ssaoSettings, AOMaskSize);
+            else if (ssaoSettings.blurMethod == SSAOBlurType.eBilateral)
+            {
+                RenderTextureFormat bilateralFilterOutputFormat = ssaoSettings.enableTemporalFilter ? RenderTextureFormat.RFloat : RenderTextureFormat.R8;
+                blurOutput = CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight, "AOBlur", bilateralFilterOutputFormat);
+                ssaoMask = BilateralBlur(renderingData, ssaoMask, blurOutput, ssaoSettings, AOMaskSize);
+            }
 
             if (ssaoSettings.enableTemporalFilter)
             {
                 TextureHandle previousHistory = renderingData.renderGraph.ImportTexture(aoHistoryData.m_AOHistoryRT[1]);
-                if (ssaoSettings.halfResolution || ssaoSettings.blurMethod == SSAOBlurType.eNone)
+                //if (ssaoSettings.halfResolution || ssaoSettings.blurMethod == SSAOBlurType.eNone)
                 {
                     ssaoMask = CreatePackAOTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight, "AOPack");
                 }
                 TemporalFilterAO(renderingData, depth, blurOutput, currentHistory, previousHistory, ssaoMask, ssaoSettings, AOMaskSize);
 
-                if (ssaoSettings.halfResolution)
+                if (ssaoSettings.halfResolution && ssaoSettings.needUpSample)
                 {
                     ssaoMask = UpSampleAO(renderingData, depth, ssaoMask, ssaoSettings, AOMaskSize);
                 }
             }
 
-            
+            SetAOMaskTexture(renderingData, ssaoMask);
         }
 
         static void GaussianBlurAOMask(RenderingData renderingData, TextureHandle ssaoMask, TextureHandle output, SSAOSettings ssaoSettings, Vector4 AOMaskSize)
@@ -414,7 +446,7 @@ namespace Insanity
                     context.cmd.SetComputeTextureParam(data.cs, data.kVerticalBlur, HBAOShaderParams._AOInput, data.aoInput);
                     context.cmd.SetComputeTextureParam(data.cs, data.kVerticalBlur, HBAOShaderParams._AOOutput, data.aoOutput);
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._AOMaskSize, data.AOMaskSize);
-
+                    context.cmd.EnableShaderKeyword("GaussianBlur");
                     int groupX = Mathf.CeilToInt(data.AOMaskSize.x / 8);
                     int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);
                     context.cmd.DispatchCompute(data.cs, data.kVerticalBlur, groupX, groupY, 1);
@@ -441,7 +473,7 @@ namespace Insanity
                     context.cmd.SetComputeTextureParam(data.cs, data.kHorizontalBlur, HBAOShaderParams._AOInput, data.aoInput);
                     context.cmd.SetComputeTextureParam(data.cs, data.kHorizontalBlur, HBAOShaderParams._AOOutput, data.aoOutput);
                     context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._AOMaskSize, data.AOMaskSize);
-
+                    context.cmd.EnableShaderKeyword("GaussianBlur");
                     int groupX = Mathf.CeilToInt(data.AOMaskSize.x / 8);
                     int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);
                     context.cmd.DispatchCompute(data.cs, data.kHorizontalBlur, groupX, groupY, 1);
@@ -514,6 +546,49 @@ namespace Insanity
             }
         }
 
+        static TextureHandle BilateralBlur(RenderingData renderingData, TextureHandle ssaoMask, TextureHandle output, SSAOSettings ssaoSettings, Vector4 AOMaskSize)
+        {
+            //BlurAOPassData blurDataBilateral;
+            using (var builder = renderingData.renderGraph.AddRenderPass<BlurAOPassData>("HBAO Bilateral Blur Pass", out var blurDataBilateral, s_BilateralBlurProfiler))
+            {
+                if (HBAOShaderParams._BilateralBlurKernel == -1)
+                {
+                    HBAOShaderParams._BilateralBlurKernel = ssaoSettings.blur.FindKernel("SpatialFilter");
+                }
+
+                builder.AllowPassCulling(false);
+                blurDataBilateral.cs = ssaoSettings.blur;
+                blurDataBilateral.kBilateralBlur = HBAOShaderParams._BilateralBlurKernel;
+                blurDataBilateral.aoInput = builder.ReadTexture(ssaoMask);
+                blurDataBilateral.aoOutput = builder.WriteTexture(output);
+                blurDataBilateral.AOMaskSize = AOMaskSize;
+                blurDataBilateral.zBufferParams = renderingData.cameraData.zBufferParams;
+                blurDataBilateral.aoSpatialBilateralAggressiveness = ssaoSettings.bilateralAggressiveness;
+                blurDataBilateral.needPackOutputAO = ssaoSettings.enableTemporalFilter;
+
+                builder.SetRenderFunc((BlurAOPassData data, RenderGraphContext context) =>
+                {
+                    context.cmd.SetComputeTextureParam(data.cs, data.kBilateralBlur, HBAOShaderParams._AOInput, data.aoInput);
+                    context.cmd.SetComputeTextureParam(data.cs, data.kBilateralBlur, HBAOShaderParams._AOOutput, data.aoOutput);
+                    context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._AOMaskSize, data.AOMaskSize);
+                    context.cmd.SetComputeVectorParam(data.cs, HBAOShaderParams._ZBufferParams, data.zBufferParams);
+                    context.cmd.SetComputeFloatParam(data.cs, HBAOShaderParams._AOSpatialBilateralAggressiveness, data.aoSpatialBilateralAggressiveness);
+                    if (data.needPackOutputAO)
+                        context.cmd.EnableShaderKeyword("NEED_PACK_AO");
+                    else
+                    {
+                        context.cmd.DisableShaderKeyword("NEED_PACK_AO");
+                    }
+
+                    int groupX = Mathf.CeilToInt(data.AOMaskSize.x / 8);
+                    int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);
+                    context.cmd.DispatchCompute(data.cs, data.kBilateralBlur, groupX, groupY, 1);
+                });
+
+                return blurDataBilateral.aoOutput;
+            }
+        }
+
         static void TemporalFilterAO(RenderingData renderingData, TextureHandle depth, TextureHandle aoInput, TextureHandle currentHistory, TextureHandle outputHistory, 
             TextureHandle aoOutput, SSAOSettings ssaoSettings, Vector4 AOMaskSize)
         {
@@ -542,6 +617,8 @@ namespace Insanity
                 passData.cameraDisplacement = renderingData.cameraData.mainViewConstants.worldSpaceCameraPos - renderingData.cameraData.mainViewConstants.prevWorldSpaceCameraPos;
                 passData.frameTime = Time.deltaTime;
                 passData.halfRes = ssaoSettings.halfResolution;
+                passData.needUpSample = ssaoSettings.needUpSample;
+                passData.AOInputPacked = ssaoSettings.needPackAO;
                 passData.viewProjInverse = renderingData.cameraData.mainViewConstants.invViewProjMatrixOriginal;
                 passData.preViewProj = renderingData.cameraData.mainViewConstants.prevViewProjMatrixOriginal;
 
@@ -564,14 +641,19 @@ namespace Insanity
 
                         context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._ViewProjInverse, data.viewProjInverse);
                         context.cmd.SetComputeMatrixParam(data.cs, HBAOShaderParams._PreViewProj, data.preViewProj);
-                        if (data.halfRes)
+                        if (data.halfRes && data.needUpSample)
                         {
                             context.cmd.EnableShaderKeyword("HALF_RES");
                         }
                         else
                         {
                             context.cmd.DisableShaderKeyword("HALF_RES");
-                        }    
+                        }
+
+                        if (data.AOInputPacked)
+                            context.cmd.EnableShaderKeyword("NEED_PACK_AO");
+                        else
+                            context.cmd.DisableShaderKeyword("NEED_PACK_AO");
 
                         int groupX = Mathf.CeilToInt(data.AOMaskSize.x / 8);
                         int groupY = Mathf.CeilToInt(data.AOMaskSize.y / 8);
@@ -599,6 +681,7 @@ namespace Insanity
 
             using (var builder = renderingData.renderGraph.AddRenderPass<UpSampleAOPassData>("Up Sample Pass", out var passData, s_UpSampleAOProfiler))
             {
+                builder.AllowPassCulling(false);
                 int AOMaskWidth = (int)GlobalRenderSettings.screenResolution.width;
                 int AOMaskHeight = (int)GlobalRenderSettings.screenResolution.height;
                 passData.aoMask = builder.WriteTexture(CreateAOMaskTexture(renderingData.renderGraph, AOMaskWidth, AOMaskHeight, "FullResAO"));
@@ -623,6 +706,23 @@ namespace Insanity
                 });
 
                 return passData.aoMask;
+            }
+        }
+
+        class SetAOMaskTextureData
+        {
+            public TextureHandle aoMask;
+        }
+        static void SetAOMaskTexture(RenderingData renderingData, TextureHandle aoMask)
+        {
+            using (var builder = renderingData.renderGraph.AddRenderPass<SetAOMaskTextureData>("Set AO Mask Global Texture", out var passData, s_SetAOMaskProfiler))
+            {
+                builder.AllowPassCulling(false);
+                passData.aoMask = builder.ReadTexture(aoMask);
+                builder.SetRenderFunc((SetAOMaskTextureData data, RenderGraphContext context) =>
+                {
+                    context.cmd.SetGlobalTexture(HBAOShaderParams._AOMask, data.aoMask);
+                });
             }
         }
 

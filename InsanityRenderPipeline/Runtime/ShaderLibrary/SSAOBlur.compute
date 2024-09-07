@@ -1,15 +1,20 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel VerticleBlur
 #pragma kernel HorizontalBlur
-
+#pragma kernel SpatialFilter
+#pragma enable_d3d11_debug_symbols
+//#pragma multi_compile GAUSSIAN_BLUR
+#pragma multi_compile _ NEED_PACK_AO
+#include "SSAOCommon.hlsl"
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 Texture2D<float> _AOInput;
 RWTexture2D<float> _AOOutput;
 float4 _AOMaskSize;
-SamplerState s_linear_clamp_sampler;
-SamplerState s_point_clamp_sampler;
-#define GAUSSIAN_BLUR 1
+float4x4 _ProjInverse;
+float4 _ZBufferParams;
+float _AOSpatialBilateralAggressiveness;
+
 
 // https://software.intel.com/content/www/us/en/develop/blogs/an-investigation-of-fast-real-time-gpu-based-image-blur-algorithms.html
 half GaussianBlur(half2 uv, half2 pixelOffset)
@@ -47,30 +52,30 @@ half GaussianBlur(half2 uv, half2 pixelOffset)
 // ------------------------------------------------------------------
 
 //bilateral filter
-half BilateralBlur(const half2 uv, const half2 delta)
-{
-    half p0 = _AOInput.SampleLevel(s_linear_clamp_sampler, uv, 0);
-    half p1a = _AOInput.SampleLevel(s_linear_clamp_sampler, uv - delta * 1.3846153846, 0);
-    half p1b = _AOInput.SampleLevel(s_linear_clamp_sampler, uv + delta * 1.3846153846, 0);
-    half p2a = _AOInput.SampleLevel(s_linear_clamp_sampler, uv - delta * 3.2307692308, 0);
-    half p2b = _AOInput.SampleLevel(s_linear_clamp_sampler, uv + delta * 3.2307692308, 0);
+//half BilateralBlur(const half2 uv, const half2 delta)
+//{
+//    half p0 = _AOInput.SampleLevel(s_linear_clamp_sampler, uv, 0);
+//    half p1a = _AOInput.SampleLevel(s_linear_clamp_sampler, uv - delta * 1.3846153846, 0);
+//    half p1b = _AOInput.SampleLevel(s_linear_clamp_sampler, uv + delta * 1.3846153846, 0);
+//    half p2a = _AOInput.SampleLevel(s_linear_clamp_sampler, uv - delta * 3.2307692308, 0);
+//    half p2b = _AOInput.SampleLevel(s_linear_clamp_sampler, uv + delta * 3.2307692308, 0);
 
-    half w0 = half(0.2270270270);
-    half w1a = half(0.3162162162);
-    half w1b = half(0.3162162162);
-    half w2a = half(0.0702702703);
-    half w2b = half(0.0702702703);
+//    half w0 = half(0.2270270270);
+//    half w1a = half(0.3162162162);
+//    half w1b = half(0.3162162162);
+//    half w2a = half(0.0702702703);
+//    half w2b = half(0.0702702703);
 
-    half s = half(0.0);
-    s += p0 * w0;
-    s += p1a * w1a;
-    s += p1b * w1b;
-    s += p2a * w2a;
-    s += p2b * w2b;
-    s *= rcp(w0 + w1a + w1b + w2a + w2b);
+//    half s = half(0.0);
+//    s += p0 * w0;
+//    s += p1a * w1a;
+//    s += p1b * w1b;
+//    s += p2a * w2a;
+//    s += p2b * w2b;
+//    s *= rcp(w0 + w1a + w1b + w2a + w2b);
 
-    return s;
-}
+//    return s;
+//}
 
 [numthreads(8,8,1)]
 void VerticleBlur(uint3 id : SV_DispatchThreadID)
@@ -83,11 +88,7 @@ void VerticleBlur(uint3 id : SV_DispatchThreadID)
     half2 uv = ((half2) id.xy + 0.5) * _AOMaskSize.zw;
     half2 delta = half2(0, _AOMaskSize.w);
 
-#if GAUSSIAN_BLUR
     _AOOutput[id.xy] = GaussianBlur(uv, delta);
-#else
-    _AOOutput[id.xy] = BilateralBlur(uv, delta);
-#endif
 }
 
 [numthreads(8, 8, 1)]
@@ -101,9 +102,145 @@ void HorizontalBlur(uint3 id : SV_DispatchThreadID)
     half2 uv = ((half2) id.xy + 0.5) * _AOMaskSize.zw;
     half2 delta = half2(_AOMaskSize.z, 0);
 
-#if GAUSSIAN_BLUR
     _AOOutput[id.xy] = GaussianBlur(uv, delta);
+}
+
+#define BILATERAL_EPSILON 0.01
+
+// Functions to clamp UVs to use when RTHandle system is used.
+
+float2 ClampAndScaleUV(float2 UV, float2 texelSize, float numberOfTexels, float2 scale)
+{
+    float2 maxCoord = 1.0f - numberOfTexels * texelSize;
+    return min(UV, maxCoord) * scale;
+}
+
+float2 ClampAndScaleUV(float2 UV, float2 texelSize, float numberOfTexels)
+{
+    return ClampAndScaleUV(UV, texelSize, numberOfTexels, 1.0);
+}
+
+// This is assuming half a texel offset in the clamp.
+float2 ClampAndScaleUVForBilinear(float2 UV, float2 texelSize)
+{
+    return ClampAndScaleUV(UV, texelSize, 0.5);
+}
+
+float BilateralWeight(float sampleDepth, float linearCentralDepth)
+{
+    float linearSample = LinearEyeDepth(sampleDepth, _ZBufferParams);
+    float delta = abs(linearSample - linearCentralDepth);
+    float w = saturate(1.0f - (_AOSpatialBilateralAggressiveness * delta + BILATERAL_EPSILON));
+
+    return w;
+}
+
+float BilateralBlur(float2 centralPos, out float centralDepth, out float centralAO)
+{
+    //centralPos -= 0.5;
+    float4 UnpackedAOs, UnpackedDepths;
+
+    float2 texelFrac = frac(centralPos + (-0.5 + 1.0 / 512.0));
+    float2 UV = float2((centralPos + float2(0.0, 0.0)) * _AOMaskSize.zw); //ClampAndScaleUVForBilinear((centralPos + float2(0.0, 0.0)) * _AOMaskSize.zw, _AOMaskSize.zw); 
+    GatherAOData(_AOInput, UV, UnpackedAOs, UnpackedDepths);
+
+    centralDepth = UnpackedDepths.y;
+    float linearCentralDepth = LinearEyeDepth(centralDepth, _ZBufferParams);
+    centralAO = UnpackedAOs.y;
+    float total = UnpackedAOs.y;
+    float totalWeight = 1;
+
+    // This manual unrolling is horrible looking, but I found it hard to please the PS4 compiler otherwise. TODO: Make this nicer.
+
+    // First set of gathered data.
+    float weight = BilateralWeight(UnpackedDepths.x, linearCentralDepth);
+    total += weight * UnpackedAOs.x;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.z, linearCentralDepth);
+    total += weight * UnpackedAOs.z;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.w, linearCentralDepth);
+    total += weight * UnpackedAOs.w;
+    totalWeight += weight;
+
+    // Second set of gathered data.
+    UV = float2((floor(centralPos + float2(2.0, 0.0) - 0.5) + 1.0) * _AOMaskSize.zw); //ClampAndScaleUVForBilinear((centralPos + float2(2.0, 0.0)) * _AOMaskSize.zw, _AOMaskSize.zw);
+    GatherAOData(_AOInput, UV, UnpackedAOs, UnpackedDepths);
+
+    weight = BilateralWeight(UnpackedDepths.x, linearCentralDepth);
+    total += weight * UnpackedAOs.x;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.y, linearCentralDepth);
+    total += weight * UnpackedAOs.y;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.z, linearCentralDepth);
+    total += weight * UnpackedAOs.z;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.w, linearCentralDepth);
+    total += weight * UnpackedAOs.w;
+    totalWeight += weight;
+
+
+    // Third set of gathered data.
+    UV = float2((floor(centralPos + float2(0.0, 2.0) - 0.5) + 1) * _AOMaskSize.zw); //ClampAndScaleUVForBilinear((centralPos + float2(0.0, 2.0)) * _AOMaskSize.zw, _AOMaskSize.zw); 
+    GatherAOData(_AOInput, UV, UnpackedAOs, UnpackedDepths);
+
+    weight = BilateralWeight(UnpackedDepths.x, linearCentralDepth);
+    total += weight * UnpackedAOs.x;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.y, linearCentralDepth);
+    total += weight * UnpackedAOs.y;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.z, linearCentralDepth);
+    total += weight * UnpackedAOs.z;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.w, linearCentralDepth);
+    total += weight * UnpackedAOs.w;
+    totalWeight += weight;
+
+    // Fourth set of gathered data.
+    UV = float2((floor(centralPos + float2(2.0, 2.0) - 0.5) + 1.0) * _AOMaskSize.zw); //ClampAndScaleUVForBilinear((centralPos + float2(2.0, 2.0)) * _AOMaskSize.zw, _AOMaskSize.zw); 
+    GatherAOData(_AOInput, UV, UnpackedAOs, UnpackedDepths);
+
+    weight = BilateralWeight(UnpackedDepths.x, linearCentralDepth);
+    total += weight * UnpackedAOs.x;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.y, linearCentralDepth);
+    total += weight * UnpackedAOs.y;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.z, linearCentralDepth);
+    total += weight * UnpackedAOs.z;
+    totalWeight += weight;
+
+    weight = BilateralWeight(UnpackedDepths.w, linearCentralDepth);
+    total += weight * UnpackedAOs.w;
+    totalWeight += weight;
+
+
+    total /= totalWeight;
+
+    return total;
+}
+
+[numthreads(8, 8, 1)]
+void SpatialFilter(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+    float centralDepth, centralAO;
+    float final = BilateralBlur(dispatchThreadId.xy, centralDepth, centralAO);
+
+#ifdef NEED_PACK_AO
+    _AOOutput[dispatchThreadId.xy] = PackAOOutput(final, centralDepth);
 #else
-    _AOOutput[id.xy] = BilateralBlur(uv, delta);
+    _AOOutput[dispatchThreadId.xy] = final;
 #endif
 }

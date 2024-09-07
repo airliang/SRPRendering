@@ -83,8 +83,10 @@ namespace UnityEditor.Insanity
             public static GUIContent ssaoFadeDistanceText = EditorGUIUtility.TrTextContent("AO Fade Distance Range");
             public static GUIContent ssaoSelfOcclusionBiasText = EditorGUIUtility.TrTextContent("AO Self Occlusion Depth Bias(View Space)");
             public static GUIContent ssaoBlurMethodText = EditorGUIUtility.TrTextContent("Blur Method");
-            public static string[] ssaoBlurMethodOptions = { "None", "Gaussian", "Dual" };
+            public static string[] ssaoBlurMethodOptions = { "None", "Gaussian", "Dual", "Bilateral" };
             public static GUIContent ssaoEnableTemperalFilterText = EditorGUIUtility.TrTextContent("Temperal Filter");
+            public static GUIContent ssaoBilateralAggressivenessText = EditorGUIUtility.TrTextContent("Bilateral Aggressiveness", "Higher this value, the less lenient with depth differences the spatial filter is. Increase if for example noticing white halos where AO should be.");
+            public static GUIContent ssaoUpSampleText = EditorGUIUtility.TrTextContent("Up Sample", "Up sample the SSAO mask texture to screen size");
 
             public static GUIContent debugViewSettingsText = EditorGUIUtility.TrTextContent("DebugView", "DebugView to display the rendering results in the pipeline");
             public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "SSAO", "TriangleOverdraw" };
@@ -156,6 +158,8 @@ namespace UnityEditor.Insanity
         SerializedProperty m_SSAOSelfOcclusionBiasProp;
         SerializedProperty m_SSAOBlurMethodProp;
         SerializedProperty m_SSAOTemperalFilterProp;
+        SerializedProperty m_SSAOBilateralAggressivenessProp;
+        SerializedProperty m_SSAOUpSampleProp;
 
         SavedBool m_DebugViewSettingFoldout;
         SerializedProperty m_DebugViewSettingsMode;
@@ -238,6 +242,8 @@ namespace UnityEditor.Insanity
             m_SSAOSelfOcclusionBiasProp = serializedObject.FindProperty("m_SelfOcclusionBias");
             m_SSAOBlurMethodProp = serializedObject.FindProperty("m_SSAOBlurType");
             m_SSAOTemperalFilterProp = serializedObject.FindProperty("m_EnableTemperalFilter");
+            m_SSAOBilateralAggressivenessProp = serializedObject.FindProperty("m_BilateralAggressiveness");
+            m_SSAOUpSampleProp = serializedObject.FindProperty("m_SSAOUpSample");
 
             m_DebugViewSettingFoldout = new SavedBool($"{target.GetType()}.DebugViewSettingFoldout", false);
             m_DebugViewSettingsMode = serializedObject.FindProperty("m_DebugViewMode");
@@ -400,6 +406,10 @@ namespace UnityEditor.Insanity
                     m_MaxRadiusInPixelProp.floatValue = EditorGUILayout.Slider(Styles.ssaoMaxRadiusInPixelText, m_MaxRadiusInPixelProp.floatValue, 10.0f, 100.0f);
                     m_HBAOHorizonBiasProp.floatValue = EditorGUILayout.Slider(Styles.hbaoHorizonBiasText, m_HBAOHorizonBiasProp.floatValue, 0, 1.0f);
                     m_SSAOHalfResolutionProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoHalfResolutionText, m_SSAOHalfResolutionProp.boolValue);
+                    if (m_SSAOHalfResolutionProp.boolValue)
+                    {
+                        m_SSAOUpSampleProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoUpSampleText, m_SSAOUpSampleProp.boolValue);
+                    }
                     m_SSAOIntensityProp.floatValue = EditorGUILayout.Slider(Styles.ssaoIntensityText, m_SSAOIntensityProp.floatValue, 0, 10.0f);
                     float fadeStart = m_SSAOFadeDistanceStartProp.floatValue;
                     float fadeEnd = m_SSAOFadeDistanceEndProp.floatValue;
@@ -409,6 +419,10 @@ namespace UnityEditor.Insanity
                     m_SSAOSelfOcclusionBiasProp.floatValue = EditorGUILayout.Slider(Styles.ssaoSelfOcclusionBiasText, m_SSAOSelfOcclusionBiasProp.floatValue, 0, 0.1f);
 
                     CoreEditorUtils.DrawPopup(Styles.ssaoBlurMethodText, m_SSAOBlurMethodProp, Styles.ssaoBlurMethodOptions);
+                    if (m_SSAOBlurMethodProp.intValue == (int)SSAOBlurType.eBilateral)
+                    {
+                        m_SSAOBilateralAggressivenessProp.floatValue = EditorGUILayout.Slider(Styles.ssaoBilateralAggressivenessText, m_SSAOBilateralAggressivenessProp.floatValue, 0, 1.0f);
+                    }
                     m_SSAOTemperalFilterProp.boolValue = EditorGUILayout.Toggle(Styles.ssaoEnableTemperalFilterText, m_SSAOTemperalFilterProp.boolValue);
                 }
                 EditorGUILayout.Space();

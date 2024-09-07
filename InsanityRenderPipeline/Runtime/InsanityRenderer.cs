@@ -213,6 +213,8 @@ namespace Insanity
                     m_ssaoSettings.selfOcclusionBiasViewSpace = asset.AOSelfOcclusionBias;
                     m_ssaoSettings.blurMethod = asset.SSAOBlurMethod;
                     m_ssaoSettings.enableTemporalFilter = asset.EnableTemperalFilter;
+                    m_ssaoSettings.bilateralAggressiveness = asset.BilateralAggressiveness;
+                    m_ssaoSettings.needUpSample = asset.SSAOUpSample;
                     if (m_ssaoSettings.blueNoiseTexture == null)
                     {
                         RenderPasses.CreateNoiseTexture(out m_ssaoSettings.blueNoiseTexture);
