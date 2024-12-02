@@ -152,7 +152,7 @@ half3 EnviromentIBLSpecular(float roughness, float NdV, float3 R, float3 kS)
     half3 specularEnvColor = SAMPLE_TEXTURECUBE_LOD(_ATMOSPHERE_SPECULAR, s_linear_repeat_sampler, R, mipLevel).rgb;
     half3 specularEnvColor2 = SAMPLE_TEXTURECUBE_LOD(_ATMOSPHERE_SPECULAR, s_linear_repeat_sampler, R, mipLevel + 1).rgb;
     specularEnvColor = lerp(specularEnvColor, specularEnvColor2, mipT);
-    half3 brdf = SAMPLE_TEXTURE2D(_BRDFLUTTex, s_point_repeat_sampler, half2(NdV, roughness));
+    half3 brdf = SAMPLE_TEXTURE2D_LOD(_BRDFLUTTex, s_point_repeat_sampler, half2(NdV, roughness), 0);
     half3 indirectSpecular = specularEnvColor * (kS * brdf.x + brdf.y);
     return indirectSpecular;
 

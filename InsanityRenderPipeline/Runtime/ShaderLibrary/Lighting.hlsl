@@ -64,7 +64,7 @@ TEXTURE2D(_AOMask);
 
 half GetScreenSpaceAmbientOcclusion(float2 normalizedScreenSpaceUV)
 {
-    return SAMPLE_TEXTURE2D(_AOMask, sampler_LinearClamp, normalizedScreenSpaceUV).x;
+    return SAMPLE_TEXTURE2D_LOD(_AOMask, sampler_LinearClamp, normalizedScreenSpaceUV, 0).x;
 }
 #endif
 

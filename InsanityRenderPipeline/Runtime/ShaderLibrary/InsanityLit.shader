@@ -140,6 +140,30 @@
 		}
 
         Pass 
+		{
+            Name "GBuffer"
+            Tags { "LightMode" = "InsanityGBuffer" }
+
+            ZWrite Off
+            ZTest Equal
+            Cull [_Cull]
+
+            HLSLPROGRAM
+            //#pragma shader_feature_local _ALPHATEST_ON
+			#pragma enable_d3d11_debug_symbols
+			#pragma vertex GBufferPassVertex
+			#pragma fragment GBufferPassFragment
+            #pragma multi_compile_instancing
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local _NORMALMAP
+			
+#include "LitInput.hlsl"
+#include "LitGBufferPass.hlsl"
+
+			ENDHLSL
+		}
+
+        Pass 
         {
             Tags { "LightMode" = "DebugView" }
             ZWrite Off

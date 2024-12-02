@@ -65,6 +65,9 @@ namespace Insanity
         LinearDepth,
         Normal,
         SSAO,
+        Albedo,
+        Metallic,
+        Smoothness,
         TriangleOverdraw
     }
 
@@ -97,6 +100,11 @@ namespace Insanity
         eGaussian,
         eDual,
         eBilateral
+    }
+
+    public enum DepthBit
+    {
+
     }
 
     [ExecuteInEditMode]
@@ -143,7 +151,7 @@ namespace Insanity
         [SerializeField] float m_ResolutionRate = 1.0f;
         [SerializeField] bool m_UseSRPBatcher = true;
         [SerializeField] MsaaQuality m_MSAASamples = MsaaQuality.Disabled;
-        
+        [SerializeField] int m_DepthBits = 32;
 
         public bool HDREnable
         {
@@ -174,6 +182,9 @@ namespace Insanity
             get { return m_MSAASamples; }
             set { m_MSAASamples = value; }
         }
+
+        public int DepthBits
+        { get { return m_DepthBits; } set { m_DepthBits = value; } }
 
         
         #endregion

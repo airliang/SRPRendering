@@ -57,6 +57,7 @@ namespace Insanity
             GlobalRenderSettings.ResolutionRate = asset.ResolutionRate;
             GlobalRenderSettings.screenResolution = new Rect(camera.pixelRect.x, camera.pixelRect.y,
                 camera.pixelRect.width * GlobalRenderSettings.ResolutionRate, camera.pixelRect.height * GlobalRenderSettings.ResolutionRate);
+            GlobalRenderSettings.depthBits = (DepthBits)asset.DepthBits;
         }
 
         protected override void Render(ScriptableRenderContext context, Camera[] cameras)

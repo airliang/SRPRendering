@@ -43,7 +43,7 @@ namespace Insanity
                 float width = GlobalRenderSettings.ResolutionRate * renderingData.cameraData.camera.pixelWidth;
                 float height = GlobalRenderSettings.ResolutionRate * renderingData.cameraData.camera.pixelHeight;
                 TextureDesc depthRTDesc = new TextureDesc((int)width, (int)height);
-                depthRTDesc.colorFormat = GraphicsFormat.R32_SFloat;
+                depthRTDesc.colorFormat = GraphicsFormat.R16_SFloat;
                 depthRTDesc.depthBufferBits = 0;
                 depthRTDesc.msaaSamples = MSAASamples.None;
                 depthRTDesc.enableRandomWrite = false;
@@ -85,7 +85,6 @@ namespace Insanity
                             break;
                     }
                     context.cmd.SetGlobalTexture("_CameraDepthAttachment", data.m_Source);
-                    //context.cmd.DrawMesh(s_FullScreenTriangleMesh, Matrix4x4.identity, data.m_CopyMaterial);
                     context.cmd.DrawProcedural(Matrix4x4.identity, data.m_CopyMaterial, 0, MeshTopology.Triangles, 3, 1);
                 });
             }

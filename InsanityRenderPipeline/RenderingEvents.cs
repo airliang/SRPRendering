@@ -13,6 +13,7 @@ namespace Insanity
         //ShadowCasterPassEvent,
         OpaqueForwardPassEvent,
         PostProcessEvent,
+        GBufferPassEvent,
         MaxEvent,
     }
 
@@ -29,15 +30,16 @@ namespace Insanity
         public static event ShadowCasterPassEventDelegate ShadowCasterRenderDelegate;
         public static event RenderingEventDelegate OpaqueForwardRenderDelegate;
         public static event RenderingEventDelegate PostProcessRenderDelegate;
+        public static event RenderingEventDelegate GBufferPassRenderDelegate;
         public static event RenderGraphPassDelegate BeforeExecuteRenderGraphDelegate;
         static RenderingEventDelegate[] m_Events = new RenderingEventDelegate[(int)RenderingEvents.MaxEvent]
         {
-            DepthPassRenderDelegate, DepthNormalPassRenderDelegate, OpaqueForwardRenderDelegate, PostProcessRenderDelegate
+            DepthPassRenderDelegate, DepthNormalPassRenderDelegate, OpaqueForwardRenderDelegate, PostProcessRenderDelegate, GBufferPassRenderDelegate
         };
 
         static RenderGraphPassDelegate[] m_RenderGraphPassEvents = new RenderGraphPassDelegate[(int)RenderingEvents.MaxEvent]
         {
-            null, null, null, null
+            null, null, null, null, null
         };
 
         public static void AddEvent(RenderingEvents evt, RenderingEventDelegate del)

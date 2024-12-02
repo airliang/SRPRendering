@@ -29,6 +29,7 @@ namespace Insanity
             public ComputeShader SSAODualBlur;
             public ComputeShader SSAOTemporalFilter;
             public ComputeShader SSAOUpSample;
+            public ComputeShader DeferredLighting;
             //public ComputeShader TileFrustumCompute;
         }
 

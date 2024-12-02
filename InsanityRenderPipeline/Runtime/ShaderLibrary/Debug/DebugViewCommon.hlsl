@@ -8,7 +8,10 @@
 #define DebugLinearDepth 3
 #define DebugNormal                 4
 #define DebugSSAO 5
-#define DebugOverdraw               6
+#define DebugAlbedo 6
+#define DebugMetallic 7
+#define DebugSmoothness 8
+#define DebugOverdraw 9
 
 CBUFFER_START(DebugViewVariables)
 int _DebugViewMode;

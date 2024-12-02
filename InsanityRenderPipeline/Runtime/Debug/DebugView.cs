@@ -17,6 +17,9 @@ namespace Insanity
             LinearDepth,
             WorldSpaceNormal,
             SSAO,
+            Albedo,
+            Metallic,
+            Smoothness,
             TriangleOverDraw,
         }
 
@@ -37,18 +40,13 @@ namespace Insanity
 
         public class DebugViewPassData
         {
-            public TextureHandle m_displayTexture;
-            public Material m_finalBlitMaterial;
-            public RendererListHandle m_renderList_opaque;
-            public TextureHandle m_Albedo;
-            public bool m_AdditionalLightsEnable;
             public DebugViewVariables m_debugViewVariable;
         }
 
         static ShaderTagId m_DebugViewShaderTag = new ShaderTagId("DebugView");
         public static DebugViewVariables m_DebugViewVariablesCB = new DebugViewVariables();
 
-        public static DebugViewPassData DebugViewPreparePass(RenderingData renderingData/*, TextureHandle colorTarget, TextureHandle depthTarget*/)
+        public static DebugViewPassData DebugViewPreparePass(RenderingData renderingData)
         {
             using (var builder = renderingData.renderGraph.AddRenderPass<DebugViewPassData>("DebugView Prepare Pass", out var passData,
                 new ProfilingSampler("DebugView Prepare Pass Profiler")))
@@ -75,6 +73,8 @@ namespace Insanity
             public TextureHandle m_Normal;
             public TextureHandle m_Overdraw;
             public TextureHandle m_SSAO;
+            public TextureHandle m_GBufferAlbedoMetallic;
+            public TextureHandle m_GBufferNormalSmoothness;
             public ComputeBuffer m_LightVisibilityIndexBuffer;
         }
 
@@ -87,6 +87,7 @@ namespace Insanity
             public TextureHandle m_Normal;
             public TextureHandle m_Overdraw;
             public TextureHandle m_SSAO;
+            public TextureHandle m_Albedo;
             public bool flip;
             public Material m_finalBlitMaterial;
             public int m_DebugViewMode;
@@ -95,7 +96,7 @@ namespace Insanity
 
         
 
-        public static void ShowDebugPass(RenderingData renderingData, ref DebugViewGPUResources debugViewTextures, TextureHandle colorTarget, Material finalBlitMaterial, int debugViewMode)
+        public static void ShowDebugPass(RenderingData renderingData, ref DebugViewGPUResources debugViewTextures, TextureHandle colorTarget, Material finalBlitMaterial, int debugViewMode, RendererData.eRenderingPath renderingPath = RendererData.eRenderingPath.Forward)
         {
             if (finalBlitMaterial == null)
                 finalBlitMaterial = CoreUtils.CreateEngineMaterial(asset.InsanityPipelineResources.shaders.DebugViewBlit);
@@ -106,14 +107,19 @@ namespace Insanity
                 {
                     passData.m_Depth = builder.ReadTexture(debugViewTextures.m_Depth);
                 }
-                if (debugViewType == DebugViewType.WorldSpaceNormal)
+                if (debugViewType == DebugViewType.WorldSpaceNormal || debugViewType == DebugViewType.Smoothness)
                 {
-                    passData.m_Normal = builder.ReadTexture(debugViewTextures.m_Normal);
+                    passData.m_Normal = renderingPath == RendererData.eRenderingPath.Forward ? builder.ReadTexture(debugViewTextures.m_Normal)
+                        : builder.ReadTexture(debugViewTextures.m_GBufferNormalSmoothness);
                     //passData.m_Overdraw = builder.ReadTexture(debugViewTextures.m_Overdraw);
                 }
                 else if (debugViewType == DebugViewType.SSAO)
                 {
                     passData.m_SSAO = builder.ReadTexture(debugViewTextures.m_SSAO);
+                }
+                else if (debugViewType == DebugViewType.Albedo || debugViewType == DebugViewType.Metallic)
+                {
+                    passData.m_Albedo = builder.ReadTexture(debugViewTextures.m_GBufferAlbedoMetallic);
                 }
                 //else if (debugViewType == DebugViewType.TileBasedCullingResult)
                 {
@@ -134,6 +140,7 @@ namespace Insanity
                     context.cmd.SetGlobalBuffer("_LightVisibilityIndexBuffer", data.m_LightVisibilityIndexBuffer);
                     data.m_finalBlitMaterial.SetTexture("_NormalTexture", data.m_Normal);
                     data.m_finalBlitMaterial.SetTexture("_AOMask", data.m_SSAO);
+                    data.m_finalBlitMaterial.SetTexture("_AlbedoTexture", data.m_Albedo);
                     context.cmd.SetRenderTarget(data.m_Dest);
                     
                     //context.cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);

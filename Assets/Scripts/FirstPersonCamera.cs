@@ -48,6 +48,15 @@ public class FirstPersonCamera : MonoBehaviour
             {
                 transform.position -= transform.forward * Time.deltaTime * moveSpeed;
             }
+
+            if (Input.GetKey(KeyCode.D))
+            {
+                transform.position += transform.right * Time.deltaTime * moveSpeed;
+            }
+            else if (Input.GetKey(KeyCode.A))
+            {
+                transform.position += -transform.right * Time.deltaTime * moveSpeed;
+            }
         }
 
     }

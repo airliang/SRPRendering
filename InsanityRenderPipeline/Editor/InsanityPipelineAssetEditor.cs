@@ -21,8 +21,10 @@ namespace UnityEditor.Insanity
             public static GUIContent screenPercentageText = EditorGUIUtility.TrTextContent("Screen Resolution Percentage", "Controls the global screen resolution settings.");
             public static GUIContent srpBatcherText = EditorGUIUtility.TrTextContent("SRP Batcher", "Controls the global SRP Batcher settings.");
             public static GUIContent msaaText = EditorGUIUtility.TrTextContent("MSAA", "Controls the global anti aliasing settings");
-            
+            public static GUIContent depthBitsText = EditorGUIUtility.TrTextContent("Depth Bits", "Set the depth bits for the camera depth");
+
             public static string[] msaaOptions = { "Disabled", "2x", "4x", "8x" };
+            public static string[] depthBitsOptions = { "16", "32" };
 
             public static GUIContent shadowSettingsText = EditorGUIUtility.TrTextContent("Shadows");
 
@@ -89,7 +91,7 @@ namespace UnityEditor.Insanity
             public static GUIContent ssaoUpSampleText = EditorGUIUtility.TrTextContent("Up Sample", "Up sample the SSAO mask texture to screen size");
 
             public static GUIContent debugViewSettingsText = EditorGUIUtility.TrTextContent("DebugView", "DebugView to display the rendering results in the pipeline");
-            public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "SSAO", "TriangleOverdraw" };
+            public static string[] debugViewTypeOptions = { "None", "TileBasedLights", "Depth", "LinearDepth", "Normal", "SSAO", "Albedo", "Metallic", "Smoothness", "TriangleOverdraw" };
 
         }
         SavedBool m_RenderSettingsFoldout;
@@ -98,7 +100,7 @@ namespace UnityEditor.Insanity
         SerializedProperty m_ScreenResolutionProp;
         SerializedProperty m_SRPBatcherProp;
         SerializedProperty m_MSAAProp;
-        
+        SerializedProperty m_DepthBitsProp;
 
         SavedBool m_ShadowSettingsFoldout;
 
@@ -186,7 +188,7 @@ namespace UnityEditor.Insanity
             m_ScreenResolutionProp = serializedObject.FindProperty("m_ResolutionRate");
             m_SRPBatcherProp = serializedObject.FindProperty("m_UseSRPBatcher");
             m_MSAAProp = serializedObject.FindProperty("m_MSAASamples");
-            
+            m_DepthBitsProp = serializedObject.FindProperty("m_DepthBits");
 
             m_ShadowSettingsFoldout = new SavedBool($"{target.GetType()}.ShadowSettingsFoldout", false);
 
@@ -266,7 +268,10 @@ namespace UnityEditor.Insanity
 
                 m_SRPBatcherProp.boolValue = EditorGUILayout.Toggle(Styles.srpBatcherText, m_SRPBatcherProp.boolValue);
                 EditorGUILayout.PropertyField(m_MSAAProp, Styles.msaaText);
-                
+
+                //CoreEditorUtils.DrawPopup(Styles.depthBitsText, m_DepthBitsProp, Styles.depthBitsOptions);
+
+
             }
             EditorGUILayout.EndFoldoutHeaderGroup();
         }

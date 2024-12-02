@@ -20,42 +20,6 @@ namespace Insanity
     {
         static ShaderTagId m_DepthPrePassId = new ShaderTagId("DepthPrepass");
         static ProfilingSampler s_DepthPrePassProfiler = new ProfilingSampler("DepthPrepass Profiler");
-        private static TextureHandle CreateDepthTexture(RenderGraph graph, Camera camera, string name)
-        {
-            //Texture description
-            float width = GlobalRenderSettings.ResolutionRate * camera.pixelWidth;
-            float height = GlobalRenderSettings.ResolutionRate * camera.pixelHeight;
-            TextureDesc depthRTDesc = new TextureDesc((int)width, (int)height);
-            depthRTDesc.colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Depth, false);
-            depthRTDesc.depthBufferBits = DepthBits.Depth24;
-            depthRTDesc.msaaSamples = MSAASamples.None;
-            depthRTDesc.enableRandomWrite = false;
-            depthRTDesc.clearBuffer = true;
-            depthRTDesc.clearColor = Color.black;
-            depthRTDesc.name = name;
-
-            return graph.CreateTexture(depthRTDesc);
-        }
-
-        private static TextureHandle CreateColorTexture(RenderGraph graph, Camera camera, string name)
-        {
-            bool colorRT_sRGB = (QualitySettings.activeColorSpace == ColorSpace.Linear);
-
-            //Texture description
-            float width = GlobalRenderSettings.ResolutionRate * camera.pixelWidth;
-            float height = GlobalRenderSettings.ResolutionRate * camera.pixelHeight;
-            TextureDesc colorRTDesc = new TextureDesc((int)width, (int)height);
-            colorRTDesc.colorFormat = GlobalRenderSettings.HDREnable ? GraphicsFormat.R16G16B16A16_SFloat 
-                : GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, colorRT_sRGB);
-            colorRTDesc.depthBufferBits = 0;
-            colorRTDesc.msaaSamples = MSAASamples.None;
-            colorRTDesc.enableRandomWrite = false;
-            colorRTDesc.clearBuffer = true;
-            colorRTDesc.clearColor = Color.black;
-            colorRTDesc.name = name;
-
-            return graph.CreateTexture(colorRTDesc);
-        }
 
         public static DepthPrepassData Render_DepthPrePass(RenderingData renderingData, TextureHandle depth)
         {

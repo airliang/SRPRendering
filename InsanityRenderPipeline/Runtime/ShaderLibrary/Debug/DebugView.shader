@@ -19,6 +19,7 @@ Shader "Insanity/DebugViewBlit"
             //#pragma multi_compile _ _USE_DRAW_PROCEDURAL
 
             #pragma enable_d3d11_debug_symbols
+#pragma enable_vulkan_debug_symbols
 
             #include "../Fullscreen.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
@@ -32,6 +33,8 @@ Shader "Insanity/DebugViewBlit"
             SAMPLER(sampler_NormalTexture);
             TEXTURE2D(_AOMask);
             SAMPLER(sampler_AOMask);
+            TEXTURE2D(_AlbedoTexture);
+            SAMPLER(sampler_AlbedoTexture);
             StructuredBuffer<int> _LightVisibilityIndexBuffer;
 
             static const uint nbColours = 10;
@@ -100,10 +103,26 @@ Shader "Insanity/DebugViewBlit"
                 else if (_DebugViewMode == DebugNormal)
                 {
                     col = SAMPLE_TEXTURE2D(_NormalTexture, sampler_NormalTexture, input.uv);
+                    col.a = 1;
+                }
+                else if (_DebugViewMode == DebugAlbedo)
+                {
+                    col = SAMPLE_TEXTURE2D(_AlbedoTexture, sampler_AlbedoTexture, input.uv);
+                    col.a = 1;
+                }
+                else if (_DebugViewMode == DebugMetallic)
+                {
+                    col = SAMPLE_TEXTURE2D(_AlbedoTexture, sampler_AlbedoTexture, input.uv);
+                    col = float4(col.aaa, 1);
+                }
+                else if (_DebugViewMode == DebugSmoothness)
+                {
+                    col = SAMPLE_TEXTURE2D(_NormalTexture, sampler_NormalTexture, input.uv);
+                    col = float4(col.aaa, 1);
                 }
 
-                return col;
-            }
+        return col;
+}
             ENDHLSL
         }
     }

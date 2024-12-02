@@ -84,7 +84,7 @@ half SampleScreenSpaceShadowmap(float2 shadowCoord)
 {
     //shadowCoord.xy /= shadowCoord.w;
 
-    half attenuation = SAMPLE_TEXTURE2D(_ScreenSpaceShadowmapTexture, sampler_LinearClamp, shadowCoord.xy).x;
+    half attenuation = SAMPLE_TEXTURE2D_LOD(_ScreenSpaceShadowmapTexture, sampler_LinearClamp, shadowCoord.xy, 0).x;
 
     return attenuation;
 }
