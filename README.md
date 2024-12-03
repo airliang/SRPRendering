@@ -5,11 +5,12 @@ This pipeline implements the personal exprimental rendering features.
 
 ## Features
 #### Precompute Atmosphere Scattering
-
+![](screenshots/atmosphere_scattering.jpg)
 #### Realtime Baking Atmosphere Scattering to Spherical Harmonics
-
+![](screenshots/bake_atmophere_sh.mp4)
 
 #### Shadow Mapping
+![](screenshots/shadowmap.mp4)
 - Percentage-Closer Soft Shadows
 - PCSS
 
@@ -25,6 +26,7 @@ This pipeline implements the personal exprimental rendering features.
 ![](screenshots/tilebasedlightculling.png)
 ![](screenshots/lightcullingsponza.gif)
 #### SSAO
-
+![](screenshots/ao_compare.png)
+![](screenshots/ao_mask.jpg)
 #### Deferred Shading
 
