@@ -7,9 +7,8 @@ This pipeline implements the personal exprimental rendering features.
 #### Precompute Atmosphere Scattering
 ![](screenshots/atmosphere_scattering.jpg)
 #### Realtime Baking Atmosphere Scattering to Spherical Harmonics
-<video src="https://github.com/airliang/SRPRendering/blob/main/screenshots/bake_atmophere_sh.mp4" controls></video>
 #### Shadow Mapping
-[![Shadow Mapping](screenshots/shadowmap.mp4)
+![Shadow Mapping](screenshots/shadowmap.gif)
 - Percentage-Closer Soft Shadows
 - PCSS
 
