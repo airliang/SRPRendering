@@ -7,6 +7,7 @@ This pipeline implements the personal exprimental rendering features.
 #### Precompute Atmosphere Scattering
 ![](screenshots/atmosphere_scattering.jpg)
 #### Realtime Baking Atmosphere Scattering to Spherical Harmonics
+![](screenshots/bake_atmosphere_sh.gif)
 #### Shadow Mapping
 ![Shadow Mapping](screenshots/shadowmap.gif)
 - Percentage-Closer Soft Shadows
