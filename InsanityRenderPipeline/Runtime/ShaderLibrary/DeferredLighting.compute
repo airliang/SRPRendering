@@ -1,0 +1,83 @@
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "LitInput.hlsl"
+#include "LightInput.hlsl"
+#include "Lighting.hlsl"
+#include "Shadow/shadows.hlsl"
+#include "UnityBuiltIn.hlsl"
+
+#pragma multi_compile _ _SSAO_ENABLE
+#pragma multi_compile _ _ADDITIONAL_LIGHTS
+#pragma multi_compile _ _TILEBASED_LIGHT_CULLING
+#pragma multi_compile _ _SCREENSPACE_SHADOW
+
+#pragma enable_d3d11_debug_symbols
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> _FinalLighting;
+Texture2D<float4> _AlbedoMetallic;
+Texture2D<float4> _NormalSmoothness;
+//Texture2D _ScreenSpaceShadowmapTexture;
+Texture2D _DepthTexture;
+float4x4 _ProjInverse;
+float4x4 _ViewInverse;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float2 screenUV = ((float2) id.xy + 0.5) * _ScreenSize.zw;
+    
+    //first step is to calculate the world position 
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, screenUV, 0);
+    //float3 viewPosCur = ComputeViewSpacePosition(screenUV, depth, _ProjInverse); //UVtoViewPosCurFrame(uv, depth);
+    float3 clipSpacePos = float3(screenUV, 1.0 - depth) * 2.0 - 1.0;
+    float4 viewPosCur = mul(_ProjInverse, float4(clipSpacePos, 1));
+    viewPosCur /= viewPosCur.w;
+    float4 positionWS = mul(_ViewInverse, float4(viewPosCur.xyz, 1));
+    positionWS = positionWS / positionWS.w;
+    
+    ShadowSampleCoords shadowSample = GetShadowSampleData(positionWS.xyz, screenUV);
+    
+    // initialize brdf data.
+    BRDFData brdfData;
+    float4 albedoMetallic = _AlbedoMetallic.SampleLevel(s_point_clamp_sampler, screenUV, 0);
+    float4 normalSmoothness = _NormalSmoothness.SampleLevel(s_point_clamp_sampler, screenUV, 0);
+    float3 normalWS = 2.0 * normalSmoothness.xyz - 1.0;
+    InitializeBRDFData(albedoMetallic.rgb, albedoMetallic.a, 0, normalSmoothness.a, 1.0, brdfData);
+
+    Light mainLight = GetMainLight(shadowSample);
+    
+    half occlusion = 1;
+#ifdef _SSAO_ENABLE
+    occlusion = GetScreenSpaceAmbientOcclusion(screenUV);
+#endif
+    half3 bakedGI = max(half3(0, 0, 0), ShadeSH9(half4(normalWS, 1.0)));
+    float3 viewDirectionWS = -normalize(positionWS.xyz); //camera relative rendering, camera position is zero
+    half3 color = GlobalIllumination(brdfData, bakedGI, occlusion, positionWS.xyz, normalWS, viewDirectionWS);
+    color += LightingPhysicallyBased(brdfData, mainLight, normalWS, viewDirectionWS);
+#if defined(_ADDITIONAL_LIGHTS)
+    half3 diffuseAdditonal = 0;
+#ifdef _TILEBASED_LIGHT_CULLING
+    TileBasedAdditionalLightingFragmentPBR(brdfData, positionWS.xyz, normalWS, viewDirectionWS, screenUV, diffuseAdditonal);
+
+#else
+    uint pixelLightCount = GetAdditionalLightsCount();
+
+    for (uint lightIndex = 0; lightIndex < min(pixelLightCount, MAX_VISIBLE_LIGHTS); lightIndex++)
+    {
+        //FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
+
+        Light additionalLight = GetAdditionalLight(lightIndex, positionWS.xyz);
+        diffuseAdditonal += LightingPhysicallyBased(brdfData, additionalLight, normalWS, viewDirectionWS);
+    }
+#endif
+    color += diffuseAdditonal;
+#endif
+    //color += emission;
+    
+    _FinalLighting[id.xy] = half4(color, 1);
+
+}
