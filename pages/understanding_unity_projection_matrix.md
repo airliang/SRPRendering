@@ -1,12 +1,3 @@
----
-title: 'Understanding Unity Projection Matrix'
-date: 2024-03-20
-permalink: /posts/understanding_unity_projection_matrix.md
-tags:
-  - cool posts
-  - unity
-  - math
----
 # Understanding Unity Projection Matrix
 ## Matrix Tricks
 There are some tricks for Unity camera matrices we have to make clear here.
