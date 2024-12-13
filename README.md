@@ -10,9 +10,8 @@ This pipeline implements the personal exprimental rendering features.
 
 #### Shadow Mapping
 
-- Percentage-Closer Soft Shadows
-- PCSS
-- Variance Shadow Mapping
+- Percentage-Closer Soft Shadows: [Reference page PCSS](pages/PCSS.md)
+- Variance Shadow Mapping: 
 - Exponential Variance Shadow Mapping
 - Screen Space Shadow Mapping
 
