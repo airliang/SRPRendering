@@ -5,30 +5,33 @@ This pipeline implements the personal exprimental rendering features.
 
 ## Features
 #### Precompute Atmosphere Scattering
-![](screenshots/atmosphere_scattering.jpg)
+
 #### Realtime Baking Atmosphere Scattering to Spherical Harmonics
-![](screenshots/bake_atmosphere_sh.gif)
+
 #### Shadow Mapping
-![Shadow Mapping](screenshots/shadowmap.gif)
+
 - Percentage-Closer Soft Shadows
 - PCSS
-
 - Variance Shadow Mapping
-
 - Exponential Variance Shadow Mapping
-
 - Screen Space Shadow Mapping
 
 #### Camera Relative Rendering
 
 #### Tile based Light Culling
-![](screenshots/tilebasedlightculling.png)
-![](screenshots/lightcullingsponza.gif)
+
 #### SSAO
-![](screenshots/ao_compare.png)
-![](screenshots/ao_mask.jpg)
+
 #### Deferred Shading
 
+## Screenshots
+![Atmosphere scattering](screenshots/atmosphere_scattering.jpg)
+![Atmosphere to spherical harmonic](screenshots/bake_atmosphere_sh.gif)
+![Shadow Mapping](screenshots/shadowmap.gif)
+![Tile based light culling](screenshots/tilebasedlightculling.png)
+![Tile based light culling](screenshots/lightcullingsponza.gif)
+![SSAO](screenshots/ao_compare.png)
+![SSAO mask](screenshots/ao_mask.jpg)
 ## Pages
 These pages could help you know more about the relative rendering features in this Pipeline.
 
