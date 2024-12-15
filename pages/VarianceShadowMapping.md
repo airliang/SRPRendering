@@ -1,5 +1,6 @@
 # Variance Shadow Mapping
 ## Algorithm Overview
+### Understand Chebyshev's Inequality
 Before going to the implementation, we need to understand the following formulas.
 $\mu = E(x)= M_1$
 $\sigma^2 = E(x^2) - E(x)^2 = M_2 - M_1$
@@ -38,6 +39,7 @@ return pMax;
 After modified:
 ![](vsm/vsm_problem_resolve.png)
 ### Biasing
+What shadow bias really is? We know that self shadow will cause shadow ance easily. But in variance shadow mapping, we don't need the depth bias since the shadow is not calculated by the depth compare. But we need to clamp the variance to a proper value. So in this case, __Bias__ means variance bias, not depth bias.
 From GPU Gem3 chapter 8, a solution to the problem of shadow biasing is introduced. 
 If we see the shadow map as a parametric surface, each pixel in shadow map has their tangent plane. As the paper said:
 ![](vsm/gpu_gem_c8.png)
