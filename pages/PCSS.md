@@ -31,8 +31,10 @@ We can randomly rotate the Poisson disk samples around its center to make an imp
 Because we want to rotate the Poisson disk randomly, we should introduce random numbers which are camera stable for reducing flickering.
 So how to generate these random numbers? We can use a noise texture which was pregenerated.
 This is the result of Uniform Grid Offset Sampling compared with non-uniform Disk Offset Sampling:
+
 ![](pcss/poisson_disk_com.png)
 If we rotate the disk samples we can get the TV noise pattern:
+
 ![](pcss/poisson_disk_com1.png)
 
 ### Depth Bias
@@ -42,20 +44,29 @@ How to understand the derivative below?
 ![](pcss/pcss_derivative.png)
 I use mathematics tools to explain.
 About the Jacobian Det, we have:
+
 $f(u, v) = f(u(x,y), v(x, y))$
-$J(u,v) = \begin{bmatrix}
+$
+J(u,v) = \begin{bmatrix}
 \frac{\partial u}{\partial x} & \frac{\partial u}{\partial y}\\ 
 \frac{\partial v}{\partial x} & \frac{\partial v}{\partial y}
-\end{bmatrix}$
+\end{bmatrix}
+$
+
 In screen space, we can just know the depth derivative of screen coordinate x and y.
 But we still don't know the depth derivative in shadowmap space of coordinate u and v.
 And if we see d as a depth function of the shadowmap, we have:
 d(u, v) = d(u(x,y), v(x, y)) so d is the composite function
 Now we want to know the derivative of d to (x,y). It is a second derivative because u and v are the functions of x and y.
 So we use the chain rule of composite function derivative:
-$\frac{\partial d}{\partial x} = \frac{\partial d}{\partial u} \frac{\partial u}{\partial x} + \frac{\partial d}{\partial v} \frac{\partial v}{\partial x}$
-$\frac{\partial d}{\partial y} = \frac{\partial d}{\partial u} \frac{\partial u}{\partial y} + \frac{\partial d}{\partial v} \frac{\partial v}{\partial y}$
+
+$
+\frac{\partial d}{\partial x} = \frac{\partial d}{\partial u} \frac{\partial u}{\partial x} + \frac{\partial d}{\partial v} \frac{\partial v}{\partial x}$
+$\frac{\partial d}{\partial y} = \frac{\partial d}{\partial u} \frac{\partial u}{\partial y} + \frac{\partial d}{\partial v} \frac{\partial v}{\partial y}
+$
+
 So it can be seen as matrix multiplication.
+
 $\begin{bmatrix}
 \frac{\partial d}{\partial x} \\ 
 \frac{\partial d}{\partial y}
@@ -68,6 +79,7 @@ $\begin{bmatrix}
 \frac{\partial d}{\partial u}\\ 
 \frac{\partial d}{\partial v}
 \end{bmatrix}$
+
 Then we can see the matrix as the transpose of the Jacobian matrix.
 So we get the formula above.
 After we get the derivative of depth value, how should we use it?
