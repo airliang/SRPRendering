@@ -41,8 +41,9 @@ After modified:
 ### Biasing
 What shadow bias really is? We know that self shadow will cause shadow ance easily. But in variance shadow mapping, we don't need the depth bias since the shadow is not calculated by the depth compare. But we need to clamp the variance to a proper value. So in this case, __Bias__ means variance bias, not depth bias.
 From GPU Gem3 chapter 8, a solution to the problem of shadow biasing is introduced. 
-If we see the shadow map as a parametric surface, each pixel in shadow map has their tangent plane. As paper[3] said:
+If we see the shadow map as a parametric surface, each pixel in shadow map has their tangent plane. As paper[3] says:
 ![](vsm/gpu_gem_c8.png)
+I wonder how the formula $f(x,y) = \mu + x \frac{\partial f}{\partial x} + y \frac{\partial f}{\partial y}$ comes. It looks like the __Taylor Expansion__ of the function. But could we approximate $\mu$ as f(0,0)?
 So $f(x,y)$ is the depth plane equation for each pixel.Actually, I don't understand how this formula come. If someone knows please tell me.
 Then the second moment(the variance) can be computed by the following equation:
 $M_2 = E(f^2) = E(\mu^2) + E(x^2)\Big [\frac{\partial f}{\partial x}\Big] ^2 + E(y^2) \Big [\frac{\partial f}{\partial y}\Big] ^2$
