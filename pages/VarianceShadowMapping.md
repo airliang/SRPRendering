@@ -102,10 +102,10 @@ Paper [3] gives us an example of the wrap function. And this may make object c c
 So how to make object b correct again? The author introduces layers. Different layers have different wrap functions. In the case above, if we put object c in layer 1, object b in layer 2, we can get the correct results.
 We define a layer has index i, covering an interval [pi, qi], we get the following wrap:
 
-$\varphi_i(t) = \begin{cases}
+$`\varphi_i(t) = \begin{cases}
   0 \space \space \space \rm if \space t \leq p_{i}  \\
   \frac{t-p_{i}}{q_{i} - p_{i}} \space \space \rm if \space p_{i} < t < q_{i}  \\ 1 \space \space \space \rm if \space q_{i} \leq t
-\end{cases}$
+\end{cases}`$
 
 I am not going to state more details about the algorithm because I don't think it is necessary if we choose EVSM.
 The remaining details of LVSM are the minimum variance for each layer, the layer overlaps and the Lloyd Relaxation Algorithm which defines the layer ranges.
