@@ -58,11 +58,11 @@ About the Jacobian Det, we have:
 
 $f(u, v) = f(u(x,y), v(x, y))$
 
-```math
+$`
 \begin{aligned}
 J(u,v) = \begin{bmatrix} \frac{\partial u}{\partial x} & \frac{\partial u}{\partial y} \\ \frac{\partial v}{\partial x} & \frac{\partial v}{\partial y} \end{bmatrix}
 \end{aligned}
-```
+`$
 
 In screen space, we can just know the depth derivative of screen coordinate x and y.
 But we still don't know the depth derivative in shadowmap space of coordinate u and v.
@@ -70,15 +70,18 @@ And if we see d as a depth function of the shadowmap, we have:
 d(u, v) = d(u(x,y), v(x, y)) so d is the composite function
 Now we want to know the derivative of d to (x,y). It is a second derivative because u and v are the functions of x and y.
 So we use the chain rule of composite function derivative:
-```math
+
+$`
 \frac{\partial d}{\partial x} = \frac{\partial d}{\partial u} \frac{\partial u}{\partial x} + \frac{\partial d}{\partial v} \frac{\partial v}{\partial x}
-```
-```math
+`$
+
+$`
 \frac{\partial d}{\partial y} = \frac{\partial d}{\partial u} \frac{\partial u}{\partial y} + \frac{\partial d}{\partial v} \frac{\partial v}{\partial y}
-```
+`$
+
 So it can be seen as matrix multiplication.
 
-```math
+$`
 \begin{bmatrix}
 \frac{\partial d}{\partial x} \\
 \frac{\partial d}{\partial y}
@@ -91,7 +94,8 @@ So it can be seen as matrix multiplication.
 \frac{\partial d}{\partial u}\\ 
 \frac{\partial d}{\partial v}
 \end{bmatrix}
-```
+`$
+
 Then we can see the matrix as the transpose of the Jacobian matrix.
 So we get the formula above.
 After we get the derivative of depth value, how should we use it?
