@@ -6,28 +6,44 @@ Volume rendering is the foundation of atmosphere rendering.
 As light travels through the volume in the direction of our eye (which is how images of objects we are seeing are formed in our eye), some of it will be absorbed by the volume as it passes through it. This phenomenon is called __absorption__.
 The amount of light that's being transmitted through that volume is governed by the __Beer-Lambert law__ (or __Beer's law__ for short).
 The Beer-Lambert law equation looks like this:
+
 $T = exp(-distance * \sigma_a) = e^{-distatnce*\sigma_a}$
+
 $\sigma_a$ is the representation of absorption coefficient of the volume.
 #### In-Scattering
 Volumes can be lit by light. As we can see, the scattering in the following image.
+
 ![](atmosphere_scattering/in_scattering1.PNG)
+
 But the radiance reaches our eye is not just one light beam showing above. We must integrate all the scattering points along the eye ray.
+
 ![](atmosphere_scattering/in_scattering2.PNG)
+
 We need to integrate the light that's be redirected towards the eye due to in-scattering along the segment of the ray that passes through the volumetric object.
 Because there is no analytic solution to integration, so we can use Riemann sum to estimate the integration. If we know the distance from t0 to t1 and divide the distance into several segments, we can calculate the integration.
+
 ![](atmosphere_scattering/in_scattering3.PNG)
+
 We assume that function Li(x) is the the scattering radiance reaches the eye form the point x. The lesson do not give the function of $L_i(x)$. So I guess the function $L_i(x)$ could be this:
+
 $L_i(x) = Color_{light}(x) \times e ^{-(x - t_0) \times \sigma_a}$
+
 $Color_{light}(x)$ is the color from the light reaches the point.
 The following image shows the estimation of integration.
+
 ![](atmosphere_scattering/in_scattering4.PNG)
+
 #### The Phase Function
 When in-scattering happen, how much radiance should be scattered to a specific direction? The answer is deal to the phase function. 
 We look at the in-scattering contribution using the following equation:
+
 $L_i(x, \omega)= \sigma_s\int_{S^2}p(x,\omega,\omega')L(x,\omega')d\omega'$
+
 Where $p(x,\omega,\omega')$ is the phase function.
 I consider the phase function as a probability density function. And the integration of the phase function over a sphere is one.
+
 $\int_{S^2}f_p(x,\omega,\omega')d\omega' = 1$
+
 #### Optical Depth
 It is actually transmittance, the amount of attenuated light after it passes a distance.
 
@@ -47,19 +63,27 @@ $R, M$ refers to Rayleigh and Mie respectively.
 $\rho_{R,M}(h)$ represents the Rayleigh/Mie density function where h is the altitude.
 
 I just use the image from paper [2] here:
+
 ![](atmosphere_scattering/concepts.png)
+
 Rayleigh and Mie have different functions respectively.
 Here is the phase function of Rayleigh:
+
 $F_R=\frac{3}{4}(1+\cos^2(\theta))$
+
 Here is the phase function of Mie:
+
 $F_M(\theta, g)=\frac{3(1-g^2)}{2(2+g^2)}\frac{(1+\cos^2(\theta))}{(1+g^2-2g\cos(\theta))^{3/2}}$
 
 And here is the Scattering coefficient definition.
 Rayleigh/Mie particle polarisability constant:
+
 $\alpha_{R,M}=\frac{2\pi^2(n_e^2-1)}{3N_{e_{R,M}}^2}$
+
 The Rayleigh and Mie scattering coefficients $\beta_R(\lambda)$ and $\beta_M()$ are then defined as 
 $\beta_R(\lambda) = 4\pi\frac{N_R}{\lambda^4}\alpha_R$
 $\beta_M()=4\pi N_M \alpha _M$
+
 There is a little confusion about the coefficient $N_{e_{R,M}}$and $N_{R,M}$. $N_{e_{R,M}}$ represent the Rayleigh/Mie particles’ molecular number density of the Earth’s atmosphere at sea level. While $N_{R,M}$ denotes molecular number density of Rayleigh/Mie particles in the desired atmosphere.
 In this way, Rayleigh's coefficient can be a constant while Mie's coefficient must be defined customly.
 >Note: As aerosol particles both scatter and absorb light, the extinction of the mie coefficient is equal to $\beta_M + \beta_{M_a}$ ($\beta_{M_a}$ is the absorption coefficient). And we use $\beta_{M_a} = \beta_M / 0.9$ suggested by Bruneton and Neyret[BN08].
@@ -71,17 +95,24 @@ $H_R \approx  8000m$
 $H_M \approx 1200m$
 ### Transmittance Function
 Transmittance is also optical depth. The equation of calculating transmittance is:
+
 $t_{R,M}(S,\lambda)=\beta_{R,M}^e(\lambda)\int_0^S\rho_{R,M}(s')ds'$
+
 Where $S$ is the distance of the transmittance.
+
 $\beta^{e}_{R} = \beta_R ,  
 \beta^{e}_{M} = \beta_M + \beta^{a}_M$
 
 ### Single Scattering
 There are infinite points can be scattered into the direction the eyes look at. So the scattering light reaches to the eye should be integrated by $\bf \it I_{S_{R,M}}$ , not only the scattering point to the eye but also the sunlight reaches to the scattering point.
+
 $I^{(1)}_{S_{R,M}}(P_O, V, L, \lambda) = I_I(\lambda) F_{R,M}(\theta) \frac{\beta_{R,M}(\lambda)}{4\pi}
 \cdot \int_{P_a}^{P_b} \rho_{R,M}(h) \exp(-t_{R,M}(PP_C, \lambda) - t_{R,M}(P_a P, \lambda)) ds$
+
 Where $P_c$ $P_b$ $P_a$ and $P_o$ can be described in this image:
+
 ![](atmosphere_scattering/single_scattering.PNG)
+
 The (k) in the upright corner of the function $I_S^{(k)}$ means the scattering order. It is something to do with the multiple scattering which will be mentioned immediately.
 
 ### Multiple Scattering
@@ -317,3 +348,10 @@ for (int i = 0; i < MultipleScatteringOrder; ++i)
     curOrderOutput = tmp;
 }
 ```
+## Reference
+https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/intro-volume-rendering.html [1]
+https://old.cescg.org/CESCG-2009/papers/PragueCUNI-Elek-Oskar09.pdf [2]
+http://nishitalab.org/user/nis/cdrom/sig93_nis.pdf [3]
+https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.75.5595&rep=rep1&type=pdf [4]
+https://developer.nvidia.com/gpugems/gpugems2/part-ii-shading-lighting-and-shadows/chapter-16-accurate-atmospheric-scattering [5]
+https://publications.lib.chalmers.se/records/fulltext/203057/203057.pdf [6]
