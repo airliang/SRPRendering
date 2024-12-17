@@ -5,7 +5,7 @@ This pipeline implements the personal exprimental rendering features.
 
 ## Features
 #### Precompute Atmosphere Scattering
-
+[Reference page VSM](pages/AtmosphereScattering.md)
 #### Realtime Baking Atmosphere Scattering to Spherical Harmonics
 
 #### Shadow Mapping

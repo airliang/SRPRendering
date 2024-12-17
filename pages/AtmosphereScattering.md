@@ -87,14 +87,22 @@ The (k) in the upright corner of the function $I_S^{(k)}$ means the scattering o
 ### Multiple Scattering
 In fact, what we see in the sky is not just single scattering. The light beam will scatter many times in a variety of directions and then finally scatter into the view direction. This is called multiple scattering.
 We assume that the light beam scatter into our eye at point P scatter k times and then into the same point P, then the scattering light amount can be defined as follows:
+
 $G_{R,M}^{(k)}(P,V,L,\lambda)=\int_{4\pi}F_{R,M}(\theta)I_{S_{R,M}}^{(k)}(P,\omega,L,\lambda)d\omega$
+
 Where $\theta$ is the angle between $V$ and $\omega$.
 This is defined as the gathering function of order k expresses the light gathered in point P, where the light has undergone exactly k scattering events.
+
 ![](atmosphere_scattering/multiple_scattering.PNG)
+
 Each order of the scattering is defined below:
-$I_{S_{R,M}}^{(k)}(P,\omega,L,\lambda)=\frac{\beta_{R,M}(\lambda)}{4\pi} \cdot \int_{P_a}^{P_b}G_{R,M}^{(k-1)}(P,V,L,\lambda)\beta_{R,M}(\lambda)exp(-t_{R,M}(P_aP,\lambda))ds$ 
+
+$`I_{S_{R,M}}^{(k)}(P,\omega,L,\lambda)=\frac{\beta_{R,M}(\lambda)}{4\pi} \cdot \int_{P_a}^{P_b}G_{R,M}^{(k-1)}(P,V,L,\lambda)\beta_{R,M}(\lambda)exp(-t_{R,M}(P_aP,\lambda))ds`$ 
+
 Add up all the scattering order, we can get the final scattering intensity as
+
 $I_S=\Sigma_{i=1}^KI_S^{(k)} $
+
 So we can see the computation of multiple scattering is very complicated. There is an integration to calculate $I_S$ in $G$, and $G$ is also an integration in the last order. Then the whole computation includes integration in a recursion.
 To make a deeper understanding, we should know that each point p along the view direction can scatter not only the sunlight (single scattering) but also all possible orders scattering.
 This means that point p scatter light includes single scattering, 1 order scattering, 2 order scattering to infinite order scattering. But no matter how many orders of the scattering happen, the input light directions are the whole sphere surrounding the point. This explains why we should use the previous order of the scattering as the current order scattering input.
@@ -104,31 +112,208 @@ According to the theory, it is easy to implement if we just calculate the single
 
 ### Realtime Single Scattering
 We first define the input parameters we need. According to the equation of scattering, we will define view vector, light vector, light radiance and eye position as inputs.
-$I_{S_{R,M}}^{(1)}(P,\omega,L,\lambda)=I_I(\lambda)\rho_{R,M}(h)F_{R,M}(\theta)\frac{\beta_{R,M}(\lambda)}{4\pi} \cdot \int_{P_a}^{P_b} \rho_{R,M}(h) \exp(-t_{R,M}(PP_c, \lambda) - t_{R,M}(P_a P, \lambda)) ds$ 
+
+$`I_{S_{R,M}}^{(1)}(P,\omega,L,\lambda)=I_I(\lambda)\rho_{R,M}(h)F_{R,M}(\theta)\frac{\beta_{R,M}(\lambda)}{4\pi} \cdot \int_{P_a}^{P_b} \rho_{R,M}(h) \exp(-t_{R,M}(PP_c, \lambda) - t_{R,M}(P_a P, \lambda)) ds`$ 
+
 For each point P along the ray from $P_a$ to $P_b$ , $PP_c$ is the ray from the point to the sun and PPa is the ray from the sample point to the camera. [5]
 The second step is we should define constants which are mentioned by the theory.
 
 #### Scattering Coefficient
 According to the definition of scattering coefficient, we need to define Rayleigh/Mie particles’ molecular number density at sea level and also the refractive index of air. As paper [4] says, the Rayleigh scattering coefficient is defined as follows:
+
 $\beta_{R_{RGB}} = (6.55e−6, 1.73e−5, 2.30e−5)$
+
 And the Mie scattering coefficient is independent of the wavelengths, so it is defined as follows:
+
 $\beta_M()=4\pi N_M \alpha _M$
-$\beta_{M_{RGB}} = (2e−6, 2e−6, 2e−6)$ where $N_m = 1$. Because we are not sure  the particle size of Mie scattering, we need to __apply a scale__ to this coefficient.
+
+$\beta_{M_{RGB}} = (2e−6, 2e−6, 2e−6)$ 
+
+where $N_m = 1$. 
+Because we are not sure  the particle size of Mie scattering, we need to __apply a scale__ to this coefficient.
 
 ### Precompute Scattering
 #### Analyze
 Because the scattering calculation is based on integration. So we need to integrate all the possible paths of the eye rays. From the scattering equation, we could see there are 9 parameters we should consider. The camera position, the light direction, and the view direction. 
 In order to reduce the number of parameters, we should make the follow assumptions [4]:
+
 ![](atmosphere_scattering/precompute_scattering.png)
 
 we can also quote the assumptions from paper [2]:
+
 ![](atmosphere_scattering/precompute_scattering1.png)
 
 All these assumptions can inspire us to eliminate the 9 dimensional table into a 4 dimensional table.
 If we consider the vector formed by the planet circle point to the camera point as the Zenith. Then we can know the sunlight vector by these parameters, altitude $h$, view to zenith angle $\theta_v$, sun to zenith angle θs and sun to view azimuth angle $\theta_{\omega}$. Only these 4 parameters can determine the whole directions.
 Look at this image from paper [4]:
+
 ![](atmosphere_scattering/precompute_scattering2.png)
+
 This is the top view of the directions:
+
 ![](atmosphere_scattering/precompute_scattering_topview.png)
+
 We can see that, no matter what the $\theta_{\omega}$ is, the integration of the transmittance will be the same if $\theta_{\omega} = 90^{\circ} - \theta_s$, and then set the $\theta_{\omega} = 0$. Because the distance from Pc to P, P to Pa will be the same. This deals with the assumption that the planet is perfectly a sphere.
 According to the single scattering equation, there are two integrals should be calculated. One is the vector along the view direction, the other is the transmittance function which is inside the first integral.
+
+#### Compute Transmittance Function
+We can use the camera height and the θs to calculate all the possible integration of the Transmittance function.
+
+$`t_{R,M}(S, \lambda)=\beta ^e_{R,M}(\lambda) \int_{0}^{S} \rho_{R,M}(s')ds' `$
+
+The paper [4] introduces precompute the transmittance function by 2 parameters which are height and θs to the all possible directions from the camera to the top of the atmosphere transmittance.
+But I decided not to use precompute, if I use steps equals 64 in precompute the skybox lut pass to calculate the transmittance, it will not be very slow.
+
+```c++
+//transmittance calculation
+float2 Transmittance(float3 rayStart, float3 rayEnd, float3 earthCenter)
+{
+    float distance = length(rayEnd - rayStart);
+    float sampleCount = 64.0;
+    float3 step = (rayEnd - rayStart) / sampleCount;
+    float stepSize = length(step);
+    float3 rayDir = normalize(rayEnd - rayStart);
+    float2 densityIntegral = 0;
+    for (float s = 0.5; s < sampleCount; s++)
+    {
+        float3 samplePoint = rayStart + step * s;
+        float height = max(length(samplePoint - earthCenter) - _EarthRadius, 0);
+        densityIntegral += GetAtmosphereDensity(height) * stepSize;
+    }
+
+    return densityIntegral;
+}
+```
+
+#### Skybox LUT Precomputation
+First, we should make sense of __what is being precomputed__.
+Look at the single scattering equation again:
+
+$`I_{S_{R,M}}^{(1)}(P,\omega,L,\lambda)=I_I(\lambda)\rho_{R,M}(h)F_{R,M}(\theta)\frac{\beta_{R,M}(\lambda)}{4\pi} \cdot \int_{P_a}^{P_b} \rho_{R,M}(h) \exp(-t_{R,M}(PP_c, \lambda) - t_{R,M}(P_a P, \lambda)) ds`$ 
+
+According to the equation, the heaviest part of the equation is the integral form point a to point b.
+The previous analysis has told us that if we knew the height, view to zenith angle $\theta_v$, sun to zenith angle $\theta_s$, we could calculate the integral by numerical method.
+As we have analyzed before, we should use a 3d texture to store the single scattering result. And the texture parameters are camera height, $\cos\theta_v$, $\cos\theta_s$ respectively. And paper [4] illustrates that these three parameters should be parametrized to [0,1].
+And we already know the range of the three parameters here:
+
+![](atmosphere_scattering/skylut_precompute_formula1.png)
+
+The most straightforward implementation of such a function would be to use a linear parametrization:
+
+![](atmosphere_scattering/skylut_precompute_formula2.png)
+
+And Paper [4] states that it is sufficient if the texture resolution is large enough. Otherwise we should improve the parametrization with a smaller texture. The details of parametrization are introduced in the chapter 4 of  paper [4] and I am not going to show it here.
+And here is the parametrization result of the coordinates:
+
+![](atmosphere_scattering/skylut_precompute_formula3.png)
+
+![](atmosphere_scattering/skylut_precompute_formula4.png)
+
+![](atmosphere_scattering/skylut_precompute_formula5.png)
+
+But when we precompute the scattering, all we have is the coordinates, so we should apply a __reverse operation__ to calculate height, cv and cs:
+
+![](atmosphere_scattering/skylut_precompute_formula6.png)
+
+After parametrizing the texture coordinates, we can calculate the integration of single scattering.
+And the scattering integration and trasmittance calculation codes are listed below:
+```c++
+//transmittance calculation
+float2 Transmittance(float3 rayStart, float3 rayEnd, float3 earthCenter)
+{
+    float distance = length(rayEnd - rayStart);
+    float sampleCount = 64.0;
+    float3 step = (rayEnd - rayStart) / sampleCount;
+    float stepSize = length(step);
+    float3 rayDir = normalize(rayEnd - rayStart);
+    float2 densityIntegral = 0;
+    for (float s = 0.5; s < sampleCount; s++)
+    {
+        float3 samplePoint = rayStart + step * s;
+        float height = max(length(samplePoint - earthCenter) - _EarthRadius, 0);
+        densityIntegral += GetAtmosphereDensity(height) * stepSize;
+    }
+
+    return densityIntegral;
+}
+
+float4 IntegrateInScattering(float3 rayStart, float3 rayEnd, float3 sunLight, float3 earthCenter)
+{
+    float sampleCount = 64.0;
+    float3 step = (rayEnd - rayStart) / sampleCount;
+    float stepSize = length(step);
+    float3 scatteringR = 0;
+    float3 scatteringM = 0;
+    float3 tRayleigh = 0;
+    float3 tMie = 0;
+    float3 preScatteringR = 0;
+    float3 preScatteringM = 0;
+    for (float i = 0.5; i < sampleCount; i++)
+    {
+        float3 samplePoint = rayStart + step * i;
+        float height = abs(length(samplePoint - earthCenter) - _EarthRadius);
+        float2 localDensity = exp(-height.xx / _HeightScales.xy);
+        float3 tPAR = 0;
+        float3 tPAM = 0;
+        float2 densityPA = Transmittance(rayStart, samplePoint, earthCenter);
+        float2 densityCP = 0;
+
+        
+        float2 intersection = RaySphereIntersection(samplePoint, -sunLight, earthCenter, _EarthRadius);
+        
+        if (intersection.x > 0)
+        {
+            // intersection with planet, write high density
+            densityCP = 1e+20;
+        }
+        else
+        {
+            intersection = RaySphereIntersection(samplePoint, -sunLight, earthCenter, _EarthRadius + _AtmosphereHeight);
+            //because we are in the atmosphere, intersection.x is always negative, so we use intersection.y as the raylength.
+            float3 pc = samplePoint - intersection.y * sunLight;
+```
+#### Rendering skybox
+I use a fullscreen method instead of a sphere mesh to draw the skybox. As paper [4] mentions that we should parameteralize the height, cv(view zenith) and cs(sun zenith) to LUT coordinates. Then we sample the LUT and calculate the scattering radiance by scattering equation.
+If we want to simulate sun rendering, we can use the original Mie phase function.
+```c++
+//use traditional mie phase function to simulate sun rendering
+//As g is close to 1, the phase function will be larger when cosTheta is close to 1.
+float3 SunSimulation(float cosTheta)
+{
+    float g = 0.99;
+    float g2 = g * g;
+
+    float sun = pow(1.0 - g, 2.0) / (4.0 * PI * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
+    return sun * 0.003;
+}
+```
+
+### Multiple Scattering
+If we understand the process of multiple scattering clearly, it will be easy to implement. Think about the single scattering LUT table, what does it miss? Yes, it misses the 1 to k order multiple scattering results. So each integration along the view direction should plus the current order gather light function result. Then use the output LUT as the input of the next order LUT precomputation.
+This is the main process of computing multiple scattering:
+
+![](atmosphere_scattering/mutiple_scattering_process.png)
+
+In compute shader, we just need a pre-order(k-1) LUT table to calculate the gather function, and output the cur-order(k) LUT table as the next input table.
+
+```c++
+Texture3D skyboxLUT = SingleScatteringLut();
+
+preOrder = CreateLUTRenderTexture("PreOrderLUT");
+Graphics.CopyTexture(skyboxLUT, preOrder);
+curOrderOutput = CreateLUTRenderTexture("CurOrderLUT");
+
+for (int i = 0; i < MultipleScatteringOrder; ++i)
+{
+    precomputeScattering.SetTexture(kPrecomputeMultipleLUT,
+                   AtmosphereShaderParameters._PreOrderScatteringLUT, preOrder);
+    precomputeScattering.SetTexture(kPrecomputeMultipleLUT,
+        AtmosphereShaderParameters._OutScatteringLUT, curOrderOutput);
+
+    precomputeScattering.Dispatch(kPrecomputeMultipleLUT, skyboxLUTSize.x, skyboxLUTSize.y, skyboxLUTSize.z);
+    finalOutput = curOrderOutput;
+    RenderTexture tmp = preOrder;
+    preOrder = curOrderOutput;
+    curOrderOutput = tmp;
+}
+```
