@@ -350,8 +350,13 @@ for (int i = 0; i < MultipleScatteringOrder; ++i)
 ```
 ## Reference
 https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/intro-volume-rendering.html [1]
+
 https://old.cescg.org/CESCG-2009/papers/PragueCUNI-Elek-Oskar09.pdf [2]
+
 http://nishitalab.org/user/nis/cdrom/sig93_nis.pdf [3]
+
 https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.75.5595&rep=rep1&type=pdf [4]
+
 https://developer.nvidia.com/gpugems/gpugems2/part-ii-shading-lighting-and-shadows/chapter-16-accurate-atmospheric-scattering [5]
+
 https://publications.lib.chalmers.se/records/fulltext/203057/203057.pdf [6]
