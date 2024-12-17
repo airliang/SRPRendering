@@ -33,12 +33,12 @@ If we use PCF to determine the probability p of a shading point, we know exactly
 
 Here comes a question. Why $E(x)$ is computed by the formula above? If we see $E(x)$ as the average depth, maybe we can imagine the equation well.
 As the paper[3] mentions, if the depth of the shading point is less than the $E(x)$, it is definitely not in the shadow, otherwise the visibility function is computed by the Chbyshelve equation.
-```math
+$`
 P(x \geq t) \approx\begin{cases}
   1 \space \space \rm if \space t \leq \mu  \\
   \frac{\sigma^2}{\sigma^2 + (t-\mu)^2} \space \space \rm if \space t > \mu
 \end{cases}
-```
+`$
 What if $t >\mu$ or  $t \approx \mu$ ? As I have implemented in my project, we can see the result in the picture below.
 
 ![](vsm/vsm_problem.png)
