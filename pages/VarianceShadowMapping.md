@@ -165,10 +165,10 @@ float ReduceLightBleeding(float pMax, float amount)
 Assigning a value amount, all the p less than this value will be set to zero, and the values larger than it will be remapped to [0, 1].
 
 ## Reference
-https://calcworkshop.com/joint-probability-distribution/chebyshev-inequality/ [1]
+- https://calcworkshop.com/joint-probability-distribution/chebyshev-inequality/ [1]
 
-http://igm.univ-mlv.fr/~biri/Enseignement/MII2/Donnees/variance_shadow_maps.pdf [2]
+- http://igm.univ-mlv.fr/~biri/Enseignement/MII2/Donnees/variance_shadow_maps.pdf [2]
 
-https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-8-summed-area-variance-shadow-maps [3]
+- https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-8-summed-area-variance-shadow-maps [3]
 
-[Layered Variance Shadow Maps](https://dl.acm.org/doi/pdf/10.5555/1375714.1375739) [4]
+- [Layered Variance Shadow Maps](https://dl.acm.org/doi/pdf/10.5555/1375714.1375739) [4]

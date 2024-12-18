@@ -4,15 +4,14 @@ This project is a personal rendering pipeline develop various rendering features
 This pipeline implements the personal exprimental rendering features.
 
 ## Features
-#### Precompute Atmosphere Scattering
-[Reference page VSM](pages/AtmosphereScattering.md)
-#### Realtime Baking Atmosphere Scattering to Spherical Harmonics
-
+__We could click the feature title to read the relative technical papers. Some of the features are lacking relative papers, I will add them gradually.__
+#### [Precompute Atmosphere Scattering](pages/AtmosphereScattering.md)
+#### [Realtime Baking Atmosphere Scattering to Spherical Harmonics](pages/BakingAtmosphereScatteringToSH.md)
 #### Shadow Mapping
 
-- Percentage-Closer Soft Shadows: [Reference page PCSS](pages/PCSS.md)
-- Variance Shadow Mapping: [Reference page VSM](pages/VarianceShadowMapping.md)
-- Exponential Variance Shadow Mapping: [Reference page EVSM](pages/VarianceShadowMapping.md)
+- [Percentage-Closer Soft Shadows](pages/PCSS.md)
+- [Variance Shadow Mapping](pages/VarianceShadowMapping.md)
+- [Exponential Variance Shadow Mapping](pages/VarianceShadowMapping.md)
 - Screen Space Shadow Mapping
 
 #### Camera Relative Rendering
