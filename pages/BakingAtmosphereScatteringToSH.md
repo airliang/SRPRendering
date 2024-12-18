@@ -42,7 +42,9 @@ $`y_{l}^{m}(\theta, \phi) = y_i(\theta, \phi)    where i = l(l+1)+m`$
 The parameters $l$ and $m$ are defined slightly differently from the Legendre polynomials $l$ is still a positive integer starting from 0, but m takes signed integer values from $–l$ to $l$. 
 The next process is to project a spherical function to the spherical harmonics coefficients. The equation for calculating coefficients is simple:
 
-$`c _i = \int _S f(x)y_i(x)   dx \space \space \space \space \space (3) \\ where S is the spherical domain, x is a direction in the \space spherical. `$ 
+$`c _i = \int _S f(x)y_i(x)   dx \space \space \space \space \space`$   (3)
+
+where $S$ is the spherical domain, $x$ is a direction in the spherical.  
 
 We must evaluate this integral using Monte Carlo integration, so recalling the Monte Carlo estimator we have: 
 
