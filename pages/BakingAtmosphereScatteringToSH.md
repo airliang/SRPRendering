@@ -1,4 +1,7 @@
 # Realtime Baking Atmosphere Scattering to Spherical Harmonics
+![](../screenshots/bake_atmosphere_sh.gif)
+![](../screenshots/atmosphere_scattering.jpg)
+![](bake_atmosphere_sh/640px-Spherical_Harmonics.png)
 ## 1.Introduction
 Atmosphere scattering is widely used in realtime rendering, to present a physically based sky. In this way, the atmosphere will impact the whole environmental lighting when the time-of-day system is enabled. The amount of environmental light is different during different time in a day. An efficient way to calculate environmental lighting is to use spherical harmonics to reconstruct the lighting function of the sky. Precompute Atmosphere Scattering( Nishita T. 1996) is a mature method for real-time multiple-scattering atmosphere rendering. Spherical harmonics is a great contribution to efficient global environmental lighting.
 
@@ -135,5 +138,9 @@ In this performance comparison, the parallel prefix sum-based approach has demon
 [Manson J and Sloan P: Fast Filtering of Reflection Probes](https://research.activision.com/publications/archives/fast-filtering-of-reflection-probes)
 
 [SLOAN P.: Stupid spherical harmonics (SH) tricks, 2008.](https://www.ppsloan.org/publications/StupidSH36.pdf)
+
+[Mark Harris. Parallel Prefix Sum (Scan) with CUDA](https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
+
+[Kostas Anagnostou - GPU Driven Rendering Experiments](https://onedrive.live.com/view.aspx?resid=48825310AF038F63!142275&ithint=file%2Cpptx&app=PowerPoint&authkey=!AD1BPt6859dRnoU)
 
 [Karis B: Real Shading in Unreal Engine 4](https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf)

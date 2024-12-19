@@ -20,6 +20,8 @@ __We could click the feature title to read the relative technical papers. Some o
 
 #### SSAO
 
+#### [Indirect Instance Rendering](pages/IndirectRenderingWithCS.md)
+
 #### Deferred Shading
 
 ## Screenshots
