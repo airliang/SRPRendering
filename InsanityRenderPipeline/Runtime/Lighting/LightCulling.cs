@@ -201,7 +201,7 @@ namespace Insanity
                     m_LightsVisibilityIndexBuffer = null;
                 }
 
-                m_TileFrustumBuffer = new ComputeBuffer(m_CurrentTileNumbers.x * m_CurrentTileNumbers.y, Marshal.SizeOf<Vector4>() * 4, ComputeBufferType.Default);
+                //m_TileFrustumBuffer = new ComputeBuffer(m_CurrentTileNumbers.x * m_CurrentTileNumbers.y, Marshal.SizeOf<Vector4>() * 4, ComputeBufferType.Default);
                 
                 m_LightsVisibilityIndexBuffer = new ComputeBuffer(m_CurrentTileNumbers.x * m_CurrentTileNumbers.y * MAX_VISIBLE_LIGHTS_PER_TILE, 
                     sizeof(int), ComputeBufferType.Default);
@@ -307,7 +307,6 @@ namespace Insanity
         {
             public ComputeShader computeShader;
             public ComputeBuffer additionalLightsBuffer;
-            public ComputeBuffer tileFrustumBuffer;
             public ComputeBuffer lightVisibilityIndexBuffer;
             public TextureHandle tileVisibleLightCounts;
             public TextureHandle depthTexture;
@@ -329,14 +328,11 @@ namespace Insanity
                 m_kernelLightCulling = tileBasedLightCulling.FindKernel("LightCulling");
             }
 
-            //TestLightCulling(new Vector2Int(0, 1), Vector2Int.zero, renderingData.cameraData.camera);
-
             using (var builder = renderingData.renderGraph.AddRenderPass<TileBasedLightCullingData>("Tile based light culling", out var passData,
                 new ProfilingSampler("Tile based light culling Profiler")))
             {
                 passData.computeShader = tileBasedLightCulling;
                 passData.additionalLightsBuffer = m_AdditionalLightsBuffer;
-                passData.tileFrustumBuffer = m_TileFrustumBuffer;
                 passData.lightVisibilityIndexBuffer = m_LightsVisibilityIndexBuffer;
                 passData.kernelId = m_kernelLightCulling;
                 TextureHandle tileLightVisibleCounts = CreateLightVisibleCountTexture(renderingData.renderGraph, m_CurrentTileNumbers.x, m_CurrentTileNumbers.y);
@@ -360,7 +356,6 @@ namespace Insanity
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc((TileBasedLightCullingData data, RenderGraphContext context) =>
                 {
-                    context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._TileFrustums, data.tileFrustumBuffer);
                     context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._LightBuffer, data.additionalLightsBuffer);
                     context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._LightVisibilityIndexBuffer, data.lightVisibilityIndexBuffer);
                     context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._DepthTexture, data.depthTexture);

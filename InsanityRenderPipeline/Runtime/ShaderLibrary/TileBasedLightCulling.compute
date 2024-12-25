@@ -6,7 +6,7 @@
 
 StructuredBuffer<LightData> _LightBuffer;
 RWStructuredBuffer<int> _LightVisibilityIndexBuffer; //tile nums * MAX_LIGHT_NUM_PER_TILE
-StructuredBuffer<TileFrustum> _TileFrustums;
+//StructuredBuffer<TileFrustum> _TileFrustums;
 Texture2D _DepthTexture;
 float4x4 _ViewMatrix;   //platform unrelative matrix
 float4x4 _ProjInverse;  //platform unrelative matrix
@@ -19,7 +19,7 @@ RWTexture2D<uint> _TileVisibleLightCounts;
 
 groupshared uint _MinDepth;
 groupshared uint _MaxDepth;
-groupshared TileFrustum _LightGridFrustum;
+//groupshared TileFrustum _LightGridFrustum;
 groupshared TileAABB _AABBInView;
 groupshared uint _TileLightCount;
 groupshared int _LightList[MAX_LIGHT_NUM_PER_TILE];
@@ -42,7 +42,7 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
         _MaxDepth = 0;
         _TileLightCount = 0;
         //_TileIndex = _TileNumber.x * groupId.y + groupId.x;
-        _LightGridFrustum = _TileFrustums[tileIndex];
+        //_LightGridFrustum = _TileFrustums[tileIndex];
 
     }
     GroupMemoryBarrierWithGroupSync();

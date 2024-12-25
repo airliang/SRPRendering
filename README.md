@@ -16,7 +16,7 @@ __We could click the feature title to read the relative technical papers. Some o
 
 #### Camera Relative Rendering
 
-#### Tile based Light Culling
+#### [Tile based Light Culling](pages/TileBasedLightCulling.md)
 
 #### SSAO
 
@@ -36,3 +36,13 @@ __We could click the feature title to read the relative technical papers. Some o
 These pages could help you know more about the relative rendering features in this Pipeline.
 
 [Understanding Unity Projection Matrix](pages/understanding_unity_projection_matrix.md)
+
+[Precompute Atmosphere Scattering](pages/AtmosphereScattering.md)
+
+[Realtime Baking Atmosphere Scattering to Spherical Harmonics](pages/BakingAtmosphereScatteringToSH.md)
+
+[Percentage-Closer Soft Shadows](pages/PCSS.md)
+
+[Variance Shadow Mapping](pages/VarianceShadowMapping.md)
+
+[Indirect Rendering with Compute Shader](pages/IndirectRenderingWithCS.md)
