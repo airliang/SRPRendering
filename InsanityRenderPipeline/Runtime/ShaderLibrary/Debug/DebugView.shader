@@ -35,7 +35,8 @@ Shader "Insanity/DebugViewBlit"
             SAMPLER(sampler_AOMask);
             TEXTURE2D(_AlbedoTexture);
             SAMPLER(sampler_AlbedoTexture);
-            StructuredBuffer<int> _LightVisibilityIndexBuffer;
+            //StructuredBuffer<int> _LightVisibilityIndexBuffer;
+            Texture2D<int> _TileVisibleLightCounts;
 
             static const uint nbColours = 10;
             static const float4 colours[nbColours] =
@@ -65,14 +66,15 @@ Shader "Insanity/DebugViewBlit"
                 {
                     uint2 screenCoord = input.uv * _ScreenSize.xy;
                     uint2 tileId = uint2(floor(screenCoord / TILE_SIZE));
-                    uint lightCount = 0;
-                    uint lightIndexOffset = (tileId.y * _TileNumber.x + tileId.x) * MAX_LIGHT_NUM_PER_TILE;
-                    int lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset];
-                    for (int i = 0; i < MAX_LIGHT_NUM_PER_TILE && lightIndex >= 0; ++i)
-                    {
-                        lightCount++;
-                        lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset + i + 1];
-                    }
+                    // uint lightCount = 0;
+                    // uint lightIndexOffset = (tileId.y * _TileNumber.x + tileId.x) * MAX_LIGHT_NUM_PER_TILE;
+                    // int lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset];
+                    // for (int i = 0; i < MAX_LIGHT_NUM_PER_TILE && lightIndex >= 0; ++i)
+                    // {
+                    //     lightCount++;
+                    //     lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset + i + 1];
+                    // }
+                    int lightCount = _TileVisibleLightCounts.Load(int3(tileId, 0));
                     col = GetTileVisibleLightDebugColor(lightCount);
                     col.a = lightCount > 0 ? 0.75 : 0.5;
                 }

@@ -562,6 +562,25 @@ half3 AdditionalLightingPhysicallyBased(BRDFData brdfData, Light light, half3 no
 
 #ifdef _TILEBASED_LIGHT_CULLING
 #include "LightCullingInclude.hlsl"
+
+void TileBasedAdditionalLightingFragmentBlinnPhong(int lightIndex, float3 positionWS, float3 normalWS, float3 viewDirWS, float2 screenPos, 
+    half smoothness, out half3 diffuse, out half3 specular)
+{
+    diffuse = 0;
+    specular = 0;
+
+    Light light = GetAdditionalLight(lightIndex, positionWS);
+    diffuse += LightingLambert(light.color * light.distanceAttenuation, light.direction, normalWS);
+    specular += LightingSpecular(light.color * light.distanceAttenuation, light.direction, normalWS, viewDirWS, smoothness);
+}
+
+void TileBasedAdditionalLightingFragmentPBR(int lightIndex, BRDFData brdfData, float3 positionWS, float3 normalWS, float3 viewDirWS, float2 screenPos, out half3 outColor)
+{
+    outColor = 0;
+    Light light = GetAdditionalLight(lightIndex, positionWS);
+    outColor += AdditionalLightingPhysicallyBased(brdfData, light, normalWS, viewDirWS);
+}
+
 StructuredBuffer<int> _LightVisibilityIndexBuffer;
 void TileBasedAdditionalLightingFragmentBlinnPhong(float3 positionWS, float3 normalWS, float3 viewDirWS, float2 screenPos, 
     half smoothness, out half3 diffuse, out half3 specular)

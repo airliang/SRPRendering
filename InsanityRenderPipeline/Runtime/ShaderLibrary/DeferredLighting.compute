@@ -8,6 +8,11 @@
 #pragma multi_compile _ _SSAO_ENABLE
 #pragma multi_compile _ _ADDITIONAL_LIGHTS
 #pragma multi_compile _ _TILEBASED_LIGHT_CULLING
+#pragma multi_compile _ _MAIN_LIGHT_SHADOWS
+#pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
+#pragma multi_compile _ _SHADOW_PCSS
+#pragma multi_compile _ _SHADOW_VSM
+#pragma multi_compile _ _SHADOW_EVSM
 #pragma multi_compile _ _SCREENSPACE_SHADOW
 
 #pragma enable_d3d11_debug_symbols
@@ -22,8 +27,8 @@ Texture2D<float4> _AlbedoMetallic;
 Texture2D<float4> _NormalSmoothness;
 //Texture2D _ScreenSpaceShadowmapTexture;
 Texture2D _DepthTexture;
-float4x4 _ProjInverse;
-float4x4 _ViewInverse;
+//float4x4 _ViewMatrix; //platform unrelative matrix
+//float4x4 _ProjInverse; //platform unrelative matrix
 
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
@@ -32,12 +37,12 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     
     //first step is to calculate the world position 
     float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, screenUV, 0);
-    //float3 viewPosCur = ComputeViewSpacePosition(screenUV, depth, _ProjInverse); //UVtoViewPosCurFrame(uv, depth);
-    float3 clipSpacePos = float3(screenUV, 1.0 - depth) * 2.0 - 1.0;
-    float4 viewPosCur = mul(_ProjInverse, float4(clipSpacePos, 1));
-    viewPosCur /= viewPosCur.w;
-    float4 positionWS = mul(_ViewInverse, float4(viewPosCur.xyz, 1));
-    positionWS = positionWS / positionWS.w;
+    //float3 clipSpacePos = float3(screenUV, 1.0 - depth) * 2.0 - 1.0;
+    //float4 viewPosCur = mul(_ProjInverse, float4(clipSpacePos, 1));
+    //viewPosCur /= viewPosCur.w;
+    //float4 positionWS = mul(_ViewInverse, float4(viewPosCur.xyz, 1));
+    //positionWS = positionWS / positionWS.w;
+    float3 positionWS = ComputeWorldSpacePosition(screenUV, depth, _InvViewProjMatrix);
     
     ShadowSampleCoords shadowSample = GetShadowSampleData(positionWS.xyz, screenUV);
     

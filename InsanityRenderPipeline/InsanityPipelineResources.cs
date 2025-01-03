@@ -30,6 +30,7 @@ namespace Insanity
             public ComputeShader SSAOTemporalFilter;
             public ComputeShader SSAOUpSample;
             public ComputeShader DeferredLighting;
+            public ComputeShader TileBasedDeferredLighting;
             //public ComputeShader TileFrustumCompute;
         }
 

@@ -1,34 +1,78 @@
 // Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel LightCulling
+#pragma kernel TileBasedDeferredLighting
 #pragma enable_d3d11_debug_symbols
+#pragma multi_compile _ _SSAO_ENABLE
+#pragma multi_compile _ _ADDITIONAL_LIGHTS
+#pragma multi_compile _ _TILEBASED_LIGHT_CULLING
+#pragma multi_compile _ _MAIN_LIGHT_SHADOWS
+#pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
+#pragma multi_compile _ _SHADOW_PCSS
+#pragma multi_compile _ _SHADOW_VSM
+#pragma multi_compile _ _SHADOW_EVSM
+#pragma multi_compile _ _SCREENSPACE_SHADOW
+#pragma multi_compile _ _TILEBASED_LIGHT_CULLING_DEBUG
 #include "LightCullingInclude.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "LitInput.hlsl"
+#include "LightInput.hlsl"
+#define _TILEBASED_DEFERRED_LIGHTING
+#include "Lighting.hlsl"
+#include "Shadow/shadows.hlsl"
+#include "UnityBuiltIn.hlsl"
 
-
-StructuredBuffer<LightData> _LightBuffer;
-RWStructuredBuffer<int> _LightVisibilityIndexBuffer; //tile nums * MAX_LIGHT_NUM_PER_TILE
-//StructuredBuffer<TileFrustum> _TileFrustums;
+//StructuredBuffer<LightData> _LightBuffer;
+Texture2D<float4> _AlbedoMetallic;
+Texture2D<float4> _NormalSmoothness;
 Texture2D _DepthTexture;
-float4x4 _View;   //platform unrelative matrix
-float4x4 _ProjInverse;  //platform unrelative matrix
-uint2 _TileNumber;
+float4x4 _View; //platform unrelative matrix
+float4x4 _ProjInverse; //platform unrelative matrix
+//uint2 _ScreenSize;
+//uint2 _TileNumber;
 uint _TotalLightNum;
 
-RWTexture2D<uint> _TileVisibleLightCounts;
-//RWStructuredBuffer<TileAABB> _TileAABBs;
 
 groupshared uint _MinDepth;
 groupshared uint _MaxDepth;
-//groupshared TileFrustum _LightGridFrustum;
+groupshared int _LightList[MAX_LIGHT_NUM_PER_TILE];
 groupshared TileAABB _AABBInView;
 groupshared uint _TileLightCount;
-groupshared int _LightList[MAX_LIGHT_NUM_PER_TILE];
-//groupshared uint _TileIndex;
-//groupshared uint _VisibleLightStartOffset;
+#ifdef _TILEBASED_LIGHT_CULLING_DEBUG
+RWTexture2D<uint> _TileVisibleLightCounts;
+#endif
+
+RWTexture2D<float4> _FinalLighting;
+
 
 
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
-void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+void TileBasedDeferredLighting(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
 {
+    float2 screenUV = ((float2) DTid.xy + 0.5) * _ScreenSize.zw;
+    
+    //first step is to calculate the world position 
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, screenUV, 0);
+    float3 positionWS = ComputeWorldSpacePosition(screenUV, depth, _InvViewProjMatrix);
+    
+    ShadowSampleCoords shadowSample = GetShadowSampleData(positionWS.xyz, screenUV);
+    
+    // initialize brdf data.
+    BRDFData brdfData;
+    float4 albedoMetallic = _AlbedoMetallic.SampleLevel(s_point_clamp_sampler, screenUV, 0);
+    float4 normalSmoothness = _NormalSmoothness.SampleLevel(s_point_clamp_sampler, screenUV, 0);
+    float3 normalWS = 2.0 * normalSmoothness.xyz - 1.0;
+    InitializeBRDFData(albedoMetallic.rgb, albedoMetallic.a, 0, normalSmoothness.a, 1.0, brdfData);
+
+    Light mainLight = GetMainLight(shadowSample);
+    
+    half occlusion = 1;
+#ifdef _SSAO_ENABLE
+    occlusion = GetScreenSpaceAmbientOcclusion(screenUV);
+#endif
+    half3 bakedGI = max(half3(0, 0, 0), ShadeSH9(half4(normalWS, 1.0)));
+    float3 viewDirectionWS = -normalize(positionWS.xyz); //camera relative rendering, camera position is zero
+    half3 color = GlobalIllumination(brdfData, bakedGI, occlusion, positionWS.xyz, normalWS, viewDirectionWS);
+    color += LightingPhysicallyBased(brdfData, mainLight, normalWS, viewDirectionWS);
+#if defined(_TILEBASED_LIGHT_CULLING)
     //first step, get the tile by groupid
     //uint2 tileId = groupId.xy;
     int groupIndex = GTid.x + GTid.y * TILE_SIZE;
@@ -40,13 +84,10 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
         _MinDepth = 0xffffffff;
         _MaxDepth = 0;
         _TileLightCount = 0;
-        //_TileIndex = _TileNumber.x * groupId.y + groupId.x;
-        //_LightGridFrustum = _TileFrustums[tileIndex];
-
     }
     GroupMemoryBarrierWithGroupSync();
     //compute the min max depth of a tile
-    float depth = _DepthTexture.Load(int3(DTid.xy, 0));
+    //float depth = _DepthTexture.Load(int3(DTid.xy, 0));
     depth = 1.0 - depth;
     InterlockedMax(_MaxDepth, asuint(depth * 2.0 - 1.0));
     InterlockedMin(_MinDepth, asuint(depth * 2.0 - 1.0));
@@ -103,15 +144,12 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
         }
         _AABBInView.center = (minAABB + maxAABB) * 0.5;
         _AABBInView.extents = maxAABB - _AABBInView.center;
-        
-        //_TileAABBs[tileIndex] = _AABBInView;
-
     }
     GroupMemoryBarrierWithGroupSync();
     
     for (int i = groupIndex; i < _TotalLightNum; i += TILE_SIZE * TILE_SIZE)
     {
-        LightData light = _LightBuffer[i];
+        GPULight light = _GPUAdditionalLights[i];
         float4 lightPosInView = mul(_View, float4(light.position.xyz, 1));
         lightPosInView /= lightPosInView.w;
         bool intersect = false;
@@ -123,7 +161,7 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
                 intersect = true;
             }
         }
-        else   //spot light
+        else //spot light
         {
             float3 directionView = mul(_View, float4(light.direction.xyz, 0));
 
@@ -133,9 +171,11 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
                 intersect = true;
             }
         }
+
         if (intersect)
         {
             uint index = 0; // Index into the visible lights array.
+
             InterlockedAdd(_TileLightCount, 1, index);
             if (index < MAX_LIGHT_NUM_PER_TILE)
             {
@@ -143,15 +183,22 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
             }
         }
     }
-
-    GroupMemoryBarrierWithGroupSync();
     
-    int offset = tileIndex * MAX_LIGHT_NUM_PER_TILE;
+    GroupMemoryBarrierWithGroupSync();
+    for (int i = 0; i < _TileLightCount; ++i)
+    {
+        half3 diffuseAdditonal = 0;
+        int lightIndex = _LightList[i];
+        TileBasedAdditionalLightingFragmentPBR(lightIndex, brdfData, positionWS.xyz, normalWS, viewDirectionWS, screenUV, diffuseAdditonal);
+        color += diffuseAdditonal;
+    }
+#ifdef _TILEBASED_LIGHT_CULLING_DEBUG
     if (groupIndex == 0)
     {
         _TileVisibleLightCounts[groupId.xy] = _TileLightCount;
     }
+#endif
+    #endif
     
-    _LightVisibilityIndexBuffer[offset + groupIndex] = groupIndex < _TileLightCount ? _LightList[groupIndex] : -1;
-    
+    _FinalLighting[DTid.xy] = float4(color, 1);
 }

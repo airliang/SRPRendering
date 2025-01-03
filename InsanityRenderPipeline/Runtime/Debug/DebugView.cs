@@ -69,7 +69,7 @@ namespace Insanity
         public struct DebugViewGPUResources
         {
             public TextureHandle m_Depth;
-            //public TextureHandle m_TileVisibleLightCount;
+            public TextureHandle m_TileVisibleLightCount;
             public TextureHandle m_Normal;
             public TextureHandle m_Overdraw;
             public TextureHandle m_SSAO;
@@ -82,7 +82,7 @@ namespace Insanity
         {
             //public TextureHandle m_Source;
             public TextureHandle m_Depth;
-            //public TextureHandle m_TileVisibleLightCount;
+            public TextureHandle m_TileVisibleLightCount;
             public ComputeBuffer m_LightVisibilityIndexBuffer;
             public TextureHandle m_Normal;
             public TextureHandle m_Overdraw;
@@ -124,6 +124,7 @@ namespace Insanity
                 //else if (debugViewType == DebugViewType.TileBasedCullingResult)
                 {
                     passData.m_LightVisibilityIndexBuffer = debugViewTextures.m_LightVisibilityIndexBuffer;
+                    passData.m_TileVisibleLightCount = builder.ReadTexture(debugViewTextures.m_TileVisibleLightCount);
                 }
                 passData.m_Dest = builder.UseColorBuffer(colorTarget, 0);
                 passData.flip = renderingData.cameraData.isMainGameView;
@@ -138,6 +139,7 @@ namespace Insanity
                     data.m_finalBlitMaterial.SetInt("_DebugViewMode", data.m_DebugViewMode);
                     context.cmd.SetGlobalTexture("_DepthTexture", data.m_Depth);
                     context.cmd.SetGlobalBuffer("_LightVisibilityIndexBuffer", data.m_LightVisibilityIndexBuffer);
+                    data.m_finalBlitMaterial.SetTexture("_TileVisibleLightCounts", data.m_TileVisibleLightCount);
                     data.m_finalBlitMaterial.SetTexture("_NormalTexture", data.m_Normal);
                     data.m_finalBlitMaterial.SetTexture("_AOMask", data.m_SSAO);
                     data.m_finalBlitMaterial.SetTexture("_AlbedoTexture", data.m_Albedo);

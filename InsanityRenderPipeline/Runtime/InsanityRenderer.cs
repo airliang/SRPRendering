@@ -17,6 +17,7 @@ namespace Insanity
         private ComputeShader m_parallelScan;
         private ComputeShader m_tilebasedLightCulling;
         private ComputeShader m_DeferredLighting;
+        private ComputeShader m_TileBasedDeferredLighting;
         Light m_sunLight;
         //ShadowManager m_ShadowMananger;
         int m_mainLightIndex = -1;
@@ -66,6 +67,7 @@ namespace Insanity
             m_copyDepthMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.CopyDepth);
             m_tilebasedLightCulling = InsanityPipeline.asset.InsanityPipelineResources.shaders.TileBasedLightCulling;
             m_DeferredLighting = InsanityPipeline.asset.InsanityPipelineResources.shaders.DeferredLighting;
+            m_TileBasedDeferredLighting = InsanityPipeline.asset.InsanityPipelineResources.shaders.TileBasedDeferredLighting;
             m_ssaoSettings.ssao = InsanityPipeline.asset.InsanityPipelineResources.shaders.HBAO;
             m_ssaoSettings.blur = InsanityPipeline.asset.InsanityPipelineResources.shaders.SSAOBlur;
 
@@ -275,6 +277,7 @@ namespace Insanity
                     DebugView.DebugViewGPUResources textures = new DebugView.DebugViewGPUResources();
                     textures.m_Depth = m_FrameRenderSets.cameraDepthResolved;
                     textures.m_LightVisibilityIndexBuffer = lightCullingData != null ? lightCullingData.lightVisibilityIndexBuffer : LightCulling.Instance.LightsVisibilityIndexBuffer;
+                    textures.m_TileVisibleLightCount = lightCullingData != null ? lightCullingData.tileVisibleLightCounts : TextureHandle.nullHandle;
                     textures.m_Normal = m_FrameRenderSets.cameraNormal;
                     textures.m_SSAO = m_FrameRenderSets.ssaoMask;
                     DebugView.ShowDebugPass(renderingData, ref textures, m_FrameRenderSets.backBufferColor, m_debugViewBlitMaterial, (int)DebugView.debugViewType);
@@ -300,13 +303,12 @@ namespace Insanity
             RenderPasses.Render_DepthPrePass(renderingData, m_FrameRenderSets.cameraDepth);
             RenderPasses.CopyDepthPass(renderingData, out m_FrameRenderSets.cameraDepthResolved, m_FrameRenderSets.cameraDepth, m_copyDepthMaterial, (int)asset.MSAASamples);
 
-            LightCulling.TileBasedLightCullingData lightCullingData = null;
-            if (renderingData.supportAdditionalLights && LightCulling.Instance.ValidAdditionalLightsCount > 0)
-            {
-                //LightCulling.Instance.ExecuteTileFrustumCompute(renderingData, m_forwardRenderData.ForwardPathResources.shaders.TileFrustumCompute);
-                lightCullingData = LightCulling.Instance.ExecuteTilebasedLightCulling(renderingData, m_FrameRenderSets.cameraDepthResolved,
-                    m_tilebasedLightCulling);
-            }
+            //LightCulling.TileBasedLightCullingData lightCullingData = null;
+            //if (renderingData.supportAdditionalLights && LightCulling.Instance.ValidAdditionalLightsCount > 0)
+            //{
+            //    lightCullingData = LightCulling.Instance.ExecuteTilebasedLightCulling(renderingData, m_FrameRenderSets.cameraDepthResolved,
+            //        m_tilebasedLightCulling);
+            //}
 
             if (DebugView.NeedDebugView())
             {
@@ -338,7 +340,8 @@ namespace Insanity
 
                     if (ShadowManager.Instance.shadowSettings.requiresScreenSpaceShadowResolve)
                     {
-                        ShadowManager.Instance.Render_ScreenSpaceShadow(renderingData.renderGraph, renderingData.cameraData.camera, shadowmap, m_FrameRenderSets.cameraDepthResolved);
+                        ScreenSpaceShadowPassData ssShadowPassData = ShadowManager.Instance.Render_ScreenSpaceShadow(renderingData.renderGraph, renderingData.cameraData.camera, shadowmap, m_FrameRenderSets.cameraDepthResolved);
+                        shadowmap = ssShadowPassData.m_SSShadowmap;
                     }
                 }
             }
@@ -347,8 +350,9 @@ namespace Insanity
 
             RenderSSAO(cmdRG, renderingData);
 
-            RenderPasses.DeferredShadingPass(renderingData, RenderPasses.s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.AlbedoMetallic],
-                RenderPasses.s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.NormalSmoothness], m_FrameRenderSets.cameraDepthResolved, m_FrameRenderSets.cameraColor, m_DeferredLighting);
+            //RenderPasses.DeferredShadingPass(renderingData, RenderPasses.s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.AlbedoMetallic],
+            //    RenderPasses.s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.NormalSmoothness], m_FrameRenderSets.cameraDepthResolved, shadowmap, m_FrameRenderSets.cameraColor, m_DeferredLighting);
+            LightCulling.TileBasedDeferredShadingData tileBasedDeferredData = LightCulling.Instance.TileBasedDeferredShading(renderingData, RenderPasses.s_GBuffer.GBufferAttachments, m_FrameRenderSets.cameraDepthResolved, shadowmap, m_FrameRenderSets.cameraColor, m_TileBasedDeferredLighting);
 
             Atmosphere atmosphere = Atmosphere.Instance;
             if (asset.PhysicalBasedSky)
@@ -370,7 +374,8 @@ namespace Insanity
             {
                 DebugView.DebugViewGPUResources textures = new DebugView.DebugViewGPUResources();
                 textures.m_Depth = m_FrameRenderSets.cameraDepthResolved;
-                textures.m_LightVisibilityIndexBuffer = lightCullingData != null ? lightCullingData.lightVisibilityIndexBuffer : LightCulling.Instance.LightsVisibilityIndexBuffer;
+                //textures.m_LightVisibilityIndexBuffer = lightCullingData != null ? lightCullingData.lightVisibilityIndexBuffer : LightCulling.Instance.LightsVisibilityIndexBuffer;
+                textures.m_TileVisibleLightCount = tileBasedDeferredData.tileVisibleLightCounts;
                 textures.m_GBufferNormalSmoothness = RenderPasses.s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.NormalSmoothness];
                 textures.m_SSAO = m_FrameRenderSets.ssaoMask;
                 textures.m_GBufferAlbedoMetallic = RenderPasses.s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.AlbedoMetallic];

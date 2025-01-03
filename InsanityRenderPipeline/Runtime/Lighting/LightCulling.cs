@@ -9,6 +9,8 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
+using static Insanity.RenderPasses;
+using static UnityEditor.ShaderData;
 
 namespace Insanity
 {
@@ -42,11 +44,17 @@ namespace Insanity
             public static int _LightBuffer;
             public static int _DepthTexture;
             public static int _ProjInverse;
-            public static int _ScreenSize;
+            //public static int _ScreenSize;
             public static int _TotalLightNum;
             public static int _TileVisibleLightCounts;
-            public static int _ViewMatrix;
+            public static int _View;
             public static int _TileAABBsBuffer;
+            public static int _FinalLighting;
+            public static int _AlbedoMetallic;
+            public static int _NormalSmoothness;
+            public static int _ShadowMap;
+            public static int _ScreenSpaceShadowmapTexture;
+            public static int _ViewInverse;
         }
 
 
@@ -68,6 +76,7 @@ namespace Insanity
         Vector2Int m_CurrentTileNumbers;
         int m_kernelTileFrustumCompute = -1;
         int m_kernelLightCulling = -1;
+        int m_kernelTBDS = -1; //tile-based deferred shading kernel
         int m_tileSize = 0;
 
         static LightCulling s_instance = null;
@@ -92,11 +101,18 @@ namespace Insanity
             LightCullingShaderParams._LightBuffer = Shader.PropertyToID("_LightBuffer");
             LightCullingShaderParams._DepthTexture = Shader.PropertyToID("_DepthTexture");
             LightCullingShaderParams._ProjInverse = Shader.PropertyToID("_ProjInverse");
-            LightCullingShaderParams._ScreenSize = Shader.PropertyToID("_ScreenSize");
+            //LightCullingShaderParams._ScreenSize = Shader.PropertyToID("_ScreenSize");
             LightCullingShaderParams._TotalLightNum = Shader.PropertyToID("_TotalLightNum");
             LightCullingShaderParams._TileVisibleLightCounts = Shader.PropertyToID("_TileVisibleLightCounts");
-            LightCullingShaderParams._ViewMatrix = Shader.PropertyToID("_ViewMatrix");
+            LightCullingShaderParams._View = Shader.PropertyToID("_View");
             LightCullingShaderParams._TileAABBsBuffer = Shader.PropertyToID("_TileAABBs");
+
+            LightCullingShaderParams._FinalLighting = Shader.PropertyToID("_FinalLighting");
+            LightCullingShaderParams._AlbedoMetallic = Shader.PropertyToID("_AlbedoMetallic");
+            LightCullingShaderParams._NormalSmoothness = Shader.PropertyToID("_NormalSmoothness");
+            DeferredShadingParams._ShadowMap = Shader.PropertyToID("_ShadowMap");
+            DeferredShadingParams._ScreenSpaceShadowmapTexture = Shader.PropertyToID("_ScreenSpaceShadowmapTexture");
+            LightCullingShaderParams._ViewInverse = Shader.PropertyToID("_ViewInverse");
         }
 
         private LightCulling()
@@ -360,11 +376,13 @@ namespace Insanity
                     context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._LightVisibilityIndexBuffer, data.lightVisibilityIndexBuffer);
                     context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._DepthTexture, data.depthTexture);
                     context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._TileVisibleLightCounts, data.tileVisibleLightCounts);
-                    context.cmd.SetComputeVectorParam(data.computeShader, LightCullingShaderParams._ScreenSize, data.screenSize);
+
                     context.cmd.SetComputeVectorParam(data.computeShader, LightCullingShaderParams._TileNumber, data.tileNumbers);
                     context.cmd.SetComputeMatrixParam(data.computeShader, LightCullingShaderParams._ProjInverse, data.projInverse);
                     context.cmd.SetComputeIntParam(data.computeShader, LightCullingShaderParams._TotalLightNum, data.totalLightsNum);
-                    context.cmd.SetComputeMatrixParam(data.computeShader, LightCullingShaderParams._ViewMatrix, data.viewMatrix);
+                    context.cmd.SetComputeMatrixParam(data.computeShader, LightCullingShaderParams._View, data.viewMatrix);
+
+
                     if (m_DebugMode)
                     {
                         context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._TileAABBsBuffer, data.tileAABBsBuffer);
@@ -377,6 +395,129 @@ namespace Insanity
                 return passData;
             }
             
+        }
+
+        public class TileBasedDeferredShadingData
+        {
+            public ComputeShader computeShader;
+            public ComputeBuffer additionalLightsBuffer;
+            public TextureHandle depthTexture;
+            public TextureHandle shadowMap;
+            public TextureHandle albedoMetallic;
+            public TextureHandle normalSmoothness;
+            public TextureHandle finalLighting;
+            public TextureHandle tileVisibleLightCounts;
+            public Vector2 tileNumbers;
+            public int kernelId;
+            public float tileSize;
+            public Matrix4x4 projInverse;
+            //public Vector2 screenSize;
+            public int totalLightsNum;
+            public Matrix4x4 viewMatrix;
+            public Matrix4x4 invViewMatrix;
+            public bool additionalLightsEnable;
+            public bool ssaoEnable = false;
+            public bool screenSpaceShadow = false;
+            public int cascadeCount = 1;
+            public eShadowType shadowType = eShadowType.PCF;
+            public eAdditionalLightCullingFunction additionalLightCullingFunction;
+            public bool showDebugView = false;
+        }
+
+        public TileBasedDeferredShadingData TileBasedDeferredShading(RenderingData renderingData, TextureHandle[] gbuffer,
+            TextureHandle depth, TextureHandle shadowMap, TextureHandle output, ComputeShader deferredLighting)
+        {
+            if (m_kernelTBDS == -1)
+            {
+                m_kernelTBDS = deferredLighting.FindKernel("TileBasedDeferredLighting");
+            }
+
+            using (var builder = renderingData.renderGraph.AddRenderPass<TileBasedDeferredShadingData>("Tile based light culling", out var passData,
+                new ProfilingSampler("Tile based deferred shading Profiler")))
+            {
+                passData.computeShader = deferredLighting;
+                passData.kernelId = m_kernelTBDS;
+                //TextureHandle tileLightVisibleCounts = CreateLightVisibleCountTexture(renderingData.renderGraph, m_CurrentTileNumbers.x, m_CurrentTileNumbers.y);
+
+                passData.albedoMetallic = builder.ReadTexture(gbuffer[(int)GBuffer.GBufferIndex.AlbedoMetallic]);
+                passData.normalSmoothness = builder.ReadTexture(gbuffer[(int)GBuffer.GBufferIndex.NormalSmoothness]);
+                passData.depthTexture = builder.ReadTexture(depth);
+                passData.tileNumbers = m_CurrentTileNumbers;
+                passData.tileSize = m_tileSize;
+                //camera.projectMatrix transform the view space position to the NDC position and flip the z direction
+                //NDC position means all the values are between [-1, 1]. Notice that the z is also transform to [-1, 1]
+                Matrix4x4 proj = renderingData.cameraData.camera.projectionMatrix * Matrix4x4.Scale(new Vector3(1, 1, -1)); //GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false);
+                passData.projInverse = proj.inverse;//renderingData.cameraData.camera.projectionMatrix.inverse;
+                //passData.screenSize = new Vector2(Screen.width, Screen.height);
+                passData.totalLightsNum = ValidAdditionalLightsCount;
+                passData.viewMatrix = renderingData.cameraData.camera.transform.worldToLocalMatrix;
+                Vector3 cameraPos = renderingData.cameraData.camera.transform.position;
+                Vector3 cameraPosInView = passData.viewMatrix.MultiplyPoint(cameraPos);
+                passData.invViewMatrix = renderingData.cameraData.camera.transform.localToWorldMatrix; //renderingData.cameraData.mainViewConstants.invViewMatrix;
+                passData.invViewMatrix.SetColumn(3, new Vector4(0, 0, 0, 1));
+                passData.finalLighting = builder.WriteTexture(output);
+                passData.ssaoEnable = InsanityPipeline.asset.SSAOEnable;
+                passData.screenSpaceShadow = InsanityPipeline.asset.ScreenSpaceShadow;
+                passData.additionalLightsBuffer = AdditionalLightsBuffer;
+                passData.showDebugView = DebugView.NeedDebugView();
+                if (passData.showDebugView )
+                {
+                    TextureHandle tileLightVisibleCounts = CreateLightVisibleCountTexture(renderingData.renderGraph, m_CurrentTileNumbers.x, m_CurrentTileNumbers.y);
+
+                    passData.tileVisibleLightCounts = builder.WriteTexture(tileLightVisibleCounts);
+                }
+
+                builder.AllowPassCulling(false);
+                builder.SetRenderFunc((TileBasedDeferredShadingData data, RenderGraphContext context) =>
+                {
+                    //context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._LightBuffer, data.additionalLightsBuffer);
+                    //context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._LightVisibilityIndexBuffer, data.lightVisibilityIndexBuffer);
+                    context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._AlbedoMetallic, data.albedoMetallic);
+                    context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._NormalSmoothness, data.normalSmoothness);
+                    context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._DepthTexture, data.depthTexture);
+                    context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, data.screenSpaceShadow ? LightCullingShaderParams._ScreenSpaceShadowmapTexture : LightCullingShaderParams._ShadowMap, data.shadowMap);
+                    context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._FinalLighting, data.finalLighting);
+                    if (data.showDebugView)
+                    {
+                        context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._TileVisibleLightCounts, data.tileVisibleLightCounts);
+                    }
+                    context.cmd.SetGlobalBuffer(InsanityPipeline.ShaderIDs._GPUAdditionalLights, data.additionalLightsBuffer);
+                    //context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._TileVisibleLightCounts, data.tileVisibleLightCounts);
+                    //context.cmd.SetComputeVectorParam(data.computeShader, LightCullingShaderParams._ScreenSize, data.screenSize);
+                    context.cmd.SetComputeVectorParam(data.computeShader, LightCullingShaderParams._TileNumber, data.tileNumbers);
+                    context.cmd.SetComputeMatrixParam(data.computeShader, LightCullingShaderParams._ProjInverse, data.projInverse);
+                    context.cmd.SetComputeIntParam(data.computeShader, LightCullingShaderParams._TotalLightNum, data.totalLightsNum);
+                    context.cmd.SetComputeMatrixParam(data.computeShader, LightCullingShaderParams._View, data.viewMatrix);
+
+                    context.cmd.EnableShaderKeyword("_ADDITIONAL_LIGHTS");
+                    if (data.ssaoEnable)
+                    {
+                        context.cmd.EnableShaderKeyword("_SSAO_ENABLE");
+                    }
+                    else
+                    {
+                        context.cmd.DisableShaderKeyword("_SSAO_ENABLE");
+                    }
+                    CoreUtils.SetKeyword(context.cmd, "_TILEBASED_LIGHT_CULLING", true);
+
+                    CoreUtils.SetKeyword(context.cmd, "_TILEBASED_LIGHT_CULLING_DEBUG", data.showDebugView);
+
+                    CoreUtils.SetKeyword(context.cmd, "_MAIN_LIGHT_SHADOWS", true);
+                    //CoreUtils.SetKeyword(cmd, "_SHADOWS_SOFT", passData.m_SoftShadows);
+                    CoreUtils.SetKeyword(context.cmd, "_MAIN_LIGHT_SHADOWS_CASCADE", data.cascadeCount > 1);
+                    CoreUtils.SetKeyword(context.cmd, "_SHADOW_PCSS", data.shadowType == eShadowType.PCSS);
+
+                    CoreUtils.SetKeyword(context.cmd, "_SHADOW_VSM", data.shadowType == eShadowType.VSM);
+                    CoreUtils.SetKeyword(context.cmd, "_SHADOW_EVSM", data.shadowType == eShadowType.EVSM);
+                    CoreUtils.SetKeyword(context.cmd, "_SCREENSPACE_SHADOW", data.screenSpaceShadow);
+
+                    int threadGroupX = (int)data.tileNumbers.x;
+                    int threadGroupY = (int)data.tileNumbers.y;
+                    context.cmd.DispatchCompute(data.computeShader, data.kernelId, threadGroupX, threadGroupY, 1);
+                });
+
+                return passData;
+            }
         }
 
         public void Dispose()
