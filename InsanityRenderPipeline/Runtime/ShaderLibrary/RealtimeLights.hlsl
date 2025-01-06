@@ -100,9 +100,6 @@ half AngleAttenuation(half3 spotDirection, half3 lightDirection, half2 spotAtten
 }
 
 
-int GetAdditionalLightsCount()
-{
-    return _AdditionalLightsCount;
-}
+
 
 #endif

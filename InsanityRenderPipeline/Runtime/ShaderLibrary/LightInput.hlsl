@@ -21,4 +21,9 @@ CBUFFER_END
 
 #define MAX_VISIBLE_LIGHTS 4
 
+int GetAdditionalLightsCount()
+{
+    return _AdditionalLightsCount;
+}
+
 #endif

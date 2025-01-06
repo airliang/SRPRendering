@@ -1,30 +1,30 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel LightCulling
 #pragma enable_d3d11_debug_symbols
+#pragma multi_compile _ _TILEBASED_LIGHT_CULLING_DEBUG
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "LightInput.hlsl"
+#include "RealtimeLights.hlsl"
 #include "LightCullingInclude.hlsl"
 
 
-StructuredBuffer<LightData> _LightBuffer;
+//StructuredBuffer<LightData> _LightBuffer;
 RWStructuredBuffer<int> _LightVisibilityIndexBuffer; //tile nums * MAX_LIGHT_NUM_PER_TILE
-//StructuredBuffer<TileFrustum> _TileFrustums;
 Texture2D _DepthTexture;
 float4x4 _View;   //platform unrelative matrix
 float4x4 _ProjInverse;  //platform unrelative matrix
-uint2 _TileNumber;
+//uint2 _TileNumber;
 uint _TotalLightNum;
-
+#ifdef _TILEBASED_LIGHT_CULLING_DEBUG
 RWTexture2D<uint> _TileVisibleLightCounts;
-//RWStructuredBuffer<TileAABB> _TileAABBs;
+#endif
 
 groupshared uint _MinDepth;
 groupshared uint _MaxDepth;
-//groupshared TileFrustum _LightGridFrustum;
 groupshared TileAABB _AABBInView;
 groupshared uint _TileLightCount;
-groupshared int _LightList[MAX_LIGHT_NUM_PER_TILE];
-//groupshared uint _TileIndex;
-//groupshared uint _VisibleLightStartOffset;
 
+groupshared int _LightList[MAX_LIGHT_NUM_PER_TILE];
 
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 groupId : SV_GroupID)
@@ -111,7 +111,7 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
     
     for (int i = groupIndex; i < _TotalLightNum; i += TILE_SIZE * TILE_SIZE)
     {
-        LightData light = _LightBuffer[i];
+        GPULight light = _GPUAdditionalLights[i];
         float4 lightPosInView = mul(_View, float4(light.position.xyz, 1));
         lightPosInView /= lightPosInView.w;
         bool intersect = false;
@@ -147,10 +147,12 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
     GroupMemoryBarrierWithGroupSync();
     
     int offset = tileIndex * MAX_LIGHT_NUM_PER_TILE;
+#ifdef _TILEBASED_LIGHT_CULLING_DEBUG
     if (groupIndex == 0)
     {
         _TileVisibleLightCounts[groupId.xy] = _TileLightCount;
     }
+#endif
     
     _LightVisibilityIndexBuffer[offset + groupIndex] = groupIndex < _TileLightCount ? _LightList[groupIndex] : -1;
     

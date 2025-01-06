@@ -20,14 +20,11 @@
 #include "Shadow/shadows.hlsl"
 #include "UnityBuiltIn.hlsl"
 
-//StructuredBuffer<LightData> _LightBuffer;
 Texture2D<float4> _AlbedoMetallic;
 Texture2D<float4> _NormalSmoothness;
 Texture2D _DepthTexture;
 float4x4 _View; //platform unrelative matrix
 float4x4 _ProjInverse; //platform unrelative matrix
-//uint2 _ScreenSize;
-//uint2 _TileNumber;
 uint _TotalLightNum;
 
 

@@ -22,13 +22,6 @@ struct TileAABB
     float3 extents;
 };
 
-struct LightData
-{
-    float4 position;
-    float4 direction;
-    float4 color;
-};
-
 bool SphereOutsidePlane(float4 sphere, float4 plane)
 {
     return dot(plane, float4(sphere.xyz, 1)) + sphere.w <= 0;

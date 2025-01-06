@@ -41,10 +41,8 @@ namespace Insanity
             public static int _TileFrustums;
             public static int _ViewToScreenTranspose;
             public static int _LightVisibilityIndexBuffer;
-            public static int _LightBuffer;
             public static int _DepthTexture;
             public static int _ProjInverse;
-            //public static int _ScreenSize;
             public static int _TotalLightNum;
             public static int _TileVisibleLightCounts;
             public static int _View;
@@ -322,7 +320,6 @@ namespace Insanity
         public class TileBasedLightCullingData
         {
             public ComputeShader computeShader;
-            public ComputeBuffer additionalLightsBuffer;
             public ComputeBuffer lightVisibilityIndexBuffer;
             public TextureHandle tileVisibleLightCounts;
             public TextureHandle depthTexture;
@@ -334,6 +331,7 @@ namespace Insanity
             public int totalLightsNum;
             public Matrix4x4 viewMatrix;
             public ComputeBuffer tileAABBsBuffer;
+            public bool showDebugView;
         }
 
 
@@ -348,12 +346,9 @@ namespace Insanity
                 new ProfilingSampler("Tile based light culling Profiler")))
             {
                 passData.computeShader = tileBasedLightCulling;
-                passData.additionalLightsBuffer = m_AdditionalLightsBuffer;
                 passData.lightVisibilityIndexBuffer = m_LightsVisibilityIndexBuffer;
                 passData.kernelId = m_kernelLightCulling;
-                TextureHandle tileLightVisibleCounts = CreateLightVisibleCountTexture(renderingData.renderGraph, m_CurrentTileNumbers.x, m_CurrentTileNumbers.y);
-
-                passData.tileVisibleLightCounts = builder.WriteTexture(tileLightVisibleCounts); //m_TileVisibleLightCounts;
+                
                 passData.depthTexture = builder.ReadTexture(depthTexture);
                 passData.tileNumbers = m_CurrentTileNumbers;
                 passData.tileSize = m_tileSize;
@@ -368,20 +363,29 @@ namespace Insanity
                 Vector3 cameraPosInView = passData.viewMatrix.MultiplyPoint(cameraPos);
 
                 passData.tileAABBsBuffer = m_TileAABBsBuffer;
+                passData.showDebugView = DebugView.NeedDebugView();
+                if (passData.showDebugView)
+                {
+                    TextureHandle tileLightVisibleCounts = CreateLightVisibleCountTexture(renderingData.renderGraph, m_CurrentTileNumbers.x, m_CurrentTileNumbers.y);
+                    passData.tileVisibleLightCounts = builder.WriteTexture(tileLightVisibleCounts); //m_TileVisibleLightCounts;
+                }
 
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc((TileBasedLightCullingData data, RenderGraphContext context) =>
                 {
-                    context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._LightBuffer, data.additionalLightsBuffer);
+                    //context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._LightBuffer, data.additionalLightsBuffer);
                     context.cmd.SetComputeBufferParam(data.computeShader, data.kernelId, LightCullingShaderParams._LightVisibilityIndexBuffer, data.lightVisibilityIndexBuffer);
                     context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._DepthTexture, data.depthTexture);
-                    context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._TileVisibleLightCounts, data.tileVisibleLightCounts);
+                    if (data.showDebugView)
+                    {
+                        context.cmd.SetComputeTextureParam(data.computeShader, data.kernelId, LightCullingShaderParams._TileVisibleLightCounts, data.tileVisibleLightCounts);
+                    }
 
                     context.cmd.SetComputeVectorParam(data.computeShader, LightCullingShaderParams._TileNumber, data.tileNumbers);
                     context.cmd.SetComputeMatrixParam(data.computeShader, LightCullingShaderParams._ProjInverse, data.projInverse);
                     context.cmd.SetComputeIntParam(data.computeShader, LightCullingShaderParams._TotalLightNum, data.totalLightsNum);
                     context.cmd.SetComputeMatrixParam(data.computeShader, LightCullingShaderParams._View, data.viewMatrix);
-
+                    CoreUtils.SetKeyword(context.cmd, "_TILEBASED_LIGHT_CULLING_DEBUG", data.showDebugView);
 
                     if (m_DebugMode)
                     {
