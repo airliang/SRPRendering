@@ -96,7 +96,6 @@ namespace Insanity
             LightCullingShaderParams._ViewToScreenTranspose = Shader.PropertyToID("_ViewToScreenTranspose");
             LightCullingShaderParams._TileFrustums = Shader.PropertyToID("_TileFrustums");
             LightCullingShaderParams._LightVisibilityIndexBuffer = Shader.PropertyToID("_LightVisibilityIndexBuffer");
-            LightCullingShaderParams._LightBuffer = Shader.PropertyToID("_LightBuffer");
             LightCullingShaderParams._DepthTexture = Shader.PropertyToID("_DepthTexture");
             LightCullingShaderParams._ProjInverse = Shader.PropertyToID("_ProjInverse");
             //LightCullingShaderParams._ScreenSize = Shader.PropertyToID("_ScreenSize");
