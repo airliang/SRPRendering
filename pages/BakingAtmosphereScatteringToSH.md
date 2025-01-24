@@ -15,7 +15,7 @@ __Image-Based Lighting.__ The reflected radiance R(v) in the view direction v is
 
 $`R(v) = \int _H L(l)f(l,v)(n \cdot l) \rm dl `$
 
-Where $$f(l,v)$$ is the BRDF function, n is the surface normal of the viewing point.
+Where $f(l,v)$ is the BRDF function, n is the surface normal of the viewing point.
 Specular reflections are more complicated and we summarize the results from the paper that introduces GGX [WMLT07]. The general Cook-Torrance microfacet model for specular reflection is 
 
 $f_{spec}(l,v) = \frac{D(h)G(l,v,h)F(v,h)}{4(n \cdot l)(n \cdot v) }$
