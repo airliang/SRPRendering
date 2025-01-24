@@ -108,6 +108,7 @@ Turn off AO:
 
 ## Performance
 I test the performance under RTX3060 by NSight Graphics.
+
 Half resolution:
 ![](ssao/performance_half_res.png)
 
@@ -116,11 +117,19 @@ Full resolution:
 
 ## Reference
 [Louis Bavoil. Image-Space Horizon-Based Ambient Occlusion](https://artis.inrialpes.fr/Membres/Olivier.Hoel/ssao/nVidiaHSAO/2317-abstract.pdf) [1]
+
 [Louis Bavoil. Image-Space Horizon-Based Ambient Occlusion PPT](https://developer.download.nvidia.com/presentations/2008/SIGGRAPH/HBAO_SIG08b.pdf) [2]
+
 https://graphics.tudelft.nl/Publications-new/2012/KRES12/paper.pdf [3]
+
 [The Alchemy Screen-Space Ambient Obscurance Algorithm](https://casual-effects.com/research/McGuire2011AlchemyAO/VV11AlchemyAO.pdf) [4]
+
 [Interleaved Gradient Noise: A Different Kind of Low Discrepancy Sequence](https://blog.demofox.org/2022/01/01/interleaved-gradient-noise-a-different-kind-of-low-discrepancy-sequence/) [5]
+
 [Daniel Kvarfordt & Benjamin Lillandt. Screen Space Ambient Occlusion](https://www.cse.chalmers.se/edu/year/2018/course/TDA361/Advanced%20Computer%20Graphics/SSAO.pdf) [6]
+
 [Evaluating Tessellation and Screen-Space Ambient Occlusion in WebGL-Based Real-Time Application](https://core.ac.uk/download/pdf/97833395.pdf) [7]
+
 [Stable SSAO in Battlefield 3 with Selective Temporal Filtering](https://d29g4g2dyqv443.cloudfront.net/sites/default/files/akamai/gamedev/files/gdc12/GDC12_Bavoil_Stable_SSAO_In_BF3_With_STF.pdf) [8]
+
 [Generating smooth and cheap SSAO using Temporal Blur](https://www.gamedeveloper.com/programming/generating-smooth-and-cheap-ssao-using-temporal-blur) [9]
