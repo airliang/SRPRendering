@@ -6,7 +6,7 @@
 #include "LightInput.hlsl"
 #include "RealtimeLights.hlsl"
 #include "LightCullingInclude.hlsl"
-
+#include "ShaderVariablesGlobal.hlsl"
 
 //StructuredBuffer<LightData> _LightBuffer;
 RWStructuredBuffer<int> _LightVisibilityIndexBuffer; //tile nums * MAX_LIGHT_NUM_PER_TILE
@@ -33,20 +33,20 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
     //uint2 tileId = groupId.xy;
     int groupIndex = GTid.x + GTid.y * TILE_SIZE;
     //Get the tile frustum info
-    //_TileIndex = 0;
     int tileIndex = _TileNumber.x * groupId.y + groupId.x;
     if (groupIndex == 0)
     {
         _MinDepth = 0xffffffff;
         _MaxDepth = 0;
         _TileLightCount = 0;
-        //_TileIndex = _TileNumber.x * groupId.y + groupId.x;
-        //_LightGridFrustum = _TileFrustums[tileIndex];
-
     }
     GroupMemoryBarrierWithGroupSync();
     //compute the min max depth of a tile
-    float depth = _DepthTexture.Load(int3(DTid.xy, 0));
+    float2 screenUV = ((float2) DTid.xy + 0.5) * _ScreenSize.zw;
+    
+    //first step is to calculate the world position 
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, screenUV, 0);
+    //float depth = _DepthTexture.Load(int3(DTid.xy, 0));
     depth = 1.0 - depth;
     InterlockedMax(_MaxDepth, asuint(depth * 2.0 - 1.0));
     InterlockedMin(_MinDepth, asuint(depth * 2.0 - 1.0));
@@ -101,11 +101,9 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
             minAABB = min(minAABB, viewSpaceAABB[i].xyz);
             maxAABB = max(maxAABB, viewSpaceAABB[i].xyz);
         }
+
         _AABBInView.center = (minAABB + maxAABB) * 0.5;
         _AABBInView.extents = maxAABB - _AABBInView.center;
-        
-        //_TileAABBs[tileIndex] = _AABBInView;
-
     }
     GroupMemoryBarrierWithGroupSync();
     
@@ -115,7 +113,7 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
         float4 lightPosInView = mul(_View, float4(light.position.xyz, 1));
         lightPosInView /= lightPosInView.w;
         bool intersect = false;
-        //if (SphereInsideFrustum(float4(lightPosInView.xyz, light.position.w), _LightGridFrustum, minDepth, maxDepth))
+
         if (light.direction.w == 0)   //point light
         {
             if (SphereIntersectsAABB(float4(lightPosInView.xyz, light.position.w), _AABBInView))
@@ -147,13 +145,13 @@ void LightCulling(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadI
     GroupMemoryBarrierWithGroupSync();
     
     int offset = tileIndex * MAX_LIGHT_NUM_PER_TILE;
+    
+    _LightVisibilityIndexBuffer[offset + groupIndex] = groupIndex < _TileLightCount ? _LightList[groupIndex] : -1;
+    
 #ifdef _TILEBASED_LIGHT_CULLING_DEBUG
     if (groupIndex == 0)
     {
         _TileVisibleLightCounts[groupId.xy] = _TileLightCount;
     }
 #endif
-    
-    _LightVisibilityIndexBuffer[offset + groupIndex] = groupIndex < _TileLightCount ? _LightList[groupIndex] : -1;
-    
 }

@@ -602,13 +602,14 @@ void TileBasedAdditionalLightingFragmentBlinnPhong(float3 positionWS, float3 nor
 void TileBasedAdditionalLightingFragmentPBR(BRDFData brdfData, float3 positionWS, float3 normalWS, float3 viewDirWS, float2 screenPos, out half3 outColor)
 {
     outColor = 0;
-    uint2 tileId = screenPos * (_TileNumber - 1);
+    uint2 tileId = screenPos * (_TileNumber);
     uint  lightIndexOffset = (tileId.y * _TileNumber.x + tileId.x) * MAX_LIGHT_NUM_PER_TILE;
     int lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset];
     for (int i = 0; i < MAX_LIGHT_NUM_PER_TILE && lightIndex >= 0; ++i)
     {
         Light light = GetAdditionalLight(lightIndex, positionWS);
         outColor += AdditionalLightingPhysicallyBased(brdfData, light, normalWS, viewDirWS);
+
         lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset + i + 1];
     }
 }

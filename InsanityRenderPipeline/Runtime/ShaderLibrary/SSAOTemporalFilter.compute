@@ -69,6 +69,30 @@ float2 TemporalReprojection(float2 uv, float depth, out float preViewDepth, out 
     return uvPre;
 }
 
+void GetLimitsAO(Texture2D<float> inTexture, SamplerState inSampler, float2 inUV, out float outMin, out float outMax, out float outCenter)
+{
+    float2 uv = inUV;
+
+    // Get 9 grid texture pixel
+    float s00 = inTexture.SampleLevel(inSampler, uv, 0, int2(-1, -1)).r;
+    float s10 = inTexture.SampleLevel(inSampler, uv, 0, int2(0, -1)).r;
+    float s20 = inTexture.SampleLevel(inSampler, uv, 0, int2(1, -1)).r;
+         
+    float s01 = inTexture.SampleLevel(inSampler, uv, 0, int2(-1, 0)).r;
+    float s11 = inTexture.SampleLevel(inSampler, uv, 0, int2(0, 0)).r;
+    float s21 = inTexture.SampleLevel(inSampler, uv, 0, int2(1, 0)).r;
+         
+    float s02 = inTexture.SampleLevel(inSampler, uv, 0, int2(-1, 1)).r;
+    float s12 = inTexture.SampleLevel(inSampler, uv, 0, int2(0, 1)).r;
+    float s22 = inTexture.SampleLevel(inSampler, uv, 0, int2(1, 1)).r;
+
+    // Output center
+    outCenter = s11;
+
+    outMin = min(s00, min(s10, min(s20, min(s01, min(s11, min(s21, min(s02, min(s12, s22))))))));
+    outMax = max(s00, max(s10, max(s20, max(s01, max(s11, max(s21, max(s02, max(s12, s22))))))));
+}
+
 [numthreads(8,8,1)]
 void TemporalFilter (uint3 id : SV_DispatchThreadID)
 {
@@ -87,7 +111,8 @@ void TemporalFilter (uint3 id : SV_DispatchThreadID)
     }
     //depth = GetPlatformDepth(depth);
 #else
-    float ao = _AOInput.SampleLevel(s_linear_clamp_sampler, uv, 0);
+    float ao = _AOInput.SampleLevel(s_point_clamp_sampler, uv, 0);
+    
     float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uv, 0);
 #endif
     

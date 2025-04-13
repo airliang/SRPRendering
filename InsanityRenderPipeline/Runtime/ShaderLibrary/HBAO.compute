@@ -278,14 +278,14 @@ void HBAO (uint3 id : SV_DispatchThreadID)
         float2 samplePointVec = mul(rotation, SPIRAL_KERNEL[i]) * scalingFactorSS; /* * _ScreenSize.zw*/;
 
         float2 samplePoint = samplePointVec + uvScreen;
-        int2 samplePointPixel = (int2) (samplePoint * _ScreenSize.xy);
+        //int2 samplePointPixel = (int2) (samplePoint * _ScreenSize.xy);
         //screenCoord = _ScreenSize * samplePoint;
-        float depthSample = _DepthTexture.Load(int3(samplePointPixel, 0)); //_DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //IS_HALF_RESOLUTION ? _DepthTexture.SampleLevel(s_linear_clamp_sampler, samplePoint, 0) : _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); //_DepthTexture.Load(int3(screenCoord, 0));
+        float depthSample = _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); 
         //depthSample = GetPlatformDepth(depthSample);
-        float2 adjustSamplePoint = ((float2) samplePointPixel + 0.5) * _ScreenSize.zw;
+        //float2 adjustSamplePoint = ((float2) samplePointPixel + 0.5) * _ScreenSize.zw;
         float3 samplePointVS = ComputeViewSpacePosition(samplePoint, depthSample, _ProjInverse); //UVtoViewPos(adjustSamplePoint, depthSample);
         samplePointVS.z += SELF_OCCLUSION_DEPTH_BIAS;
-        int2 samplePointAOCoord = adjustSamplePoint * _AOMaskSize.xy;
+        //int2 samplePointAOCoord = adjustSamplePoint * _AOMaskSize.xy;
         AOIntegrate += /*samplePointAOCoord == id.xy ? 0 :*/ ComputeAO(screenPosVS, normalVS, samplePointVS) * AO_INTENSITY;
     }
     AOIntegrate = saturate(AOIntegrate / SAMPLE_COUNT);
