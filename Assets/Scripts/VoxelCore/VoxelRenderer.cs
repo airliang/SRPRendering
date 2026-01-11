@@ -14,7 +14,6 @@ using UnityEngine.Experimental.Rendering;
 //[ExecuteInEditMode]
 public class VoxelRenderer : MonoBehaviour
 {
-    /*
     public static int MAX_INSTANCE_NUM = 128 * 128;//VoxelChunk.VOXELS_NUMBER.x * VoxelChunk.VOXELS_NUMBER.y * 6;  //6 face x 32 voxel x 32 voxel 
     public ComputeBuffer m_visibilityBuffer;
     public ComputeBuffer m_shadowVisibilityBuffer;
@@ -133,12 +132,12 @@ public class VoxelRenderer : MonoBehaviour
         RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
         //RenderingEventManager.AddEvent(RenderingEvents.ShadowCasterPassEvent, RenderShadowCasterPass);
 
-        RenderingEventManager.AddShadowCasterEvent(RenderShadowCasterPass);
-        RenderingEventManager.AddEvent(RenderingEvents.DepthPassEvent, RenderCullingChunksDepthPass);
-        RenderingEventManager.AddEvent(RenderingEvents.OpaqueForwardPassEvent, RenderCullingChunks);
+        Insanity.RenderingEventManager.AddShadowCasterEvent(RenderShadowCasterPass);
+        Insanity.RenderingEventManager.AddEvent(Insanity.RenderingEvents.DepthPassEvent, RenderCullingChunksDepthPass);
+        Insanity.RenderingEventManager.AddEvent(Insanity.RenderingEvents.OpaqueForwardPassEvent, RenderCullingChunks);
         //RenderingEventManager.BeforeExecuteRenderGraphDelegate += OnBeforeExecuteRenderGraph;
 
-        InitializeRenderingData();
+        //InitializeRenderingData();
     }
 
     private void InitializeRenderingData()
@@ -287,10 +286,10 @@ public class VoxelRenderer : MonoBehaviour
     {
         RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
         //RenderingEventManager.BeforeExecuteRenderGraphDelegate -= OnBeforeExecuteRenderGraph;
-        RenderingEventManager.RemoveEvent(RenderingEvents.DepthPassEvent, RenderCullingChunksDepthPass);
+        Insanity.RenderingEventManager.RemoveEvent(Insanity.RenderingEvents.DepthPassEvent, RenderCullingChunksDepthPass);
         //RenderingEventManager.RemoveEvent(RenderingEvents.ShadowCasterPassEvent, RenderShadowCasterPass);
-        RenderingEventManager.RemoveEvent(RenderingEvents.OpaqueForwardPassEvent, RenderCullingChunks);
-        RenderingEventManager.RemoveShadowCasterEvent(RenderShadowCasterPass);
+        Insanity.RenderingEventManager.RemoveEvent(Insanity.RenderingEvents.OpaqueForwardPassEvent, RenderCullingChunks);
+        Insanity.RenderingEventManager.RemoveShadowCasterEvent(RenderShadowCasterPass);
 
         SafeReleaseBuffer(m_argBuffer);
         SafeReleaseBuffer(m_argShadowBuffer);
@@ -337,6 +336,7 @@ public class VoxelRenderer : MonoBehaviour
 
     private void OnBeginCameraRendering(ScriptableRenderContext context, Camera camera)
     {
+        InitializeRenderingData();
         //begin chunk culling
         m_camera = camera;
         m_cullingFinished = false;
@@ -453,7 +453,7 @@ public class VoxelRenderer : MonoBehaviour
         }
     }
 
-    private void RenderVoxelBatchShadow(VoxelRenderBatch voxelRenderBatch, bool cullingInstance, ShadowSettings shadowSettings, 
+    private void RenderVoxelBatchShadow(VoxelRenderBatch voxelRenderBatch, bool cullingInstance, Insanity.ShadowSettings shadowSettings, 
         ref ShadowDrawingSettings shadowDrawSettings, int cascadeIndex, CommandBuffer cmd)
     {
         cmd.SetBufferData(m_transformBuffer, voxelRenderBatch.Positions);
@@ -692,7 +692,6 @@ public class VoxelRenderer : MonoBehaviour
         }
         m_FullyInFrustumBatch.Clear();
     }
-    */
 
     private void LateUpdate()
     {

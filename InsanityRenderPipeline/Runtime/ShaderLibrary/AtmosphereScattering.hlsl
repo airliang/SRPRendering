@@ -112,14 +112,23 @@ float4 IntegrateInScattering(float3 rayStart, float3 rayEnd, float3 sunLight, fl
     float3 tMie = 0;
     float3 preScatteringR = 0;
     float3 preScatteringM = 0;
+    float height = length(rayStart - earthCenter) - _EarthRadius;
+    float2 densityPA = GetAtmosphereDensity(height);
+    float2 preDensityPA = densityPA;
+
     for (float i = 0.5; i < sampleCount; i++)
     {
+        // P - current integration point
+        // A - camera position
+        // C - top of the atmosphere
         float3 samplePoint = rayStart + step * i;
         float height = abs(length(samplePoint - earthCenter) - _EarthRadius);
         float2 localDensity = exp(-height.xx / _HeightScales.xy);
         float3 tPAR = 0;
         float3 tPAM = 0;
-        float2 densityPA = Transmittance(rayStart, samplePoint, earthCenter);
+        //float2 densityPA = Transmittance(rayStart, samplePoint, earthCenter);
+        densityPA += (localDensity + preDensityPA) * stepSize * 0.5;
+        preDensityPA = localDensity;
         float2 densityCP = 0;
 
         
@@ -128,7 +137,10 @@ float4 IntegrateInScattering(float3 rayStart, float3 rayEnd, float3 sunLight, fl
         if (intersection.x > 0)
         {
             // intersection with planet, write high density
-            densityCP = 1e+20;
+            //densityCP = min(intersection.x, 1e+20);
+            float rayLength = min(intersection.x, intersection.y);
+            float3 pc = samplePoint - rayLength * sunLight;
+            densityCP = Transmittance(samplePoint, pc, earthCenter);
         }
         else
         {

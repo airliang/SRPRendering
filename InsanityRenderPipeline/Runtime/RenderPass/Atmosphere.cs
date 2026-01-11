@@ -665,85 +665,133 @@ namespace Insanity
             if (m_skySHSetting.m_FinalProjSH == null)
                 m_skySHSetting.m_FinalProjSH = new ComputeBuffer(1, Marshal.SizeOf<GPUAmbientSHCoefL2>(), ComputeBufferType.Structured);
 
-            using (var builder = renderGraph.AddRenderPass<BakeAtmosphereToSHPassData>("Bake Atmosphere Scattering to SH Pass",
-                out var passData, m_BakeAtmosphereToSHProfiler))
+            if (AtmosphereSHSetting.DIRECT_BAKING)
             {
-                passData.csProjAtmosphereToSH = atmosphereResources.ProjAtmosphereToSH;
-                passData.kPreSumSH = atmosphereResources.ProjAtmosphereToSH.FindKernel("PresumSHCoefficient");
-                passData.kPreSumSHGroup = atmosphereResources.ProjAtmosphereToSH.FindKernel("PreSumGroupSH");
-                passData.kBakeSHToTexture = atmosphereResources.ProjAtmosphereToSH.FindKernel("BakeSHToTexture");
-                passData.SkyLUT = atmosphereResources.SkyboxLUT;
-                passData.m_SHCoefficientsTexture = m_skySHSetting.m_SHCoefficientsTexture;
-                passData.m_SHCoefficientsGroupSumTexture = m_skySHSetting.m_SHCoefficientsGroupSumTexture;
-                passData.m_FinalProjSH = m_skySHSetting.m_FinalProjSH;
-                passData.m_BakeSamples = m_skySHSetting.m_BakeSamples;
-                passData.rayleightScatteringCoef = atmosphereResources.ScatteringCoefficientRayleigh * 0.000001f * atmosphereResources.ScaleRayleigh;
-                passData.mieScatteringCoef = atmosphereResources.ScatteringCoefficientMie * 0.00001f * atmosphereResources.ScaleMie;
-                passData.mieG = atmosphereResources.MieG;
-                passData.earthRadius = Atmosphere.kAtmosphereHeight;
-                passData.atmosphereHeight = Atmosphere.kAtmosphereHeight;
-                passData.mainLightPosition = -sunLight.transform.localToWorldMatrix.GetColumn(2);
-                passData.mainLightPosition.w = 0;
-                passData.mainLightIntensity = sunLight.intensity;
-                passData.bakeSamplesCount = m_bakeSHSamples.Length;
-
-                builder.SetRenderFunc((BakeAtmosphereToSHPassData data, RenderGraphContext context) =>
+                using (var builder = renderGraph.AddRenderPass<BakeAtmosphereToSHPassData>("Bake Atmoshpere Scattering to SH Pass", out var passData, m_BakeAtmosphereToSHProfiler))
                 {
-                    LocalKeyword bakeCubemap = new LocalKeyword(data.csProjAtmosphereToSH, "_BAKE_CUBEMAP");
-                    context.cmd.DisableKeyword(data.csProjAtmosphereToSH, bakeCubemap);
+                    passData.csProjAtmosphereToSH = atmosphereResources.ProjAtmosphereToSH;
+                    passData.kDirectBake = atmosphereResources.ProjAtmosphereToSH.FindKernel("BakeSHDirect");
+                    passData.SkyLUT = atmosphereResources.SkyboxLUT;
+                    passData.m_SHCoefficientsTexture = m_skySHSetting.m_SHCoefficientsTexture;
+                    passData.m_SHCoefficientsGroupSumTexture = m_skySHSetting.m_SHCoefficientsGroupSumTexture;
+                    passData.m_FinalProjSH = m_skySHSetting.m_FinalProjSH;
+                    passData.m_BakeSamples = m_skySHSetting.m_BakeSamples;
+                    passData.rayleightScatteringCoef = atmosphereResources.ScatteringCoefficientRayleigh * 0.000001f * atmosphereResources.ScaleRayleigh;
+                    passData.mieScatteringCoef = atmosphereResources.ScatteringCoefficientMie * 0.00001f * atmosphereResources.ScaleMie;
+                    passData.mieG = atmosphereResources.MieG;
+                    passData.earthRadius = Atmosphere.kAtmosphereHeight;
+                    passData.atmosphereHeight = Atmosphere.kAtmosphereHeight;
+                    passData.mainLightPosition = -sunLight.transform.localToWorldMatrix.GetColumn(2);
+                    passData.mainLightPosition.w = 0;
+                    passData.mainLightIntensity = sunLight.intensity;
+                    passData.bakeSamplesCount = m_bakeSHSamples.Length;
 
-                    context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
-                    context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
-                    context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._BetaRayleigh, data.rayleightScatteringCoef);
-                    context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._BetaMie, data.mieScatteringCoef);
-                    context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._MieG, data.mieG);
-
-                    context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._MainLightPosition, data.mainLightPosition);
-                    context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._MainLightIntensity, data.mainLightIntensity);
-
-                    //pass 1 parallen sum the sh coefficients into array.
-                    context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSH, AtmosphereShaderParameters._SkyboxLUT, data.SkyLUT);
-                    context.cmd.SetComputeBufferParam(data.csProjAtmosphereToSH, data.kPreSumSH, ProjSHShaderParameters._BakeSamples, data.m_BakeSamples);
-                    int groupsNumX = data.bakeSamplesCount / 128;
-
-                    context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSH, ProjSHShaderParameters._SHCoefficients, data.m_SHCoefficientsTexture);
-                    context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kPreSumSH, groupsNumX, 9, 1);
-
-
-                    //pass 2, sum the last element of sh coefficients to the group array.
-                    if (groupsNumX > 1)
+                    builder.SetRenderFunc((BakeAtmosphereToSHPassData data, RenderGraphContext context) =>
                     {
-                        if (data.kPreSumSHGroup >= 0)
-                        {
-                            context.cmd.SetComputeIntParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._ArrayLengthPerThreadGroup, groupsNumX);
-                            context.cmd.SetComputeIntParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._GroupsNumPowOf2, Mathf.NextPowerOfTwo(groupsNumX));
+                        LocalKeyword bakeCubemap = new LocalKeyword(data.csProjAtmosphereToSH, "_BAKE_CUBEMAP");
+                        context.cmd.DisableKeyword(data.csProjAtmosphereToSH, bakeCubemap);
 
-                            context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, data.m_SHCoefficientsTexture);
-                            context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSHGroup,
-                                ProjSHShaderParameters._SHCoefficientsGroupSumArray, data.m_SHCoefficientsGroupSumTexture);
-                            context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kPreSumSHGroup, 1, 9, 1);
-                        }
-                    }
+                        context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
+                        context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
+                        context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._BetaRayleigh, data.rayleightScatteringCoef);
+                        context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._BetaMie, data.mieScatteringCoef);
+                        context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._MieG, data.mieG);
 
-                    //pass 3
-                    if (data.kBakeSHToTexture >= 0)
-                    {
-                        context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kBakeSHToTexture,
-                                ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, data.m_SHCoefficientsGroupSumTexture);
+                        context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._MainLightPosition, data.mainLightPosition);
+                        context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._MainLightIntensity, data.mainLightIntensity);
 
+                        context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kDirectBake, AtmosphereShaderParameters._SkyboxLUT, data.SkyLUT);
+                        context.cmd.SetComputeBufferParam(data.csProjAtmosphereToSH, data.kDirectBake, ProjSHShaderParameters._BakeSamples, data.m_BakeSamples);
+ 
 
-                        context.cmd.SetComputeBufferParam(data.csProjAtmosphereToSH, data.kBakeSHToTexture, ProjSHShaderParameters._FinalProjSH, data.m_FinalProjSH);
-                        context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kBakeSHToTexture, 1, 1, 1);
+                        context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kDirectBake, ProjSHShaderParameters._SHCoefficients, data.m_SHCoefficientsTexture);
+                        context.cmd.SetComputeBufferParam(data.csProjAtmosphereToSH, data.kDirectBake, ProjSHShaderParameters._FinalProjSH, data.m_FinalProjSH);
+                        context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kDirectBake, 1, 1, 1);
 
-                        
-                    }
-
-                    context.renderContext.ExecuteCommandBuffer(context.cmd);
-                    context.cmd.Clear();
-                });
-
-                GetAmbientSHData(m_skySHSetting.m_FinalProjSH);
+                        context.renderContext.ExecuteCommandBuffer(context.cmd);
+                        context.cmd.Clear();
+                    });
+                }
             }
+            else
+            {
+                using (var builder = renderGraph.AddRenderPass<BakeAtmosphereToSHPassData>("Bake Atmosphere Scattering to SH Pass",
+                    out var passData, m_BakeAtmosphereToSHProfiler))
+                {
+                    passData.csProjAtmosphereToSH = atmosphereResources.ProjAtmosphereToSH;
+                    passData.kPreSumSH = atmosphereResources.ProjAtmosphereToSH.FindKernel("PresumSHCoefficient");
+                    passData.kPreSumSHGroup = atmosphereResources.ProjAtmosphereToSH.FindKernel("PreSumGroupSH");
+                    passData.kBakeSHToTexture = atmosphereResources.ProjAtmosphereToSH.FindKernel("BakeSHToTexture");
+                    passData.SkyLUT = atmosphereResources.SkyboxLUT;
+                    passData.m_SHCoefficientsTexture = m_skySHSetting.m_SHCoefficientsTexture;
+                    passData.m_SHCoefficientsGroupSumTexture = m_skySHSetting.m_SHCoefficientsGroupSumTexture;
+                    passData.m_FinalProjSH = m_skySHSetting.m_FinalProjSH;
+                    passData.m_BakeSamples = m_skySHSetting.m_BakeSamples;
+                    passData.rayleightScatteringCoef = atmosphereResources.ScatteringCoefficientRayleigh * 0.000001f * atmosphereResources.ScaleRayleigh;
+                    passData.mieScatteringCoef = atmosphereResources.ScatteringCoefficientMie * 0.00001f * atmosphereResources.ScaleMie;
+                    passData.mieG = atmosphereResources.MieG;
+                    passData.earthRadius = Atmosphere.kAtmosphereHeight;
+                    passData.atmosphereHeight = Atmosphere.kAtmosphereHeight;
+                    passData.mainLightPosition = -sunLight.transform.localToWorldMatrix.GetColumn(2);
+                    passData.mainLightPosition.w = 0;
+                    passData.mainLightIntensity = sunLight.intensity;
+                    passData.bakeSamplesCount = m_bakeSHSamples.Length;
+
+                    builder.SetRenderFunc((BakeAtmosphereToSHPassData data, RenderGraphContext context) =>
+                    {
+                        LocalKeyword bakeCubemap = new LocalKeyword(data.csProjAtmosphereToSH, "_BAKE_CUBEMAP");
+                        context.cmd.DisableKeyword(data.csProjAtmosphereToSH, bakeCubemap);
+
+                        context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._AtmosphereHeight, Atmosphere.kAtmosphereHeight);
+                        context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._EarthRadius, Atmosphere.kEarthRadius);
+                        context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._BetaRayleigh, data.rayleightScatteringCoef);
+                        context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._BetaMie, data.mieScatteringCoef);
+                        context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, AtmosphereShaderParameters._MieG, data.mieG);
+
+                        context.cmd.SetComputeVectorParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._MainLightPosition, data.mainLightPosition);
+                        context.cmd.SetComputeFloatParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._MainLightIntensity, data.mainLightIntensity);
+
+                        //pass 1 parallen sum the sh coefficients into array.
+                        context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSH, AtmosphereShaderParameters._SkyboxLUT, data.SkyLUT);
+                        context.cmd.SetComputeBufferParam(data.csProjAtmosphereToSH, data.kPreSumSH, ProjSHShaderParameters._BakeSamples, data.m_BakeSamples);
+                        int groupsNumX = data.bakeSamplesCount / 128;
+
+                        context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSH, ProjSHShaderParameters._SHCoefficients, data.m_SHCoefficientsTexture);
+                        context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kPreSumSH, groupsNumX, 9, 1);
+
+
+                        //pass 2, sum the last element of sh coefficients to the group array.
+                        if (groupsNumX > 1)
+                        {
+                            if (data.kPreSumSHGroup >= 0)
+                            {
+                                context.cmd.SetComputeIntParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._ArrayLengthPerThreadGroup, groupsNumX);
+                                context.cmd.SetComputeIntParam(data.csProjAtmosphereToSH, ProjSHShaderParameters._GroupsNumPowOf2, Mathf.NextPowerOfTwo(groupsNumX));
+
+                                context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSHGroup, ProjSHShaderParameters._InputSHCoefficients, data.m_SHCoefficientsTexture);
+                                context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kPreSumSHGroup,
+                                    ProjSHShaderParameters._SHCoefficientsGroupSumArray, data.m_SHCoefficientsGroupSumTexture);
+                                context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kPreSumSHGroup, 1, 9, 1);
+                            }
+                        }
+
+                        //pass 3
+                        if (data.kBakeSHToTexture >= 0)
+                        {
+                            context.cmd.SetComputeTextureParam(data.csProjAtmosphereToSH, data.kBakeSHToTexture,
+                                    ProjSHShaderParameters._SHCoefficientsGroupSumArrayInput, data.m_SHCoefficientsGroupSumTexture);
+
+
+                            context.cmd.SetComputeBufferParam(data.csProjAtmosphereToSH, data.kBakeSHToTexture, ProjSHShaderParameters._FinalProjSH, data.m_FinalProjSH);
+                            context.cmd.DispatchCompute(data.csProjAtmosphereToSH, data.kBakeSHToTexture, 1, 1, 1);
+                        }
+
+                        context.renderContext.ExecuteCommandBuffer(context.cmd);
+                        context.cmd.Clear();
+                    });
+                }
+            }
+            GetAmbientSHData(m_skySHSetting.m_FinalProjSH);
 
             BakeAtmosphereToCubemap(renderGraph, ref context, atmosphereResources, sunLight);
         }

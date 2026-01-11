@@ -87,16 +87,16 @@ Shader "Insanity/AtmosphereSky"
                 texCoords.z = 0.5 * ((atan(max(cosSun, -0.1975) * tan(1.26 * 1.1)) / 1.1) + (1 - 0.26));
                 //texCoords = float3(0.9, 0.5, 0.5);
                 half4 scattering = tex3D(_SkyboxLUT, texCoords);
-                //return scattering;
                 //
                 float cosTheta = dot(viewDirWS, -sunDir);
                 half3 scatteringR = scattering.rgb * GetModifyRayleighPhase(cosTheta) * _BetaRayleigh / (4.0 * PI);
+                scattering = max(scattering, 0.0001);
                 half3 sM = scattering.rgb * scattering.w / scattering.r;
                 half3 scatteringM = sM * GetHGMiePhase(cosTheta, _MieG) * _BetaMie / (4.0 * PI);
                 half3 skyColor = (scatteringR + scatteringM) * _MainLightIntensity * _SunLightColor;
                 if (_RunderSun > 0)
                     skyColor += SunSimulation(cosTheta) * sM * _MainLightIntensity;
-                return half4(skyColor, 1);
+                return half4(max(skyColor, 0), 1);
             }
             ENDHLSL
         }
