@@ -256,6 +256,7 @@ namespace Insanity
 
                 ForwardPassData forwardPassData = RenderPasses.Render_OpaqueFowardPass(renderingData, m_FrameRenderSets.cameraDepth, m_FrameRenderSets.cameraColor, shadowmap);
                 Atmosphere atmosphere = Atmosphere.Instance;
+                
                 if (asset.PhysicalBasedSky)
                 {
                     //Atmosphere.Instance.BakeSkyToSHAmbient(renderingData.renderGraph, ref context, asset.AtmosphereResources, m_sunLight);

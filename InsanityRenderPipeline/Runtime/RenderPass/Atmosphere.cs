@@ -60,7 +60,7 @@ namespace Insanity
         static Vector3Int _skyboxLUTSize = new Vector3Int(32, 64, 32);
         static int _sunlightLUTSize = 128;
         public Vector4[] m_bakeSHSamples;
-        const int SHSampleCount = 128;
+        const int SHSampleCount = 512;
         private bool m_bakeCubemap = false;
         public Queue<AsyncGPUReadbackRequest> m_SHBakeReadbacks = new Queue<AsyncGPUReadbackRequest>();
         Vector3 m_sunDirectionLastFrame;
@@ -851,7 +851,7 @@ namespace Insanity
                     passData.kPreSumSH = atmosphereResources.ProjAtmosphereToSH.FindKernel("PresumSHCoefficient");
                     passData.kPreSumSHGroup = atmosphereResources.ProjAtmosphereToSH.FindKernel("PreSumGroupSH");
                     passData.kBakeSHToTexture = atmosphereResources.ProjAtmosphereToSH.FindKernel("BakeSHToTexture");
-                    passData.SkyLUT = atmosphereResources.SkyboxLUT;
+                    passData.SkyLUT = m_SkyboxLUT;
                     passData.m_SHCoefficientsTexture = m_skySHSetting.m_SHCoefficientsTexture;
                     passData.m_SHCoefficientsGroupSumTexture = m_skySHSetting.m_SHCoefficientsGroupSumTexture;
                     passData.m_FinalProjSH = m_skySHSetting.m_FinalProjSH;
