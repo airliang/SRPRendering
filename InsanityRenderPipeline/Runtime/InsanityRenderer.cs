@@ -5,7 +5,6 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
-using UnityEditor.VersionControl;
 
 namespace Insanity
 {
@@ -260,14 +259,14 @@ namespace Insanity
                 if (asset.PhysicalBasedSky)
                 {
                     //Atmosphere.Instance.BakeSkyToSHAmbient(renderingData.renderGraph, ref context, asset.AtmosphereResources, m_sunLight);
-                    atmosphere.Update();
+                    atmosphere.Update(m_sunLight);
                     RenderPasses.Render_PhysicalBaseSky(renderingData, m_FrameRenderSets.cameraColor, m_FrameRenderSets.cameraDepth, asset);
                 }
                 else
                 {
                     Cubemap cubemap = asset.InsanityPipelineResources.materials.Skybox.GetTexture("_Cubemap") as Cubemap;
                     atmosphere.BakeCubemapToSHAmbient(ref context, asset.AtmosphereResources, cubemap);
-                    atmosphere.Update();
+                    atmosphere.Update(m_sunLight);
                     RenderPasses.Render_SkyPass(renderingData, m_FrameRenderSets.cameraColor, m_FrameRenderSets.cameraDepth, asset.InsanityPipelineResources.materials.Skybox);
                 }
 
@@ -357,14 +356,14 @@ namespace Insanity
             Atmosphere atmosphere = Atmosphere.Instance;
             if (asset.PhysicalBasedSky)
             {
-                atmosphere.Update();
+                atmosphere.Update(m_sunLight);
                 RenderPasses.Render_PhysicalBaseSky(renderingData, m_FrameRenderSets.cameraColor, m_FrameRenderSets.cameraDepth, asset);
             }
             else
             {
                 Cubemap cubemap = asset.InsanityPipelineResources.materials.Skybox.GetTexture("_Cubemap") as Cubemap;
                 atmosphere.BakeCubemapToSHAmbient(ref context, asset.AtmosphereResources, cubemap);
-                atmosphere.Update();
+                atmosphere.Update(m_sunLight);
                 RenderPasses.Render_SkyPass(renderingData, m_FrameRenderSets.cameraColor, m_FrameRenderSets.cameraDepth, asset.InsanityPipelineResources.materials.Skybox);
             }
 

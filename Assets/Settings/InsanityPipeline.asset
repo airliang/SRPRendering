@@ -22,9 +22,9 @@ MonoBehaviour:
   m_ShadowCascades: 1
   m_Cascade2Split: 0.25
   m_Cascade4Split: {x: 0.067, y: 0.2, z: 0.467}
-  m_ShadowDepthBias: 1
-  m_ShadowNormalBias: 0.23
-  m_AdaptiveShadowBias: 0
+  m_ShadowDepthBias: 0.45
+  m_ShadowNormalBias: 0
+  m_AdaptiveShadowBias: 1
   m_EnableCSMBlend: 1
   m_CSMBlendDistance: 0.212
   m_ShadowType: 0
@@ -43,7 +43,7 @@ MonoBehaviour:
   m_TileSize: 16
   m_AtmosphereResources: {fileID: 11400000, guid: c30c5a287b3154b428069571e2d497fe,
     type: 2}
-  m_SunLightColor: {r: 2.9960785, g: 2.9960785, b: 2.9960785, a: 1}
+  m_SunLightColor: {r: 4.6688766, g: 4.6688766, b: 4.6688766, a: 1}
   m_physicalBasedSky: 1
   m_SSAOEnable: 1
   m_SSAORadius: 0.5

@@ -25,7 +25,8 @@ namespace UnityEditor.Insanity
         private void Precompute()
         {
             //Atmosphere atmosphere = new Atmosphere();
-            Texture3D skyboxLUT = Atmosphere.PrecomputeSkyboxLUT(_AtmosphereResources) as Texture3D;
+            Texture2D sunlightLUT = null;
+            Texture3D skyboxLUT = Atmosphere.PrecomputeSkyboxLUT(_AtmosphereResources, out sunlightLUT) as Texture3D;
             //skyboxLUT.Apply();
             if (skyboxLUT != null)
             {
@@ -56,6 +57,13 @@ namespace UnityEditor.Insanity
                 //    AssetDatabase.CreateAsset(testAsset, path + "test3DTex.asset");
                 //}
 
+                if (sunlightLUT != null)
+                {
+                    AssetDatabase.DeleteAsset(path + "SunlightLUT.asset");
+                    AssetDatabase.Refresh();
+                    AssetDatabase.CreateAsset(sunlightLUT, path + "SunlightLUT.asset");
+                }
+                //_AtmosphereResources.SunlightLUT = AssetDatabase.LoadAssetAtPath(path + "SunlightLUT.asset", typeof(Texture2D)) as Texture2D;
 
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();

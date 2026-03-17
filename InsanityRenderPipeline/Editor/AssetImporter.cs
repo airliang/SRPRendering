@@ -6,6 +6,7 @@ using System;
 using System.IO;
 using System.Linq;
 
+#if UNITY_EDITOR
 public class AssetImporter : AssetPostprocessor
 {
     void OnPostprocessModel(GameObject g)
@@ -85,3 +86,4 @@ public class AssetImporter : AssetPostprocessor
         }
     }
 }
+#endif

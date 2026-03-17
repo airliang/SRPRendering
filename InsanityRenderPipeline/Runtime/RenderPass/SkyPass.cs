@@ -65,25 +65,27 @@ namespace Insanity
             //}
             Atmosphere atmosphere = Atmosphere.Instance;
             AtmosphereResources atmosphereResources = pipelineAsset.AtmosphereResources;
-            Texture skyboxLUT;
-            if (pipelineAsset.RecalculateSkyLUT)
+            Texture skyboxLUT = atmosphere.SkyboxLUT;
+            if (skyboxLUT == null)
             {
                 skyboxLUTPassData = atmosphere.GenerateSkyboxLUT(renderingData.renderGraph, pipelineAsset, atmosphereResources.PrecomputeScattering);
 
-                if (skyboxLUTPassData.multipleScatteringOrder > 0)
+                if (skyboxLUTPassData.multipleScatteringOrder > 1)
                 {
                     skyboxLUTPassData = atmosphere.PrecomputeMultipleScatteringLUT(renderingData.renderGraph,
                         atmosphereResources.PrecomputeScattering, skyboxLUTPassData.skyboxLUT, atmosphereResources.MultipleScatteringOrder);
                 }
                 skyboxLUT = skyboxLUTPassData.skyboxLUT;
 
+                atmosphere.ReadBackSunLutPixelPass(renderingData.renderGraph);
+
                 hasPrecomputedSkyLut = false;
                 pipelineAsset.RecalculateSkyLUT = false;
+
+
             }
-            else
-                skyboxLUT = atmosphereResources.SkyboxLUT;//m_atmosphere.SkyboxLUT;
-            //Texture3D skyboxLUTAsset = pipelineAsset.AtmosphereResources.SkyboxLUT;
-            
+            //else
+            //    skyboxLUT = atmosphereResources.SkyboxLUT;
 
             using (var builder = renderingData.renderGraph.AddRenderPass<PhysicalBaseSkyPassData>("Atmosphere Scattering SkyPass", 
                 out var passData, new ProfilingSampler("Atmosphere Scattering SkyPass Profiler")))

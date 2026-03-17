@@ -10,7 +10,6 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using static Insanity.RenderPasses;
-using static UnityEditor.ShaderData;
 
 namespace Insanity
 {

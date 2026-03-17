@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
+using Unity.Mathematics;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -23,9 +24,18 @@ namespace Insanity
         public ComputeShader csSkyboxLUT;
         public int kernelSkyboxLUT = -1;
         public int kernelMultipleSkyboxLUT = -1;
+        public int kernelSunlightLUT = -1;
+        public Color sunLightColor;
         public int multipleScatteringOrder = 0;
         public RenderTexture preOrderScatteringLUT;
         public RenderTexture tmpMultipleScatteringOrderOutput;
+        public RTHandle sunlightLUT;
+    }
+
+    public class ReadbackPassData
+    {
+        public TextureHandle source;
+        public NativeArray<half4> pixels;
     }
 
     internal enum AtmosphereProfileId
@@ -45,13 +55,17 @@ namespace Insanity
         private int kernelSkyboxLUT = -1;
         private RenderTexture m_PreOrderInputLUT;
         private RenderTexture m_CurOrderOutputLUT;
+        private RTHandle m_SunlightLUT;
         int kernelMultipleSkyboxLUT = -1;
         static Vector3Int _skyboxLUTSize = new Vector3Int(32, 64, 32);
+        static int _sunlightLUTSize = 128;
         public Vector4[] m_bakeSHSamples;
         const int SHSampleCount = 128;
         private bool m_bakeCubemap = false;
         public Queue<AsyncGPUReadbackRequest> m_SHBakeReadbacks = new Queue<AsyncGPUReadbackRequest>();
         Vector3 m_sunDirectionLastFrame;
+        [ColorUsage(false, true)]
+        private Color[] _DirectionalLightLUT = null;
 
         private static Atmosphere s_instance = null;
         public static Atmosphere Instance
@@ -80,6 +94,7 @@ namespace Insanity
             public static int _MieG;
             public static int _RunderSun;
             public static int _SkyboxLUT;
+            public static int _SunlightLUT;
             public static int _SunLightColor;
             public static int _PreOrderScatteringLUT;
             public static int _OutScatteringLUT;
@@ -105,6 +120,7 @@ namespace Insanity
             AtmosphereShaderParameters._MieG = Shader.PropertyToID("_MieG");
             AtmosphereShaderParameters._RunderSun = Shader.PropertyToID("_RunderSun");
             AtmosphereShaderParameters._SkyboxLUT = Shader.PropertyToID("_SkyboxLUT");
+            AtmosphereShaderParameters._SunlightLUT = Shader.PropertyToID("_SunlightLUT");
             AtmosphereShaderParameters._SunLightColor = Shader.PropertyToID("_SunLightColor");
             AtmosphereShaderParameters._PreOrderScatteringLUT = Shader.PropertyToID("_PreOrderScatteringLUT");
             AtmosphereShaderParameters._OutScatteringLUT = Shader.PropertyToID("_OutScatteringLUT");
@@ -152,6 +168,51 @@ namespace Insanity
             return m_SkyboxLUT;
         }
 
+        RTHandle CreateSunlightLUT()
+        {
+            if (m_SunlightLUT == null)
+            {
+                //m_SunlightLUT = new RenderTexture(_sunlightLUTSize, 1, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+                //m_SunlightLUT.autoGenerateMips = false;
+                //m_SunlightLUT.enableRandomWrite = true;
+                //m_SunlightLUT.name = "SunlightLUT";
+                //m_SunlightLUT.wrapMode = TextureWrapMode.Clamp;
+                //m_SunlightLUT.Create();
+
+                RenderTextureDescriptor desc = new RenderTextureDescriptor(_sunlightLUTSize, 1);
+                desc.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
+                desc.depthBufferBits = 32;
+                desc.msaaSamples = 1;
+                desc.sRGB = true;
+                desc.useMipMap = false;
+                desc.autoGenerateMips = false;
+                desc.depthBufferBits = 0;
+                desc.enableRandomWrite = true;
+
+
+                RTHandleUtils.ReAllocateIfNeeded(ref m_SunlightLUT, desc, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "SunlightLUT");
+            }
+            return m_SunlightLUT;
+        }
+
+        //private Color ComputeDirectionalLightColor(Vector3 directionLightForward)
+        //{
+        //    float cosAngle = Vector3.Dot(Vector3.up, -directionLightForward);
+        //    float u = (cosAngle + 0.1f) / 1.1f;// * 0.5f + 0.5f;
+
+        //    u = u * _sunlightLUTSize;
+        //    int index0 = Mathf.FloorToInt(u);
+        //    float weight1 = u - index0;
+        //    int index1 = index0 + 1;
+        //    float weight0 = 1 - weight1;
+
+        //    index0 = Mathf.Clamp(index0, 0, _sunlightLUTSize - 1);
+        //    index1 = Mathf.Clamp(index1, 0, _sunlightLUTSize - 1);
+
+        //    Color c = _DirectionalLightLUT[index0] * weight0 + _DirectionalLightLUT[index1] * weight1;
+        //    return c.gamma;
+        //}
+
         RenderTexture CreateMultipleScatteringLUT(string name)
         {
             if (m_CurOrderOutputLUT == null)
@@ -180,14 +241,20 @@ namespace Insanity
                 out var passData, new ProfilingSampler("SkyboxLUT Profiler")))
             {
                 passData.skyboxLUT = CreateSkyboxLUT();//builder.WriteTexture(CreateSkyboxLUT(renderGraph));
-                passData.RayleighScatteringCoef = asset.AtmosphereResources.ScatteringCoefficientRayleigh * asset.AtmosphereResources.ScaleRayleigh;
-                passData.MieScatteringCoef = asset.AtmosphereResources.ScatteringCoefficientMie * asset.AtmosphereResources.ScaleMie;
+                passData.RayleighScatteringCoef = asset.AtmosphereResources.ScatteringCoefficientRayleigh * 0.000001f * asset.AtmosphereResources.ScaleRayleigh;
+                passData.MieScatteringCoef = asset.AtmosphereResources.ScatteringCoefficientMie * 0.00001f * asset.AtmosphereResources.ScaleMie;
                 passData.mieG = asset.AtmosphereResources.MieG;
                 passData.csSkyboxLUT = cs;
                 passData.multipleScatteringOrder = asset.AtmosphereResources.MultipleScatteringOrder;
+                passData.sunlightLUT = CreateSunlightLUT();
                 if (passData.kernelSkyboxLUT == -1)
                 {
                     passData.kernelSkyboxLUT = cs.FindKernel("PrecomputeScattering");
+                }
+
+                if (passData.kernelSunlightLUT == -1)
+                {
+                    passData.kernelSunlightLUT = cs.FindKernel("PrecomputeSunLightLUT");
                 }
 
                 builder.SetRenderFunc(
@@ -203,6 +270,12 @@ namespace Insanity
                             ctx.cmd.SetComputeTextureParam(data.csSkyboxLUT, data.kernelSkyboxLUT, AtmosphereShaderParameters._SkyboxLUT, data.skyboxLUT);
                             ctx.cmd.DispatchCompute(data.csSkyboxLUT, data.kernelSkyboxLUT, _skyboxLUTSize.x, _skyboxLUTSize.y, _skyboxLUTSize.z);
 
+                            if (data.kernelSunlightLUT > -1)
+                            {
+                                ctx.cmd.SetComputeTextureParam(data.csSkyboxLUT, data.kernelSunlightLUT, AtmosphereShaderParameters._SunlightLUT, data.sunlightLUT);
+                                ctx.cmd.DispatchCompute(data.csSkyboxLUT, data.kernelSunlightLUT, _sunlightLUTSize, 1, 1);
+                            }
+
                             ctx.renderContext.ExecuteCommandBuffer(ctx.cmd);
                             ctx.cmd.Clear();
                         }
@@ -211,6 +284,39 @@ namespace Insanity
 
                 return passData;
             }
+        }
+
+        public ReadbackPassData ReadBackSunLutPixelPass(RenderGraph renderGraph)
+        {
+            using (var builder = renderGraph.AddRenderPass<ReadbackPassData>(
+                "Readback Pass",
+                out var passData, new ProfilingSampler("ReadBackSunLutPixelPass Profiler")))
+            {
+                passData.source = builder.ReadTexture(renderGraph.ImportTexture(m_SunlightLUT));
+                
+                builder.SetRenderFunc(
+                    (ReadbackPassData data, RenderGraphContext ctx) =>
+                    {
+                        AsyncGPUReadback.Request(
+                            data.source, 0,
+                            request =>
+                            {
+                                if (!request.hasError)
+                                {
+                                    passData.pixels = request.GetData<half4>();
+                                    _DirectionalLightLUT = new Color[passData.pixels.Length];
+                                    for (int i = 0; i < _DirectionalLightLUT.Length; i++)
+                                    {
+                                        _DirectionalLightLUT[i] = new Color(passData.pixels[i].x, passData.pixels[i].y, passData.pixels[i].z);
+                                    }
+                                }
+                            });
+                    }
+                    );
+                return passData;
+
+            }
+
         }
 
 
@@ -276,8 +382,9 @@ namespace Insanity
             return lut;
         }
 
-        public static Texture PrecomputeSkyboxLUT(AtmosphereResources atmosphereResources)
+        public static Texture PrecomputeSkyboxLUT(AtmosphereResources atmosphereResources, out Texture2D outSunLightLUT)
         {
+            outSunLightLUT = null;
             if (atmosphereResources == null)
                 return null;
 
@@ -313,6 +420,7 @@ namespace Insanity
             precomputeScattering.SetVector(AtmosphereShaderParameters._BetaMie, mieScatteringCoef);
             precomputeScattering.SetFloat(AtmosphereShaderParameters._MieG, atmosphereResources.MieG);
             precomputeScattering.SetTexture(kSkyboxLUT, AtmosphereShaderParameters._SkyboxLUT, skyboxLUT);
+            precomputeScattering.SetVector(AtmosphereShaderParameters._SunLightColor, atmosphereResources.SunLight.gamma);
             precomputeScattering.Dispatch(kSkyboxLUT, skyboxLUTSize.x, skyboxLUTSize.y, skyboxLUTSize.z);
             RenderTexture finalOutput = skyboxLUT;
 
@@ -322,8 +430,8 @@ namespace Insanity
             {
                 int kPrecomputeMultipleLUT = precomputeScattering.FindKernel("PrecomputeKOrderScattering");
                 //multiple scattering precompute
-                preOrder = CreateLUTRenderTexture("PreOrderLUT");
-                Graphics.CopyTexture(skyboxLUT, preOrder);
+                preOrder = skyboxLUT;//CreateLUTRenderTexture("PreOrderLUT");
+                //Graphics.CopyTexture(skyboxLUT, preOrder);
                 curOrderOutput = CreateLUTRenderTexture("CurOrderLUT");
 
                 for (int i = 0; i < atmosphereResources.MultipleScatteringOrder; ++i)
@@ -353,7 +461,6 @@ namespace Insanity
                 RenderTexture.active = slice;
                 
                 sliceTex.ReadPixels(new Rect(0, 0, _skyboxLUTSize.x, _skyboxLUTSize.y), 0, 0);
-                //sliceTex.Apply();
                 Graphics.CopyTexture(sliceTex, 0, 0, texture3D, i, 0);
                 RenderTexture.ReleaseTemporary(slice);
             }
@@ -375,6 +482,28 @@ namespace Insanity
                 RenderTexture.ReleaseTemporary(curOrderOutput);
             }
 
+            int kSunlightLUT = precomputeScattering.FindKernel("PrecomputeSunLightLUT");
+            if (kSunlightLUT != -1)
+            {
+                RenderTexture sunlightLUT = RenderTexture.GetTemporary(_sunlightLUTSize, 1, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+                sunlightLUT.autoGenerateMips = false;
+                sunlightLUT.enableRandomWrite = true;
+                sunlightLUT.name = "SunlightLUT";
+                sunlightLUT.wrapMode = TextureWrapMode.Clamp;
+                sunlightLUT.Create();
+                precomputeScattering.SetTexture(kSunlightLUT, AtmosphereShaderParameters._SunlightLUT, sunlightLUT);
+                precomputeScattering.Dispatch(kSunlightLUT, sunlightLUT.width, sunlightLUT.height, 1);
+
+                outSunLightLUT = new Texture2D(sunlightLUT.width, sunlightLUT.height, TextureFormat.RGBAHalf, false);
+                Graphics.CopyTexture(sunlightLUT, outSunLightLUT);
+                Texture2D lutTmp = new Texture2D(sunlightLUT.width, sunlightLUT.height, TextureFormat.RGBAHalf, false);
+                lutTmp.Apply();
+                lutTmp.ReadPixels(new Rect(0, 0, sunlightLUT.width, sunlightLUT.height), 0, 0);
+                Color[] colors = lutTmp.GetPixels(0, 0, sunlightLUT.width, 1);
+                Object.DestroyImmediate(lutTmp);
+                RenderTexture.ReleaseTemporary(sunlightLUT);
+            }
+            
             return texture3D;
         }
 
@@ -382,11 +511,11 @@ namespace Insanity
         {
             //uniform sample sphere
             
-            m_bakeSHSamples = new Vector4[512];
-            for (int i = 0; i < 512; ++i)
+            m_bakeSHSamples = new Vector4[SHSampleCount];
+            for (int i = 0; i < SHSampleCount; ++i)
             {
-                float xi1 = Random.Range(0.0f, 1.0f);
-                float xi2 = Random.Range(0.0f, 1.0f);
+                float xi1 = UnityEngine.Random.Range(0.0f, 1.0f);
+                float xi2 = UnityEngine.Random.Range(0.0f, 1.0f);
                 float thetaAngle = Mathf.Acos(1.0f - xi1 * 2.0f);
                 float phiAngle = Mathf.PI * 2.0f * xi2;
                 float sinTheta = Mathf.Sin(thetaAngle);
@@ -617,8 +746,8 @@ namespace Insanity
             if (atmosphereResources.ProjAtmosphereToSH == null)
                 return;
 
-            if (atmosphereResources.SkyboxLUT == null)
-                return;
+            //if (atmosphereResources.SkyboxLUT == null)
+            //    return;
 
             if (m_bakeSHSamples == null)
             {
@@ -671,7 +800,7 @@ namespace Insanity
                 {
                     passData.csProjAtmosphereToSH = atmosphereResources.ProjAtmosphereToSH;
                     passData.kDirectBake = atmosphereResources.ProjAtmosphereToSH.FindKernel("BakeSHDirect");
-                    passData.SkyLUT = atmosphereResources.SkyboxLUT;
+                    passData.SkyLUT = m_SkyboxLUT;
                     passData.m_SHCoefficientsTexture = m_skySHSetting.m_SHCoefficientsTexture;
                     passData.m_SHCoefficientsGroupSumTexture = m_skySHSetting.m_SHCoefficientsGroupSumTexture;
                     passData.m_FinalProjSH = m_skySHSetting.m_FinalProjSH;
@@ -1017,8 +1146,35 @@ namespace Insanity
             }
         }
 
-        public void Update()
+        private Color ComputeLightColor(Light sunLight)
         {
+            if (_DirectionalLightLUT == null)
+            {
+                return sunLight.color;
+            }
+            float cosAngle = Vector3.Dot(Vector3.up, -sunLight.transform.forward);
+            float u = cosAngle; // (cosAngle + 0.1f) / 1.1f;// * 0.5f + 0.5f;
+
+            u = u * 128;
+            int index0 = Mathf.FloorToInt(u);
+            float weight1 = u - index0;
+            int index1 = index0 + 1;
+            float weight0 = 1 - weight1;
+
+            index0 = Mathf.Clamp(index0, 0, _sunlightLUTSize - 1);
+            index1 = Mathf.Clamp(index1, 0, _sunlightLUTSize - 1);
+
+            Color c = _DirectionalLightLUT[index0] * weight0 + _DirectionalLightLUT[index1] * weight1;
+            return c.gamma;
+        }
+
+        public void Update(Light sunLight)
+        {
+            //if (_DirectionalLightLUT == null)
+            //{
+            //    _DirectionalLightLUT = InsanityPipeline.asset.AtmosphereResources.SunlightLUT.GetPixels(0, 0, 128, 1);
+            //}
+            sunLight.color = ComputeLightColor(sunLight);
             if (m_SHBakeReadbacks.Count == 0)
                 return;
             while (m_SHBakeReadbacks.Peek().done || m_SHBakeReadbacks.Peek().hasError == true)

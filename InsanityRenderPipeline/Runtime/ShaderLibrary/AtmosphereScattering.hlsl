@@ -166,4 +166,37 @@ float4 IntegrateInScattering(float3 rayStart, float3 rayEnd, float3 sunLight, fl
     return float4(scatteringR, scatteringM.x);
 }
 
+float3 ComputeOpticalDepth(float2 density)
+{
+    float3 extinctionM = _BetaMie / 0.9;
+    float3 Tr = density.x * _BetaRayleigh;
+    float3 Tm = density.y * extinctionM;
+
+    float3 extinction = exp(-(Tr + Tm));
+
+    return _SunLightColor.xyz * extinction;
+}
+
+//-----------------------------------------------------------------------------------------
+// PrecomputeDirLight
+//-----------------------------------------------------------------------------------------
+float4 PrecomputeDirLight(float3 rayDir)
+{
+    float startHeight = 100;
+
+    float3 rayStart = float3(0, startHeight, 0);
+
+    float3 earthCenter = float3(0, -_EarthRadius + startHeight, 0);
+
+    float2 localDensity;
+    float2 intersection = RaySphereIntersection(rayStart, -rayDir, earthCenter, _EarthRadius + _AtmosphereHeight);
+    float rayLength = min(intersection.x, intersection.y);
+    float3 pc = rayStart - rayLength * rayDir;
+    float2 densityToAtmosphereTop = Transmittance(rayStart, pc, earthCenter);
+    float4 color;
+    color.xyz = ComputeOpticalDepth(densityToAtmosphereTop);
+    color.w = 1;
+    return color;
+}
+
 #endif

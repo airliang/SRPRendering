@@ -37,6 +37,8 @@ namespace Insanity
         public float MieG = 0.6f;
         public bool RenderSun = true;
         public int MultipleScatteringOrder = 0;
+        [ColorUsage(true, true)]
+        public Color SunLight = Color.white;
     }
 }
 

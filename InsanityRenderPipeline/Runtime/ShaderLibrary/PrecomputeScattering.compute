@@ -194,3 +194,19 @@ void PrecomputeKOrderScattering(uint3 id : SV_DispatchThreadID)
     float4 scattering = IntegrateMultipleScattering(rayStart, rayEnd, sunDir, earthCenter);
     _OutScatteringLUT[id] = scattering;
 }
+
+#pragma kernel PrecomputeSunLightLUT
+RWTexture2D<float4> _SunlightLUT;
+[numthreads(1,1,1)]
+void PrecomputeSunLightLUT(uint3 id : SV_DispatchThreadID)
+{
+    float w, h;
+    _SunlightLUT.GetDimensions(w, h);
+    float cosAngle = (float) id.x / w;
+				
+    float sinAngle = sqrt(saturate(1 - cosAngle * cosAngle));
+    float3 rayDir = normalize(float3(sinAngle, cosAngle, 0));
+    
+    _SunlightLUT[id.xy] = PrecomputeDirLight(rayDir);
+
+}

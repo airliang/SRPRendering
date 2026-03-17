@@ -1,13 +1,13 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
-
+#pragma enable_d3d11_debug_symbols
 #include "AtmosphereScattering.hlsl"
 #include "BakeAtmosphereScatteringInclude.hlsl"
 
 
 float3 _MainLightPosition;
 float _MainLightIntensity;
-
+SamplerState skyboxlut_linear_clamp_sampler;
 Texture3D<float4> _SkyboxLUT;
 
 half3 GetSkyColor(float3 viewDirWS, float3 sunDir)
@@ -31,7 +31,7 @@ half3 GetSkyColor(float3 viewDirWS, float3 sunDir)
 
     texCoords.z = 0.5 * ((atan(max(cosSun, -0.1975) * tan(1.26 * 1.1)) / 1.1) + (1 - 0.26));
     int3 texCoordsInt = int3(texCoords * float3(w, h, d));
-    half4 scattering = _SkyboxLUT[texCoordsInt]; //tex3D(_SkyboxLUT, texCoords);
+    half4 scattering = _SkyboxLUT.SampleLevel(skyboxlut_linear_clamp_sampler, texCoords, 0); //tex3D(_SkyboxLUT, texCoords); //_SkyboxLUT[texCoordsInt]; //tex3D(_SkyboxLUT, texCoords);
     //return scattering;
     //
     float cosTheta = dot(viewDirWS, -sunDir);

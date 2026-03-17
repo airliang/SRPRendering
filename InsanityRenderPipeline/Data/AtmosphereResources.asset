@@ -26,4 +26,5 @@ MonoBehaviour:
   ScaleMie: 1
   MieG: 0.625
   RenderSun: 1
-  MultipleScatteringOrder: 10
+  MultipleScatteringOrder: 0
+  SunLight: {r: 1, g: 1, b: 1, a: 1}
