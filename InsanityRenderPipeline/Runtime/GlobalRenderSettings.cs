@@ -12,6 +12,7 @@ namespace Insanity
         public static float ResolutionRate = 1.0f;
         public static Rect screenResolution;
         public static DepthBits depthBits = DepthBits.Depth32;
+        public static bool TAAEnable = false;
     }
 }
 

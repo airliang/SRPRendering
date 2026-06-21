@@ -22,6 +22,7 @@ namespace UnityEditor.Insanity
             public static GUIContent srpBatcherText = EditorGUIUtility.TrTextContent("SRP Batcher", "Controls the global SRP Batcher settings.");
             public static GUIContent msaaText = EditorGUIUtility.TrTextContent("MSAA", "Controls the global anti aliasing settings");
             public static GUIContent depthBitsText = EditorGUIUtility.TrTextContent("Depth Bits", "Set the depth bits for the camera depth");
+            public static GUIContent taaText = EditorGUIUtility.TrTextContent("TAA", "Controls the global Temporal Anti-Aliasing settings");
 
             public static string[] msaaOptions = { "Disabled", "2x", "4x", "8x" };
             public static string[] depthBitsOptions = { "16", "32" };
@@ -101,6 +102,7 @@ namespace UnityEditor.Insanity
         SerializedProperty m_SRPBatcherProp;
         SerializedProperty m_MSAAProp;
         SerializedProperty m_DepthBitsProp;
+        SerializedProperty m_TAAProp;
 
         SavedBool m_ShadowSettingsFoldout;
 
@@ -189,6 +191,7 @@ namespace UnityEditor.Insanity
             m_SRPBatcherProp = serializedObject.FindProperty("m_UseSRPBatcher");
             m_MSAAProp = serializedObject.FindProperty("m_MSAASamples");
             m_DepthBitsProp = serializedObject.FindProperty("m_DepthBits");
+            m_TAAProp = serializedObject.FindProperty("m_TAAEnable");
 
             m_ShadowSettingsFoldout = new SavedBool($"{target.GetType()}.ShadowSettingsFoldout", false);
 
@@ -271,7 +274,7 @@ namespace UnityEditor.Insanity
 
                 //CoreEditorUtils.DrawPopup(Styles.depthBitsText, m_DepthBitsProp, Styles.depthBitsOptions);
 
-
+                m_TAAProp.boolValue = EditorGUILayout.Toggle(Styles.taaText, m_TAAProp.boolValue);
             }
             EditorGUILayout.EndFoldoutHeaderGroup();
         }

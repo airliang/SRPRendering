@@ -40,7 +40,7 @@ Shader "Insanity/HDRISky"
 #else
                 float depth = 1;
 #endif
-                float4 viewDirWS = float4(ComputeWorldSpacePosition(positionNDC, depth, UNITY_MATRIX_I_VP), 1.0);//mul(float4(positionCS.xy, 1.0f, 1.0f), _PixelCoordToViewDirWS);
+                float4 viewDirWS = float4(ComputeWorldSpacePosition(positionNDC, depth, _NonJitteredInvViewProjMatrix), 1.0);
                 return normalize(viewDirWS.xyz);
             }
 

@@ -152,6 +152,7 @@ namespace Insanity
         [SerializeField] bool m_UseSRPBatcher = true;
         [SerializeField] MsaaQuality m_MSAASamples = MsaaQuality.Disabled;
         [SerializeField] int m_DepthBits = 32;
+        [SerializeField] bool m_TAAEnable = false;
 
         public bool HDREnable
         {
@@ -186,6 +187,11 @@ namespace Insanity
         public int DepthBits
         { get { return m_DepthBits; } set { m_DepthBits = value; } }
 
+        public bool TAAEnable
+        {
+            get { return m_TAAEnable; }
+            set { m_TAAEnable= value; }
+        }
         
         #endregion
 

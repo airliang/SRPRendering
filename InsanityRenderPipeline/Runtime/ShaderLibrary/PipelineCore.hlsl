@@ -85,6 +85,16 @@ float4 ComputeScreenPos(float4 positionCS)
     return o;
 }
 
+// Screen UV in [0, 1] from a view-projection matrix and world position.
+// Use non-jittered matrices for TAA motion vectors so jitter is handled by temporal accumulation.
+float2 WorldPosToScreenUV(float4x4 viewProjMatrix, float3 positionWS)
+{
+    float4 csPos = mul(viewProjMatrix, float4(positionWS, 1.0));
+    csPos.xy /= csPos.w;
+    csPos.y *= _ProjectionParams.x;
+    return csPos.xy * 0.5 + 0.5;
+}
+
 float4 ComputeGrabScreenPos (float4 pos) 
 {
     #if UNITY_UV_STARTS_AT_TOP

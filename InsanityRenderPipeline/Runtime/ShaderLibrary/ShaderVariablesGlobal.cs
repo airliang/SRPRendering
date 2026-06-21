@@ -14,7 +14,11 @@ namespace Insanity
         public Matrix4x4 _ViewProjMatrix;
         public Matrix4x4 _CameraViewProjMatrix;
         public Matrix4x4 _InvViewProjMatrix;
+        public Matrix4x4 _NonJitteredViewProjMatrix;
+        public Matrix4x4 _NonJitteredInvViewProjMatrix;
         public Matrix4x4 _PixelCoordToViewDirWS;
+        public Matrix4x4 _PrevViewProjMatrix;
+        public Matrix4x4 _PrevNonJitteredViewProjMatrix;
         public Vector4 _WorldSpaceCameraPos_Internal;
         public Vector4 _ScreenSize;
         // Values used to linearize the Z buffer (http://www.humus.name/temp/Linearize%20depth.txt)

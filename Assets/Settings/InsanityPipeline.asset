@@ -14,10 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_HDREnable: 1
   m_Exposure: 1.5
-  m_ResolutionRate: 1
+  m_ResolutionRate: 0.6
   m_UseSRPBatcher: 1
   m_MSAASamples: 1
   m_DepthBits: 32
+  m_TAAEnable: 1
   m_ShadowDistance: 50
   m_ShadowCascades: 1
   m_Cascade2Split: 0.25

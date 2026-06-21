@@ -11,6 +11,7 @@ namespace Insanity
     public class InsanityRenderer
     {
         private Material m_finalBlitMaterial;
+        private Material m_taaMaterial;
         private Material m_debugViewBlitMaterial = null;
         private Material m_copyDepthMaterial = null;
         private ComputeShader m_parallelScan;
@@ -62,6 +63,9 @@ namespace Insanity
             m_RendererData = data;
 
             m_finalBlitMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.Blit);
+            var taaShader = InsanityPipeline.asset.InsanityPipelineResources.shaders.TemporalAA;
+            if (taaShader != null)
+                m_taaMaterial = CoreUtils.CreateEngineMaterial(taaShader);
             m_debugViewBlitMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.DebugViewBlit);
             m_copyDepthMaterial = CoreUtils.CreateEngineMaterial(InsanityPipeline.asset.InsanityPipelineResources.shaders.CopyDepth);
             m_tilebasedLightCulling = InsanityPipeline.asset.InsanityPipelineResources.shaders.TileBasedLightCulling;
@@ -89,6 +93,8 @@ namespace Insanity
             m_FrameRenderSets.backBufferColor = renderGraph.ImportBackbuffer(rtBackbuffer);
 
             RenderTextureDescriptor colorDescriptor = renderingData.cameraData.GetCameraTargetDescriptor(InsanityPipeline.asset.ResolutionRate, InsanityPipeline.asset.HDREnable, (int)InsanityPipeline.asset.MSAASamples);
+            if (GlobalRenderSettings.TAAEnable)
+                colorDescriptor.msaaSamples = 1;
             colorDescriptor.useMipMap = false;
             colorDescriptor.autoGenerateMips = false;
             colorDescriptor.depthBufferBits = 0;
@@ -190,6 +196,28 @@ namespace Insanity
             CoreUtils.SetKeyword(cmdRG, "_SSAO_ENABLE", asset.SSAOEnable);
         }
 
+        TextureHandle ResolvePostProcessSource(RenderingData renderingData, RendererData.eRenderingPath renderingPath)
+        {
+            if (!GlobalRenderSettings.TAAEnable || m_taaMaterial == null)
+            {
+                RenderPasses.NotifyTAAInactive();
+                return m_FrameRenderSets.cameraColor;
+            }
+
+            TextureHandle motionVector = TextureHandle.nullHandle;
+            if (renderingPath == RendererData.eRenderingPath.Deferred)
+            {
+                motionVector = RenderPasses.s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.MotionVector];
+            }
+
+            return RenderPasses.TAAResolvePass(
+                renderingData,
+                m_FrameRenderSets.cameraColor,
+                m_FrameRenderSets.cameraDepthResolved,
+                motionVector,
+                m_taaMaterial);
+        }
+
         private void RenderGraphForwardPath(ScriptableRenderContext context, CommandBuffer cmdRG, RenderingData renderingData)
         {
             InsanityPipelineAsset asset = InsanityPipeline.asset;
@@ -271,7 +299,7 @@ namespace Insanity
                     RenderPasses.Render_SkyPass(renderingData, m_FrameRenderSets.cameraColor, m_FrameRenderSets.cameraDepth, asset.InsanityPipelineResources.materials.Skybox);
                 }
 
-                RenderPasses.FinalBlitPass(renderingData, m_FrameRenderSets.cameraColor, m_FrameRenderSets.backBufferColor, m_finalBlitMaterial);
+                RenderPasses.FinalBlitPass(renderingData, ResolvePostProcessSource(renderingData, RendererData.eRenderingPath.Forward), m_FrameRenderSets.backBufferColor, m_finalBlitMaterial);
                 if (DebugView.NeedDebugView())
                 {
                     DebugView.DebugViewGPUResources textures = new DebugView.DebugViewGPUResources();
@@ -368,7 +396,7 @@ namespace Insanity
                 RenderPasses.Render_SkyPass(renderingData, m_FrameRenderSets.cameraColor, m_FrameRenderSets.cameraDepth, asset.InsanityPipelineResources.materials.Skybox);
             }
 
-            RenderPasses.FinalBlitPass(renderingData, m_FrameRenderSets.cameraColor, m_FrameRenderSets.backBufferColor, m_finalBlitMaterial);
+            RenderPasses.FinalBlitPass(renderingData, ResolvePostProcessSource(renderingData, RendererData.eRenderingPath.Deferred), m_FrameRenderSets.backBufferColor, m_finalBlitMaterial);
 
             if (DebugView.NeedDebugView())
             {
@@ -388,6 +416,8 @@ namespace Insanity
             m_FrameRenderSets.Release();
             CoreUtils.Destroy(m_finalBlitMaterial);
             m_finalBlitMaterial = null;
+            CoreUtils.Destroy(m_taaMaterial);
+            m_taaMaterial = null;
             CoreUtils.Destroy(m_debugViewBlitMaterial);
             m_debugViewBlitMaterial = null;
             CoreUtils.Destroy(m_copyDepthMaterial);

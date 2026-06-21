@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e73ae537a7a094e4bbdf98393dd12fc3, type: 3}
   m_Name: RendererData
   m_EditorClassIdentifier: 
-  m_RenderingPath: 0
+  m_RenderingPath: 1
   m_TileSize: 16

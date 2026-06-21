@@ -31,6 +31,8 @@ namespace Insanity
             public ComputeShader SSAOUpSample;
             public ComputeShader DeferredLighting;
             public ComputeShader TileBasedDeferredLighting;
+            [Reload("Runtime/ShaderLibrary/TemporalAA.shader")]
+            public Shader TemporalAA;
             //public ComputeShader TileFrustumCompute;
         }
 

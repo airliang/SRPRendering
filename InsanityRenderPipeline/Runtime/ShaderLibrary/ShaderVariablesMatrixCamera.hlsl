@@ -10,7 +10,8 @@
 #define UNITY_MATRIX_VP    _ViewProjMatrix
 #define UNITY_MATRIX_I_VP  _InvViewProjMatrix
 #define UNITY_MATRIX_UNJITTERED_VP _NonJitteredViewProjMatrix
-#define UNITY_MATRIX_PREV_VP _PrevViewProjMatrix
+#define UNITY_MATRIX_PREV_VP _PrevNonJitteredViewProjMatrix
+#define UNITY_MATRIX_PREV_JITTERED_VP _PrevViewProjMatrix
 #define UNITY_MATRIX_PREV_I_VP _PrevInvViewProjMatrix
 
 

@@ -13,7 +13,7 @@ namespace Insanity
         {
             AlbedoMetallic = 0,
             NormalSmoothness = 1,
-            Specular = 2,
+            MotionVector = 2,
             TransformID = 3,
             MaxGBuffer = 4,
         };
@@ -45,15 +45,15 @@ namespace Insanity
                         useMipMap = false,
                         name = "GBufferNormalSmoothness"
                     };
-                case GBufferIndex.Specular:
+                case GBufferIndex.MotionVector:
                     return new TextureDesc(width, height)
                     {
-                        colorFormat = GraphicsFormat.R8G8B8A8_UNorm,
+                        colorFormat = GraphicsFormat.R16G16_SFloat,
                         dimension = TextureDimension.Tex2D,
                         filterMode = FilterMode.Point,
                         enableRandomWrite = true,
                         useMipMap = false,
-                        name = "GBufferSpecular"
+                        name = "MotionVector"
                     };
                 default:
                     return new TextureDesc(width, height);
@@ -69,7 +69,7 @@ namespace Insanity
             int requestWidth = (int)GlobalRenderSettings.screenResolution.width;
             int requestHeight = (int)GlobalRenderSettings.screenResolution.height;
             
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 3; i++)
             {
                 renderGraph.CreateTextureIfInvalid(GetGBufferTextureDesc((GBufferIndex)i, requestWidth, requestHeight), ref GBufferAttachments[i]);
                 //GBufferAttachments[i] = renderGraph.CreateTexture(GetGBufferTextureDesc((GBufferIndex)i, requestWidth, requestHeight));
@@ -82,6 +82,7 @@ namespace Insanity
         public TextureHandle m_AlbedoMetallic;
         public TextureHandle m_NormalSmoothness;
         public TextureHandle m_Depth;
+        public TextureHandle m_MotionVector;
         public RendererListHandle m_renderList_opaque;
     }
     public partial class RenderPasses
@@ -97,6 +98,7 @@ namespace Insanity
                 passData.m_AlbedoMetallic = builder.UseColorBuffer(s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.AlbedoMetallic], 0);
 
                 passData.m_NormalSmoothness = builder.UseColorBuffer(s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.NormalSmoothness], 1);
+                passData.m_MotionVector = builder.UseColorBuffer(s_GBuffer.GBufferAttachments[(int)GBuffer.GBufferIndex.MotionVector], 2);
                 normal = passData.m_NormalSmoothness;
 
                 builder.UseDepthBuffer(depth, DepthAccess.Read);

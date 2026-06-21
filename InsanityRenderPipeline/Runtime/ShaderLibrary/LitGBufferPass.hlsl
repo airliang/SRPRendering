@@ -18,6 +18,7 @@ struct GBufferOutput
 {
     half4 AlbedoMetallic : SV_Target0;
     half4 NormalSmoothness : SV_Target1;
+    half2 MotionVector : SV_Target2;
     //half4 Specular : SV_Target2;
 };
 
@@ -136,9 +137,15 @@ GBufferOutput GBufferPassFragment(Varyings input)
     InputData inputData;
 
     InitializeInputData(input, surfaceData.normalTS, inputData);
+
+    // Motion vectors use non-jittered view-proj so static scenes produce ~0 velocity.
+    // TAA reprojects real camera/object motion; sub-pixel jitter is accumulated at the same UV.
+    float2 ssPosCurr = WorldPosToScreenUV(_NonJitteredViewProjMatrix, input.positionWS);
+    float2 ssPosPrev = WorldPosToScreenUV(_PrevNonJitteredViewProjMatrix, input.positionWS);
     GBufferOutput output = (GBufferOutput)0;
     output.AlbedoMetallic = half4(surfaceData.albedo, surfaceData.metallic);
     output.NormalSmoothness = half4(input.normalWS * 0.5 + 0.5, surfaceData.smoothness);
+    output.MotionVector = half2(ssPosCurr - ssPosPrev);
     return output;
 }
 

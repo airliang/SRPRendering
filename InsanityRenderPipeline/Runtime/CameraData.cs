@@ -30,6 +30,9 @@ namespace Insanity
             public Matrix4x4 prevViewProjMatrix;
             /// <summary>Non-jittered Inverse View Projection matrix from previous frame.</summary>
             public Matrix4x4 prevInvViewProjMatrix;
+            public Matrix4x4 nonJitteredViewProjMatrix;
+            public Matrix4x4 nonJitteredInvViewProjMatrix;
+            public Matrix4x4 prevNonJitteredViewProjMatrix;
             public Matrix4x4 prevProjMatrix;
             public Matrix4x4 prevInvProjMatrix;
             public Vector3 prevWorldSpaceCameraPos;
@@ -78,8 +81,11 @@ namespace Insanity
         public int actualHeight { get; private set; }
 
         internal int frameIndex = 0;
+        internal int taaFrameIndex = 0;
 
         internal bool isFirstFrame { get; private set; }
+
+        Vector2[] haltonSequences = new Vector2[16];
 
         internal CameraData(Camera cam)
         {
@@ -88,6 +94,17 @@ namespace Insanity
             name = cam.name;
 
             Reset();
+            InitHaltonSequences();
+        }
+
+        void InitHaltonSequences()
+        {
+            for (int i = 0; i < haltonSequences.Length; i++)
+            {
+                float jitterX = HaltonSequence.Get((i & 15) + 1, 2) - 0.5f;
+                float jitterY = HaltonSequence.Get((i & 15) + 1, 3) - 0.5f;
+                haltonSequences[i] = new Vector2(jitterX, jitterY);
+            }
         }
 
         void Reset()
@@ -120,7 +137,10 @@ namespace Insanity
             cb._ViewProjMatrix = mainViewConstants.viewProjMatrix;
             cb._CameraViewProjMatrix = mainViewConstants.viewProjMatrix;
             cb._InvViewProjMatrix = mainViewConstants.invViewProjMatrix;
-            //cb._PrevViewProjMatrix = mainViewConstants.prevViewProjMatrix;
+            cb._NonJitteredViewProjMatrix = mainViewConstants.nonJitteredViewProjMatrix;
+            cb._NonJitteredInvViewProjMatrix = mainViewConstants.nonJitteredInvViewProjMatrix;
+            cb._PrevViewProjMatrix = mainViewConstants.prevViewProjMatrix;
+            cb._PrevNonJitteredViewProjMatrix = mainViewConstants.prevNonJitteredViewProjMatrix;
             //cb._PrevInvViewProjMatrix = mainViewConstants.prevInvViewProjMatrix;
             cb._PixelCoordToViewDirWS = mainViewConstants.pixelCoordToViewDirWS;
             cb._WorldSpaceCameraPos_Internal = mainViewConstants.worldSpaceCameraPos;
@@ -151,16 +171,17 @@ namespace Insanity
 
         void UpdateViewConstants(ref ViewConstants viewConstants, Matrix4x4 projMatrix, Matrix4x4 viewMatrix, Vector3 cameraPosition)
         {
-            // If TAA is enabled projMatrix will hold a jittered projection matrix. The original,
-            // non-jittered projection matrix can be accessed via nonJitteredProjMatrix.
+            // Jitter is applied to the camera projection before the GPU projection matrix is built,
+            // matching Unity URP/HDRP. Applying jitter after GetGPUProjectionMatrix causes incorrect
+            // offsets (especially on D3D) and visible per-frame camera shake.
             var nonJitteredCameraProj = projMatrix;
-            var cameraProj = nonJitteredCameraProj;
+            var jitteredCameraProj = projMatrix;
+            if (GlobalRenderSettings.TAAEnable)
+                ApplyCameraJitter(ref jitteredCameraProj);
 
-            // The actual projection matrix used in shaders is actually massaged a bit to work across all platforms
-            // (different Z value ranges etc.)
-            var gpuProj = GL.GetGPUProjectionMatrix(cameraProj, true); // Had to change this from 'false'
             var gpuView = viewMatrix;
             var gpuNonJitteredProj = GL.GetGPUProjectionMatrix(nonJitteredCameraProj, true);
+            var gpuJitteredProj = GL.GetGPUProjectionMatrix(jitteredCameraProj, true);
 
             if (s_CameraRelativeRendering != 0)
             {
@@ -168,49 +189,44 @@ namespace Insanity
                 gpuView.SetColumn(3, new Vector4(0, 0, 0, 1));
             }
 
-            //var gpuVP = gpuNonJitteredProj * gpuView;
-            //Matrix4x4 noTransViewMatrix = gpuView;
-            //if (s_CameraRelativeRendering == 0)
-            //{
-            //    // In case we are not camera relative, gpuView contains the camera translation component at this stage, so we need to remove it.
-            //    noTransViewMatrix.SetColumn(3, new Vector4(0, 0, 0, 1));
-            //}
-            //var gpuVPNoTrans = gpuNonJitteredProj * noTransViewMatrix;
             if (!isFirstFrame)
             {
                 viewConstants.prevWorldSpaceCameraPos = viewConstants.worldSpaceCameraPos;
                 viewConstants.prevInvViewProjMatrix = viewConstants.invViewProjMatrix;
                 viewConstants.prevViewMatrix = viewConstants.viewMatrix;
                 viewConstants.prevViewProjMatrix = viewConstants.viewProjMatrix;
+                viewConstants.prevNonJitteredViewProjMatrix = viewConstants.nonJitteredViewProjMatrix;
                 viewConstants.prevProjMatrix = viewConstants.projMatrix;
                 viewConstants.prevInvProjMatrix = viewConstants.invProjMatrix;
                 viewConstants.prevViewProjMatrixOriginal = viewConstants.viewProjMatrixOriginal;
             }
             else
             {
-                Vector3 cameraDisplacement = viewConstants.worldSpaceCameraPos - viewConstants.prevWorldSpaceCameraPos;
                 viewConstants.prevWorldSpaceCameraPos = cameraPosition;
                 viewConstants.prevViewMatrix = gpuView;
-                viewConstants.prevViewProjMatrix = gpuProj * gpuView;
-                viewConstants.prevProjMatrix = gpuProj;
-                viewConstants.prevInvProjMatrix = gpuProj.inverse;
-                viewConstants.prevViewProjMatrix *= Matrix4x4.Translate(cameraDisplacement);
+                viewConstants.prevViewProjMatrix = gpuJitteredProj * gpuView;
+                viewConstants.prevNonJitteredViewProjMatrix = gpuNonJitteredProj * gpuView;
+                viewConstants.prevProjMatrix = gpuJitteredProj;
+                viewConstants.prevInvProjMatrix = gpuJitteredProj.inverse;
                 viewConstants.prevInvViewProjMatrix = viewConstants.prevViewProjMatrix.inverse;
-                viewConstants.prevViewProjMatrixOriginal = gpuProj * viewMatrix;
+                viewConstants.prevViewProjMatrixOriginal = gpuNonJitteredProj * viewMatrix;
             }
 
             viewConstants.viewMatrix = gpuView;
             viewConstants.invViewMatrix = gpuView.inverse;
-            viewConstants.projMatrix = gpuProj;
-            viewConstants.invProjMatrix = gpuProj.inverse;
-            viewConstants.viewProjMatrix = gpuProj * gpuView;
+            viewConstants.projMatrix = gpuJitteredProj;
+            viewConstants.invProjMatrix = gpuJitteredProj.inverse;
+            viewConstants.viewProjMatrix = gpuJitteredProj * gpuView;
             viewConstants.invViewProjMatrix = viewConstants.viewProjMatrix.inverse;
-            //viewConstants.nonJitteredViewProjMatrix = gpuNonJitteredProj * gpuView;
+            viewConstants.nonJitteredViewProjMatrix = gpuNonJitteredProj * gpuView;
+            viewConstants.nonJitteredInvViewProjMatrix = viewConstants.nonJitteredViewProjMatrix.inverse;
             viewConstants.worldSpaceCameraPos = cameraPosition;
             viewConstants.worldSpaceCameraPosViewOffset = Vector3.zero;
-            //viewConstants.viewProjectionNoCameraTrans = gpuVPNoTrans;
-            viewConstants.pixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(viewConstants, screenSize);
-            viewConstants.viewProjMatrixOriginal = gpuProj * viewMatrix;
+
+            var skyViewConstants = viewConstants;
+            skyViewConstants.invViewProjMatrix = viewConstants.nonJitteredInvViewProjMatrix;
+            viewConstants.pixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(skyViewConstants, screenSize);
+            viewConstants.viewProjMatrixOriginal = gpuNonJitteredProj * viewMatrix;
             viewConstants.invViewProjMatrixOriginal = viewConstants.viewProjMatrixOriginal.inverse;
         }
 
@@ -268,6 +284,9 @@ namespace Insanity
             UpdateViewConstants();
 
             isFirstFrame = false;
+
+            if (++taaFrameIndex > 15)
+                taaFrameIndex = 0;
         }
 
         public void UpdateViewConstants()
@@ -403,6 +422,15 @@ namespace Insanity
                 desc.msaaSamples = 1;
 
             return desc;
+        }
+
+        void ApplyCameraJitter(ref Matrix4x4 projMatrix)
+        {
+            // Halton offsets in [-0.5, 0.5] pixel units; convert to clip-space translation.
+            // Must be applied before GetGPUProjectionMatrix so platform Y-flip is handled correctly.
+            Vector2 jitter = haltonSequences[taaFrameIndex];
+            projMatrix.m02 += jitter.x * 2.0f / screenSize.x;
+            projMatrix.m12 += jitter.y * 2.0f / screenSize.y;
         }
     }
 }
