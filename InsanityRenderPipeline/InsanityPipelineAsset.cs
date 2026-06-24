@@ -153,6 +153,7 @@ namespace Insanity
         [SerializeField] MsaaQuality m_MSAASamples = MsaaQuality.Disabled;
         [SerializeField] int m_DepthBits = 32;
         [SerializeField] bool m_TAAEnable = false;
+        [SerializeField] float m_TAAFeedback = 0.05f;
 
         public bool HDREnable
         {
@@ -191,6 +192,12 @@ namespace Insanity
         {
             get { return m_TAAEnable; }
             set { m_TAAEnable= value; }
+        }
+
+        public float TAAFeedback
+        {
+            get { return m_TAAFeedback; }
+            set { m_TAAFeedback = value; }
         }
         
         #endregion

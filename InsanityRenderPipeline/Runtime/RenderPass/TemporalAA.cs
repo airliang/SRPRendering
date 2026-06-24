@@ -106,7 +106,6 @@ namespace Insanity
 
     public partial class RenderPasses
     {
-        const float k_DefaultFeedback = 0.05f;
         // Linear eye-depth tolerance: ~0.25m difference reaches full reject before far-factor attenuation.
         const float k_DepthRejectScale = 4.0f;
         const float k_VarianceGamma = 1.25f;
@@ -158,7 +157,7 @@ namespace Insanity
                 passData.material = taaMaterial;
                 passData.useMotionVectors = useMotionVectors;
                 passData.isFirstFrame = isFirstFrame;
-                passData.feedback = k_DefaultFeedback;
+                passData.feedback = InsanityPipeline.asset.TAAFeedback;
                 passData.depthRejectScale = k_DepthRejectScale;
                 passData.varianceGamma = k_VarianceGamma;
                 passData.farAdaptStrength = k_FarAdaptStrength;

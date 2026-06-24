@@ -69,37 +69,28 @@ Shader "Insanity/TemporalAA"
                 return smoothstep(0.2, 0.9, linear01) * _TAAParams.w;
             }
 
-            int GetSampleRadius(float farFactor)
-            {
-                return farFactor > 0.35 ? 2 : 1;
-            }
-
-            float2 GetDilatedVelocity(float2 uv, float farFactor)
+            float2 GetDilatedVelocity(float2 uv)
             {
             #ifdef _USE_MOTION_VECTORS
-                int radius = GetSampleRadius(farFactor);
                 float bestDepth = -1.0;
                 float2 bestVelocity = 0.0;
 
                 UNITY_UNROLL
-                for (int x = -2; x <= 2; ++x)
+                for (int x = -1; x <= 1; ++x)
                 {
                     UNITY_UNROLL
-                    for (int y = -2; y <= 2; ++y)
+                    for (int y = -1; y <= 1; ++y)
                     {
-                        if (max(abs(x), abs(y)) <= radius)
+                        float2 sampleUV = uv + float2(x, y) * _MainTex_TexelSize.xy;
+                        float depth = SampleDepth(sampleUV);
+                    #if UNITY_REVERSED_Z
+                        if (depth > bestDepth)
+                    #else
+                        if (bestDepth < 0.0 || depth < bestDepth)
+                    #endif
                         {
-                            float2 sampleUV = uv + float2(x, y) * _MainTex_TexelSize.xy;
-                            float depth = SampleDepth(sampleUV);
-                        #if UNITY_REVERSED_Z
-                            if (depth > bestDepth)
-                        #else
-                            if (bestDepth < 0.0 || depth < bestDepth)
-                        #endif
-                            {
-                                bestDepth = depth;
-                                bestVelocity = SAMPLE_TEXTURE2D(_MotionVectorTex, s_point_clamp_sampler, sampleUV).rg;
-                            }
+                            bestDepth = depth;
+                            bestVelocity = SAMPLE_TEXTURE2D(_MotionVectorTex, s_point_clamp_sampler, sampleUV).rg;
                         }
                     }
                 }
@@ -113,7 +104,7 @@ Shader "Insanity/TemporalAA"
             float2 GetHistoryUV(float2 uv, float farFactor)
             {
             #ifdef _USE_MOTION_VECTORS
-                float2 velocity = GetDilatedVelocity(uv, farFactor);
+                float2 velocity = GetDilatedVelocity(uv);
                 return uv - velocity;
             #else
                 float deviceDepth = SampleDepth(uv);
@@ -130,33 +121,26 @@ Shader "Insanity/TemporalAA"
             #endif
             }
 
-            float3 ClipHistoryVariance(float3 history, float2 uv, float gamma, float farFactor)
+            float3 ClipHistoryVariance(float3 history, float2 uv, float gamma)
             {
-                int radius = GetSampleRadius(farFactor);
                 float3 m1 = 0.0;
                 float3 m2 = 0.0;
-                int count = 0;
 
                 UNITY_UNROLL
-                for (int x = -2; x <= 2; ++x)
+                for (int x = -1; x <= 1; ++x)
                 {
                     UNITY_UNROLL
-                    for (int y = -2; y <= 2; ++y)
+                    for (int y = -1; y <= 1; ++y)
                     {
-                        if (max(abs(x), abs(y)) <= radius)
-                        {
-                            float3 sampleRGB = SAMPLE_TEXTURE2D(_SourceTex, s_point_clamp_sampler, uv + float2(x, y) * _MainTex_TexelSize.xy).rgb;
-                            float3 sampleYCoCg = TAA_RGBToYCoCg(sampleRGB);
-                            m1 += sampleYCoCg;
-                            m2 += sampleYCoCg * sampleYCoCg;
-                            count++;
-                        }
+                        float3 sampleRGB = SAMPLE_TEXTURE2D(_SourceTex, s_point_clamp_sampler, uv + float2(x, y) * _MainTex_TexelSize.xy).rgb;
+                        float3 sampleYCoCg = TAA_RGBToYCoCg(sampleRGB);
+                        m1 += sampleYCoCg;
+                        m2 += sampleYCoCg * sampleYCoCg;
                     }
                 }
 
-                float invCount = 1.0 / max(count, 1);
-                m1 *= invCount;
-                m2 *= invCount;
+                m1 /= 9.0;
+                m2 /= 9.0;
                 float3 sigma = sqrt(max(0.0, m2 - m1 * m1));
                 float3 minYCoCg = m1 - gamma * sigma;
                 float3 maxYCoCg = m1 + gamma * sigma;
@@ -190,7 +174,7 @@ Shader "Insanity/TemporalAA"
                 depthReject *= (1.0 - farFactor * 0.75);
 
                 float varianceGamma = lerp(_TAAParams.z, _TAAParams.z * 2.0, farFactor);
-                history.rgb = ClipHistoryVariance(history.rgb, uv, varianceGamma, farFactor);
+                history.rgb = ClipHistoryVariance(history.rgb, uv, varianceGamma);
 
                 float feedback = lerp(_TAAParams.x, _TAAParams.x * 0.2, farFactor);
                 feedback = lerp(feedback, 1.0, depthReject);
