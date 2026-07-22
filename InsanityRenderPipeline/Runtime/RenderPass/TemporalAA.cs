@@ -96,20 +96,19 @@ namespace Insanity
         public TextureHandle motionVector;
         public Material material;
         public bool useMotionVectors;
+        public bool useSrgbBlend;
         public bool isFirstFrame;
-        public float feedback;
-        public float depthRejectScale;
-        public float varianceGamma;
-        public float farAdaptStrength;
+        public float weightMax;
+        public float motionStability;
+        public float motionGamma;
         public Vector4 texelSize;
     }
 
     public partial class RenderPasses
     {
-        // Linear eye-depth tolerance: ~0.25m difference reaches full reject before far-factor attenuation.
-        const float k_DepthRejectScale = 4.0f;
-        const float k_VarianceGamma = 1.25f;
-        const float k_FarAdaptStrength = 1.0f;
+        // Rainbow Six defaults: max ~40 pixels/frame motion, gamma 0.8
+        const float k_MotionRejectMaxPixels = 40.0f;
+        const float k_MotionRejectGamma = 0.8f;
         static bool s_taaWasActiveLastFrame;
 
         static readonly int s_SourceTex = Shader.PropertyToID("_SourceTex");
@@ -145,6 +144,7 @@ namespace Insanity
 
             bool useMotionVectors = motionVector.IsValid();
             bool isFirstFrame = historyData.isFirstFrame || renderingData.cameraData.isFirstFrame;
+            bool useSrgbBlend = !InsanityPipeline.asset.HDREnable;
 
             using (var builder = renderingData.renderGraph.AddRenderPass<TemporalAAResolvePassData>(
                        "TAA Resolve Pass", out var passData, new ProfilingSampler("TAA Resolve Pass Profiler")))
@@ -156,11 +156,11 @@ namespace Insanity
                 passData.motionVector = useMotionVectors ? builder.ReadTexture(motionVector) : TextureHandle.nullHandle;
                 passData.material = taaMaterial;
                 passData.useMotionVectors = useMotionVectors;
+                passData.useSrgbBlend = useSrgbBlend;
                 passData.isFirstFrame = isFirstFrame;
-                passData.feedback = InsanityPipeline.asset.TAAFeedback;
-                passData.depthRejectScale = k_DepthRejectScale;
-                passData.varianceGamma = k_VarianceGamma;
-                passData.farAdaptStrength = k_FarAdaptStrength;
+                passData.weightMax = InsanityPipeline.asset.TAAFeedback;
+                passData.motionStability = 1.0f / k_MotionRejectMaxPixels;
+                passData.motionGamma = k_MotionRejectGamma;
                 passData.texelSize = new Vector4(
                     1.0f / colorDescriptor.width,
                     1.0f / colorDescriptor.height,
@@ -171,6 +171,7 @@ namespace Insanity
                 builder.SetRenderFunc((TemporalAAResolvePassData data, RenderGraphContext context) =>
                 {
                     CoreUtils.SetKeyword(context.cmd, "_USE_MOTION_VECTORS", data.useMotionVectors);
+                    CoreUtils.SetKeyword(context.cmd, "_TAA_SRGB_BLEND", data.useSrgbBlend);
 
                     var material = data.material;
                     material.SetTexture(s_SourceTex, data.currentFrame);
@@ -179,7 +180,11 @@ namespace Insanity
                     if (data.useMotionVectors)
                         material.SetTexture(s_MotionVectorTex, data.motionVector);
                     material.SetVector(s_MainTexTexelSize, data.texelSize);
-                    material.SetVector(s_TAAParams, new Vector4(data.feedback, data.depthRejectScale, data.varianceGamma, data.farAdaptStrength));
+                    material.SetVector(s_TAAParams, new Vector4(
+                        data.weightMax,
+                        data.motionStability,
+                        data.motionGamma,
+                        0.0f));
                     material.SetFloat(s_FirstFrame, data.isFirstFrame ? 1.0f : 0.0f);
 
                     context.cmd.SetRenderTarget(data.output, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);

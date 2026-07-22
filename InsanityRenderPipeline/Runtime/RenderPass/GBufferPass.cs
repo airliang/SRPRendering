@@ -72,7 +72,6 @@ namespace Insanity
             for (int i = 0; i < 3; i++)
             {
                 renderGraph.CreateTextureIfInvalid(GetGBufferTextureDesc((GBufferIndex)i, requestWidth, requestHeight), ref GBufferAttachments[i]);
-                //GBufferAttachments[i] = renderGraph.CreateTexture(GetGBufferTextureDesc((GBufferIndex)i, requestWidth, requestHeight));
             }
         }
     }

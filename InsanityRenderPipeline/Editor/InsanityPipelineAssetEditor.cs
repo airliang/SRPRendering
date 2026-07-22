@@ -23,7 +23,7 @@ namespace UnityEditor.Insanity
             public static GUIContent msaaText = EditorGUIUtility.TrTextContent("MSAA", "Controls the global anti aliasing settings");
             public static GUIContent depthBitsText = EditorGUIUtility.TrTextContent("Depth Bits", "Set the depth bits for the camera depth");
             public static GUIContent taaText = EditorGUIUtility.TrTextContent("TAA", "Controls the global Temporal Anti-Aliasing settings");
-            public static GUIContent taaFeedbackText = EditorGUIUtility.TrTextContent("TAA Feedback", "Blend weight of the current frame. Lower values retain more history and reduce flicker but may increase ghosting.");
+            public static GUIContent taaFeedbackText = EditorGUIUtility.TrTextContent("TAA Weight Min", "Minimum current-frame blend weight (Rainbow Six g_WeightMax). Lower values retain more history.");
 
             public static string[] msaaOptions = { "Disabled", "2x", "4x", "8x" };
             public static string[] depthBitsOptions = { "16", "32" };
