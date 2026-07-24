@@ -253,17 +253,11 @@ Some engines encode velocity as an NDC delta and multiply by $`1/2`$ when conver
 
 ### 3.12 Visual comparison (TAA on vs off)
 
-Drag the vertical control line to compare the same view with and without TAA. **Left = TAA enabled**, **right = TAA disabled**.
+The GIF below compares the same view with and without TAA (slider-style wipe). **Left = TAA enabled**, **right = TAA disabled**.
 
-[Open interactive before/after slider](TAA/comparison.html)
+![](TAA/TAA%20compare.gif)
 
-<iframe src="TAA/comparison.html" title="TAA enabled vs disabled image comparison slider" width="100%" height="520" style="border:0;border-radius:8px;overflow:hidden;background:#121212;" loading="lazy"></iframe>
-
-Static fallback (if the slider above does not load):
-
-| TAA Enabled | TAA Disabled |
-|:---:|:---:|
-| ![](TAA/TAA%20enable.png) | ![](TAA/TAA%20disable.png) |
+Optional interactive version (open in a browser): [before/after slider](TAA/comparison.html)
 
 ---
 
