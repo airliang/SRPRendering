@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TAA On / Off Comparison</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --line: #f2f2f2;
+      --accent: #6cb6ff;
+      --label-bg: rgba(0, 0, 0, 0.65);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: #121212;
+      color: #e8e8e8;
+      padding: 1.25rem;
+    }
+
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+
+    p.hint {
+      margin: 0 0 1rem;
+      color: #9a9a9a;
+      font-size: 0.9rem;
+    }
+
+    .compare {
+      position: relative;
+      width: min(100%, 1280px);
+      margin: 0 auto;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border-radius: 8px;
+      background: #000;
+      user-select: none;
+      touch-action: none;
+      cursor: ew-resize;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+    }
+
+    .compare img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      display: block;
+    }
+
+    .compare .after {
+      z-index: 1;
+    }
+
+    .compare .before-wrap {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      width: 50%;
+      overflow: hidden;
+      border-right: 2px solid var(--line);
+    }
+
+    .compare .before-wrap img {
+      width: 100%;
+      max-width: none;
+      /* Keep left image locked to full frame while clip width changes */
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: var(--frame-width, 100vw);
+      max-width: none;
+      object-fit: cover;
+    }
+
+    .compare .handle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      z-index: 3;
+      width: 0;
+      transform: translateX(-50%);
+    }
+
+    .compare .handle::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 36px;
+      height: 36px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 2px solid var(--line);
+      background: rgba(20, 20, 20, 0.75);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+    }
+
+    .compare .handle::after {
+      content: "⟷";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      color: var(--line);
+      line-height: 1;
+    }
+
+    .label {
+      position: absolute;
+      top: 12px;
+      z-index: 4;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: var(--label-bg);
+      font-size: 0.8rem;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+    }
+
+    .label-left { left: 12px; }
+    .label-right { right: 12px; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>TAA Visual Comparison</h1>
+  <p class="hint">Drag the center line left / right. Left: TAA enabled &nbsp;|&nbsp; Right: TAA disabled</p>
+
+  <div class="compare" id="compare" role="img" aria-label="Interactive comparison between TAA enabled and TAA disabled">
+    <span class="label label-left">TAA Enabled</span>
+    <span class="label label-right">TAA Disabled</span>
+
+    <!-- Right (full): without TAA -->
+    <img class="after" src="./TAA%20disable.png" alt="TAA disabled" draggable="false" />
+
+    <!-- Left (clipped): with TAA -->
+    <div class="before-wrap" id="beforeWrap">
+      <img id="beforeImg" src="./TAA%20enable.png" alt="TAA enabled" draggable="false" />
+    </div>
+
+    <div class="handle" id="handle" aria-hidden="true"></div>
+    <input class="sr-only" id="slider" type="range" min="0" max="100" value="50" aria-label="Comparison slider" />
+  </div>
+
+  <script>
+    (function () {
+      const root = document.getElementById("compare");
+      const wrap = document.getElementById("beforeWrap");
+      const handle = document.getElementById("handle");
+      const beforeImg = document.getElementById("beforeImg");
+      const slider = document.getElementById("slider");
+      let dragging = false;
+
+      function syncFrameWidth() {
+        beforeImg.style.setProperty("--frame-width", root.clientWidth + "px");
+        beforeImg.style.width = root.clientWidth + "px";
+      }
+
+      function setPosition(percent) {
+        const p = Math.min(100, Math.max(0, percent));
+        wrap.style.width = p + "%";
+        handle.style.left = p + "%";
+        slider.value = String(p);
+      }
+
+      function pointerToPercent(clientX) {
+        const rect = root.getBoundingClientRect();
+        return ((clientX - rect.left) / rect.width) * 100;
+      }
+
+      root.addEventListener("pointerdown", (e) => {
+        dragging = true;
+        root.setPointerCapture(e.pointerId);
+        setPosition(pointerToPercent(e.clientX));
+      });
+
+      root.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        setPosition(pointerToPercent(e.clientX));
+      });
+
+      const endDrag = () => { dragging = false; };
+      root.addEventListener("pointerup", endDrag);
+      root.addEventListener("pointercancel", endDrag);
+
+      slider.addEventListener("input", () => setPosition(Number(slider.value)));
+
+      window.addEventListener("resize", () => {
+        syncFrameWidth();
+        setPosition(Number(slider.value));
+      });
+
+      // Ensure both images are ready so widths match
+      Promise.all([
+        beforeImg.decode?.().catch(() => {}),
+        new Promise((r) => {
+          const img = root.querySelector(".after");
+          if (img.complete) r();
+          else img.addEventListener("load", r, { once: true });
+        })
+      ]).then(() => {
+        syncFrameWidth();
+        setPosition(50);
+      });
+
+      syncFrameWidth();
+      setPosition(50);
+    })();
+  </script>
+</body>
+</html>
