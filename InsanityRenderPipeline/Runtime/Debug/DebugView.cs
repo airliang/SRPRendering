@@ -92,6 +92,7 @@ namespace Insanity
             public Material m_finalBlitMaterial;
             public int m_DebugViewMode;
             public TextureHandle m_Dest;
+            public Matrix4x4 projInverse;
         }
 
         
@@ -131,12 +132,15 @@ namespace Insanity
                 passData.m_finalBlitMaterial = finalBlitMaterial;
                 passData.m_finalBlitMaterial.SetInt("_FlipY", passData.flip ? 1 : 0);
                 passData.m_DebugViewMode = debugViewMode;
-                
+                // Non-jittered inv-proj for LinearDepth (camera.projectionMatrix has no TAA jitter).
+                passData.projInverse = GL.GetGPUProjectionMatrix(
+                    renderingData.cameraData.camera.projectionMatrix, true).inverse;
 
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc((DebugViewBlitPassData data, RenderGraphContext context) =>
                 {
                     data.m_finalBlitMaterial.SetInt("_DebugViewMode", data.m_DebugViewMode);
+                    data.m_finalBlitMaterial.SetMatrix("_ProjInverse", data.projInverse);
                     context.cmd.SetGlobalTexture("_DepthTexture", data.m_Depth);
                     context.cmd.SetGlobalBuffer("_LightVisibilityIndexBuffer", data.m_LightVisibilityIndexBuffer);
                     data.m_finalBlitMaterial.SetTexture("_TileVisibleLightCounts", data.m_TileVisibleLightCount);

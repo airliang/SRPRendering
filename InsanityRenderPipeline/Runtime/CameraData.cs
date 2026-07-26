@@ -33,6 +33,11 @@ namespace Insanity
             public Matrix4x4 nonJitteredViewProjMatrix;
             public Matrix4x4 nonJitteredInvViewProjMatrix;
             public Matrix4x4 prevNonJitteredViewProjMatrix;
+            /// <summary>Non-jittered projection (for SSAO / effects that must stay stable under TAA jitter).</summary>
+            public Matrix4x4 nonJitteredProjMatrix;
+            public Matrix4x4 nonJitteredInvProjMatrix;
+            public Matrix4x4 prevNonJitteredProjMatrix;
+            public Matrix4x4 prevNonJitteredInvProjMatrix;
             public Matrix4x4 prevProjMatrix;
             public Matrix4x4 prevInvProjMatrix;
             public Vector3 prevWorldSpaceCameraPos;
@@ -82,6 +87,10 @@ namespace Insanity
 
         internal int frameIndex = 0;
         internal int taaFrameIndex = 0;
+        /// <summary>Current TAA jitter in UV units (halton_pixels / resolution). Zero when TAA is off.</summary>
+        public Vector2 taaJitterUV { get; private set; }
+        /// <summary>Previous frame TAA jitter in UV units.</summary>
+        public Vector2 prevTaaJitterUV { get; private set; }
 
         internal bool isFirstFrame { get; private set; }
 
@@ -144,6 +153,7 @@ namespace Insanity
             //cb._PrevInvViewProjMatrix = mainViewConstants.prevInvViewProjMatrix;
             cb._PixelCoordToViewDirWS = mainViewConstants.pixelCoordToViewDirWS;
             cb._WorldSpaceCameraPos_Internal = mainViewConstants.worldSpaceCameraPos;
+            cb._PrevWorldSpaceCameraPos = mainViewConstants.prevWorldSpaceCameraPos;
             cb._ScreenSize = screenSize;
             cb._ZBufferParams = zBufferParams;
             cb._ProjectionParams = projectionParams;
@@ -176,7 +186,9 @@ namespace Insanity
             // offsets (especially on D3D) and visible per-frame camera shake.
             var nonJitteredCameraProj = projMatrix;
             var jitteredCameraProj = projMatrix;
-            if (GlobalRenderSettings.TAAEnable)
+            // Skip TAA jitter while a debug view is active: debug blit samples raw depth/GBuffer/SSAO
+            // (unlike FinalBlit, which samples TAA-resolved color). Jitter would make every debug mode shake.
+            if (GlobalRenderSettings.TAAEnable && !DebugView.NeedDebugView())
                 ApplyCameraJitter(ref jitteredCameraProj);
 
             var gpuView = viewMatrix;
@@ -198,6 +210,8 @@ namespace Insanity
                 viewConstants.prevNonJitteredViewProjMatrix = viewConstants.nonJitteredViewProjMatrix;
                 viewConstants.prevProjMatrix = viewConstants.projMatrix;
                 viewConstants.prevInvProjMatrix = viewConstants.invProjMatrix;
+                viewConstants.prevNonJitteredProjMatrix = viewConstants.nonJitteredProjMatrix;
+                viewConstants.prevNonJitteredInvProjMatrix = viewConstants.nonJitteredInvProjMatrix;
                 viewConstants.prevViewProjMatrixOriginal = viewConstants.viewProjMatrixOriginal;
             }
             else
@@ -208,6 +222,8 @@ namespace Insanity
                 viewConstants.prevNonJitteredViewProjMatrix = gpuNonJitteredProj * gpuView;
                 viewConstants.prevProjMatrix = gpuJitteredProj;
                 viewConstants.prevInvProjMatrix = gpuJitteredProj.inverse;
+                viewConstants.prevNonJitteredProjMatrix = gpuNonJitteredProj;
+                viewConstants.prevNonJitteredInvProjMatrix = gpuNonJitteredProj.inverse;
                 viewConstants.prevInvViewProjMatrix = viewConstants.prevViewProjMatrix.inverse;
                 viewConstants.prevViewProjMatrixOriginal = gpuNonJitteredProj * viewMatrix;
             }
@@ -218,6 +234,8 @@ namespace Insanity
             viewConstants.invProjMatrix = gpuJitteredProj.inverse;
             viewConstants.viewProjMatrix = gpuJitteredProj * gpuView;
             viewConstants.invViewProjMatrix = viewConstants.viewProjMatrix.inverse;
+            viewConstants.nonJitteredProjMatrix = gpuNonJitteredProj;
+            viewConstants.nonJitteredInvProjMatrix = gpuNonJitteredProj.inverse;
             viewConstants.nonJitteredViewProjMatrix = gpuNonJitteredProj * gpuView;
             viewConstants.nonJitteredInvViewProjMatrix = viewConstants.nonJitteredViewProjMatrix.inverse;
             viewConstants.worldSpaceCameraPos = cameraPosition;
@@ -281,6 +299,7 @@ namespace Insanity
             if (++frameIndex > 1024)
                 frameIndex = 0;
 
+            UpdateTaaJitterUV();
             UpdateViewConstants();
 
             isFirstFrame = false;
@@ -428,9 +447,27 @@ namespace Insanity
         {
             // Halton offsets in [-0.5, 0.5] pixel units; convert to clip-space translation.
             // Must be applied before GetGPUProjectionMatrix so platform Y-flip is handled correctly.
-            Vector2 jitter = haltonSequences[taaFrameIndex];
+            Vector2 jitter = GlobalRenderSettings.TAAEnable ? haltonSequences[taaFrameIndex] : Vector2.zero;
             projMatrix.m02 += jitter.x * 2.0f / screenSize.x;
             projMatrix.m12 += jitter.y * 2.0f / screenSize.y;
+        }
+
+        void UpdateTaaJitterUV()
+        {
+            if (isFirstFrame)
+                prevTaaJitterUV = Vector2.zero;
+            else
+                prevTaaJitterUV = taaJitterUV;
+
+            if (!GlobalRenderSettings.TAAEnable || DebugView.NeedDebugView())
+            {
+                taaJitterUV = Vector2.zero;
+                return;
+            }
+
+            // Same pixel Halton used in ApplyCameraJitter, expressed in UV for depth de-jitter sampling.
+            Vector2 jitterPixels = haltonSequences[taaFrameIndex];
+            taaJitterUV = new Vector2(jitterPixels.x * screenSize.z, jitterPixels.y * screenSize.w);
         }
     }
 }

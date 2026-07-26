@@ -95,6 +95,26 @@ float2 WorldPosToScreenUV(float4x4 viewProjMatrix, float3 positionWS)
     return csPos.xy * 0.5 + 0.5;
 }
 
+// Camera-relative: positionWS is relative to the *current* camera.
+// Previous VP is relative to the *previous* camera, so offset by camera displacement.
+float3 GetPreviousFramePositionWS(float3 positionWS)
+{
+#if (SHADEROPTIONS_CAMERA_RELATIVE_RENDERING != 0)
+    return positionWS + (_WorldSpaceCameraPos_Internal.xyz - _PrevWorldSpaceCameraPos.xyz);
+#else
+    return positionWS;
+#endif
+}
+
+// UV-space motion: current UV - previous UV. TAA uses historyUV = uv - motionVector.
+// (HDRP stores NDC delta * 0.5 for the same UV-space quantity.)
+float2 ComputeMotionVectorUV(float3 positionWS)
+{
+    float2 ssPosCurr = WorldPosToScreenUV(_NonJitteredViewProjMatrix, positionWS);
+    float2 ssPosPrev = WorldPosToScreenUV(_PrevNonJitteredViewProjMatrix, GetPreviousFramePositionWS(positionWS));
+    return ssPosCurr - ssPosPrev;
+}
+
 float4 ComputeGrabScreenPos (float4 pos) 
 {
     #if UNITY_UV_STARTS_AT_TOP

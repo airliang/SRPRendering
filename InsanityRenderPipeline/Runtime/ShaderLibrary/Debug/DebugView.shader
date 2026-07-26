@@ -60,20 +60,15 @@ Shader "Insanity/DebugViewBlit"
 
             half4 Fragment(Varyings input) : SV_Target
             {   
-                half4 col = 0; // SAMPLE_TEXTURE2D(_SourceTex, sampler_SourceTex, input.uv);
+                // Same UV sampling as Blit.shader — no TAA UV offset.
+                // Stability comes from skipping camera jitter while a debug view is active
+                // (see CameraData.ApplyCameraJitter), not from de-jittering here.
+                half4 col = 0;
                 
                 if (_DebugViewMode == DebugTileBasedCullingResult)
                 {
                     uint2 screenCoord = input.uv * _ScreenSize.xy;
                     uint2 tileId = uint2(floor(screenCoord / TILE_SIZE));
-                    // uint lightCount = 0;
-                    // uint lightIndexOffset = (tileId.y * _TileNumber.x + tileId.x) * MAX_LIGHT_NUM_PER_TILE;
-                    // int lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset];
-                    // for (int i = 0; i < MAX_LIGHT_NUM_PER_TILE && lightIndex >= 0; ++i)
-                    // {
-                    //     lightCount++;
-                    //     lightIndex = _LightVisibilityIndexBuffer[lightIndexOffset + i + 1];
-                    // }
                     int lightCount = _TileVisibleLightCounts.Load(int3(tileId, 0));
                     col = GetTileVisibleLightDebugColor(lightCount);
                     col.a = lightCount > 0 ? 0.75 : 0.5;
@@ -88,13 +83,8 @@ Shader "Insanity/DebugViewBlit"
                 }
                 else if (_DebugViewMode == DebugLinearDepth)
                 {
-                    float depth = SAMPLE_DEPTH_TEXTURE(_DepthTexture, sampler_DepthTexture, input.uv);
-            #if UNITY_REVERSED_Z
-                    depth = depth > 0 ? (1.0 - depth) : 0;
-            #endif
-                    float4 clipPos = float4(input.uv * 2.0 - 1.0, depth, 1);
-                    float4 viewPos = mul(_ProjInverse, clipPos);
-                    viewPos /= viewPos.w;
+                    float deviceDepth = SAMPLE_DEPTH_TEXTURE(_DepthTexture, sampler_DepthTexture, input.uv);
+                    float3 viewPos = ComputeViewSpacePosition(input.uv, deviceDepth, _ProjInverse);
                     col = half4(viewPos.z, viewPos.z, viewPos.z, 1);
                 }
                 else if (_DebugViewMode == DebugSSAO)

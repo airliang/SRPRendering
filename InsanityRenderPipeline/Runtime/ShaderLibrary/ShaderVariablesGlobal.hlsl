@@ -18,6 +18,7 @@ GLOBAL_CBUFFER_START(ShaderVariablesGlobal, b0)
     float4x4 _PrevViewProjMatrix;
 	float4x4 _PrevNonJitteredViewProjMatrix;
 	float4 _WorldSpaceCameraPos_Internal;
+	float4 _PrevWorldSpaceCameraPos;
 	float4 _ScreenSize;
 
 	// Values used to linearize the Z buffer (http://www.humus.name/temp/Linearize%20depth.txt)

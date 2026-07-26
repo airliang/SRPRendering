@@ -19,7 +19,7 @@ MonoBehaviour:
   m_MSAASamples: 1
   m_DepthBits: 32
   m_TAAEnable: 1
-  m_TAAFeedback: 0.05
+  m_TAAFeedback: 0.01
   m_ShadowDistance: 50
   m_ShadowCascades: 1
   m_Cascade2Split: 0.25

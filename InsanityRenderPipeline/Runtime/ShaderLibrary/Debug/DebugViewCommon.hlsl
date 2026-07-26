@@ -13,12 +13,14 @@
 #define DebugSmoothness 8
 #define DebugOverdraw 9
 
+// Must match DebugView.DebugViewVariables in C#.
 CBUFFER_START(DebugViewVariables)
 int _DebugViewMode;
 float _ScaleDepth;
-float4x4 _ProjInverse;
 float2 _DebugViewPad;
 CBUFFER_END
 
+// Non-jittered GPU inv-proj for LinearDepth (bound on the blit material).
+float4x4 _ProjInverse;
 
 #endif

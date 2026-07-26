@@ -184,8 +184,13 @@ Shader "Insanity/TemporalAA"
             #else
                 float deviceDepth = SampleDeviceDepth(uv);
                 float4 clipPos = float4(uv * 2.0 - 1.0, deviceDepth, 1.0);
+            #if UNITY_UV_STARTS_AT_TOP
+                clipPos.y = -clipPos.y;
+            #endif
                 float4 worldPos = mul(_NonJitteredInvViewProjMatrix, clipPos);
                 worldPos /= worldPos.w;
+                // Camera-relative: unprojected WS is relative to current camera; prev VP expects prev-camera space.
+                worldPos.xyz = GetPreviousFramePositionWS(worldPos.xyz);
                 float4 prevClip = mul(_PrevNonJitteredViewProjMatrix, worldPos);
                 prevClip /= prevClip.w;
             #if UNITY_UV_STARTS_AT_TOP

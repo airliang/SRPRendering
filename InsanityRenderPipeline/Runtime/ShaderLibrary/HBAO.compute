@@ -14,7 +14,9 @@ Texture2D<float4> _NormalTexture;
 Texture2D<float4> _NoiseTexture;
 Texture2D _DepthTexture;
 float4x4 _ViewMatrix;  //platform unrelative matrix
-float4x4 _ProjInverse; //platform unrelative matrix
+// Must be non-jittered GPU projection inverse (GL.GetGPUProjectionMatrix without TAA jitter).
+// Do NOT use mainViewConstants.invProjMatrix — that one is jittered when TAA is on.
+float4x4 _ProjInverse;
 float4x4 _ViewInverse; //use for test
 float4 _HBAOParams;   
 float4 _AOMaskSize;
@@ -22,7 +24,11 @@ float4 _ScreenSize;    //xy width and height, zw 1/width and 1/height
 float _HalfResolution;
 float4 _HBAOParams2;
 float4 _NoiseParam;
-float2 _ProjectionParams;
+// Use float4 (not float2) so SetComputeVectorParam cannot clobber packed neighbors.
+float4 _ProjectionParams; // xy = proj m00/m11 (scale radius to NDC)
+// Depth/normal are rendered with a jittered camera. Sample them at uv + jitter.xy and
+// unproject with stable UV + non-jittered _ProjInverse so AO is temporally stable under TAA.
+float4 _TAAJitterUV; // xy = current frame UV jitter
 #define RADIUS _HBAOParams.x    //radius in practice
 #define BIAS   _HBAOParams.y
 #define NEG_RADIUSINVSQR _HBAOParams.z  
@@ -227,8 +233,9 @@ void HBAO (uint3 id : SV_DispatchThreadID)
         return;
     }
     // TODO: insert actual code here!
-    //float2 uv = (float2) id.xy * _AOMaskSize.zw;
-    float2 uvScreen = (float2) (id.xy + 0.5) * _AOMaskSize.zw; //uv + _ScreenSize.zw * 0.5 * (_HalfResolution + 1);
+    // Stable UV (AO output pixel). Depth/normal live in jittered space → sample at +jitter.
+    float2 uvScreen = (float2) (id.xy + 0.5) * _AOMaskSize.zw;
+    float2 uvDepth = uvScreen + _TAAJitterUV.xy;
     uint2 fullScreenPos = id.xy * ((int)_HalfResolution + 1);
     //using noise texture approach
     
@@ -240,16 +247,7 @@ void HBAO (uint3 id : SV_DispatchThreadID)
     
     //end noise texture approach
     
-    //float noise1 = InterleavedGradientNoise((float2) (id.xy + 0.5), id.x);
-    //float theta = TWO_PI * noise1;
-    //float cosTheta = cos(theta);
-    //float sinTheta = sin(theta);
-    //rotation = float2x2(cosTheta, sinTheta,
-    //                             -sinTheta, cosTheta);
-    
-    
-    //int2 screenCoord = _ScreenSize * uv;
-    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvScreen, 0);
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvDepth, 0);
     if (depth < SKY_DEPTH_VALUE)
     {
 #if NEED_PACKAO
@@ -259,34 +257,26 @@ void HBAO (uint3 id : SV_DispatchThreadID)
         #endif
         return;
     }
-    //depth = GetPlatformDepth(depth);
-    
-    
-    //float depth = _DepthTexture.Load(int3(screenCoord, 0));
-    float3 screenPosVS = ComputeViewSpacePosition(uvScreen, depth, _ProjInverse); //UVtoViewPos(uvScreen, depth);    
-    float3 normalVS = GetNormalVS(uvScreen);
+
+    // Unproject with non-jittered UV + non-jittered _ProjInverse (bound from C#).
+    float3 screenPosVS = ComputeViewSpacePosition(uvScreen, depth, _ProjInverse);
+    float3 normalVS = GetNormalVS(uvDepth);
 
     half AOIntegrate = 0;
     float radiusSS = min(RADIUSINWORLD * rcp(screenPosVS.z), MAX_RADIUS_IN_NDC);
-    float2 scalingFactorSS = _ProjectionParams * radiusSS;  //remap the radius to ndc space
-    //float minLength = length(_ScreenSize.zw);
-    //float pixelSizeSS2 = dot(_ScreenSize.zw, _ScreenSize.zw);
+    float2 scalingFactorSS = _ProjectionParams.xy * radiusSS;  //remap the radius to ndc space
     float aoFade = saturate(AOFADE_PARAM1 * screenPosVS.z + AOFADE_PARAM2);
     const float2 halfTexelOffset = float2(-0.5f, -0.5f) * _AOMaskSize.zw;
     for (int i = 0; i < SAMPLE_COUNT; ++i)
     {
-        float2 samplePointVec = mul(rotation, SPIRAL_KERNEL[i]) * scalingFactorSS; /* * _ScreenSize.zw*/;
+        float2 samplePointVec = mul(rotation, SPIRAL_KERNEL[i]) * scalingFactorSS;
 
         float2 samplePoint = samplePointVec + uvScreen;
-        //int2 samplePointPixel = (int2) (samplePoint * _ScreenSize.xy);
-        //screenCoord = _ScreenSize * samplePoint;
-        float depthSample = _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePoint, 0); 
-        //depthSample = GetPlatformDepth(depthSample);
-        //float2 adjustSamplePoint = ((float2) samplePointPixel + 0.5) * _ScreenSize.zw;
-        float3 samplePointVS = ComputeViewSpacePosition(samplePoint, depthSample, _ProjInverse); //UVtoViewPos(adjustSamplePoint, depthSample);
+        float2 samplePointDepth = samplePoint + _TAAJitterUV.xy;
+        float depthSample = _DepthTexture.SampleLevel(s_point_clamp_sampler, samplePointDepth, 0);
+        float3 samplePointVS = ComputeViewSpacePosition(samplePoint, depthSample, _ProjInverse);
         samplePointVS.z += SELF_OCCLUSION_DEPTH_BIAS;
-        //int2 samplePointAOCoord = adjustSamplePoint * _AOMaskSize.xy;
-        AOIntegrate += /*samplePointAOCoord == id.xy ? 0 :*/ ComputeAO(screenPosVS, normalVS, samplePointVS) * AO_INTENSITY;
+        AOIntegrate += ComputeAO(screenPosVS, normalVS, samplePointVS) * AO_INTENSITY;
     }
     AOIntegrate = saturate(AOIntegrate / SAMPLE_COUNT);
     

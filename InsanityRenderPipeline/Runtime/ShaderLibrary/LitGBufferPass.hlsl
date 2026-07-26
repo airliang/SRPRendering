@@ -138,14 +138,12 @@ GBufferOutput GBufferPassFragment(Varyings input)
 
     InitializeInputData(input, surfaceData.normalTS, inputData);
 
-    // Motion vectors use non-jittered view-proj so static scenes produce ~0 velocity.
-    // TAA reprojects real camera/object motion; sub-pixel jitter is accumulated at the same UV.
-    float2 ssPosCurr = WorldPosToScreenUV(_NonJitteredViewProjMatrix, input.positionWS);
-    float2 ssPosPrev = WorldPosToScreenUV(_PrevNonJitteredViewProjMatrix, input.positionWS);
     GBufferOutput output = (GBufferOutput)0;
     output.AlbedoMetallic = half4(surfaceData.albedo, surfaceData.metallic);
     output.NormalSmoothness = half4(input.normalWS * 0.5 + 0.5, surfaceData.smoothness);
-    output.MotionVector = half2(ssPosCurr - ssPosPrev);
+    // Motion vectors use non-jittered view-proj so static scenes produce ~0 velocity.
+    // Camera-relative: offset WS for previous camera before applying prev VP (see ComputeMotionVectorUV).
+    output.MotionVector = half2(ComputeMotionVectorUV(input.positionWS));
     return output;
 }
 
