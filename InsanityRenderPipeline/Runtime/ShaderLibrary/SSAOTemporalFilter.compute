@@ -3,175 +3,146 @@
 #pragma enable_d3d11_debug_symbols
 #pragma multi_compile _ HALF_RES
 #pragma multi_compile _ NEED_PACK_AO
+#pragma multi_compile _ TAA_ENABLED
 
 #include "SSAOCommon.hlsl"
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
 Texture2D<float> _AOInput;
 Texture2D<float4> _CurrentHistory;
 RWTexture2D<float4> _OutputHistory;
 RWTexture2D<float> _AOOutput;
 Texture2D _DepthTexture;
 float4x4 _PreProjInverse;
-float4x4 _ProjInverse;
+float4x4 _ProjInverse; // non-jittered
 float4x4 _PreProj;
 float4x4 _ViewInverse;
 float4x4 _PreView;
 float3 _CameraDisplacement;
 float4 _AOMaskSize;
 float _FrameTime;
-//non camera relative pos
+// xy = current TAA jitter UV, zw = previous
+float4 _TAAJitterUV;
+// Non camera-relative VP (for stable reprojection)
 float4x4 _ViewProjInverse;
 float4x4 _PreViewProj;
-//----
+
 #define SHADEROPTIONS_CAMERA_RELATIVE_RENDERING (1)
 #define MAX_FRAME_NUM 8
 
-
-float3 UVtoViewPosCurFrame(float2 uv, float depth)
+float SampleAOInput(float2 uv, int2 offset)
 {
-    float2 clippos = uv * 2.0 - 1.0;
-    
-    float4 posView = mul(_ProjInverse, float4(clippos, 2.0 * depth - 1.0, 1));
-    posView /= posView.w;
-    return posView.xyz;
+#ifdef NEED_PACK_AO
+    float pack = _AOInput.SampleLevel(s_point_clamp_sampler, uv, 0, offset);
+    float aoSample, depthSample;
+    UnpackData(pack, aoSample, depthSample);
+    return aoSample;
+#else
+    return _AOInput.SampleLevel(s_point_clamp_sampler, uv, 0, offset).r;
+#endif
 }
 
-float3 UVtoViewPosPreFrame(float2 uv, float depth)
+// Clamp history to the current-frame local AO range (TAA-style AABB).
+// This is what stops "dirty AO" trails from leaking outside contact regions.
+void GetNeighborhoodAOLimits(float2 uv, out float aoMin, out float aoMax, out float aoCenter)
 {
-    float2 clippos = uv * 2.0 - 1.0;
-    
-    float4 posView = mul(_PreProjInverse, float4(clippos, 2.0 * depth - 1.0, 1));
-    posView /= posView.w;
-    return posView.xyz;
-}
+    float s00 = SampleAOInput(uv, int2(-1, -1));
+    float s10 = SampleAOInput(uv, int2(0, -1));
+    float s20 = SampleAOInput(uv, int2(1, -1));
+    float s01 = SampleAOInput(uv, int2(-1, 0));
+    float s11 = SampleAOInput(uv, int2(0, 0));
+    float s21 = SampleAOInput(uv, int2(1, 0));
+    float s02 = SampleAOInput(uv, int2(-1, 1));
+    float s12 = SampleAOInput(uv, int2(0, 1));
+    float s22 = SampleAOInput(uv, int2(1, 1));
 
-float GetPlatformDepth(float depth)
-{
-    return 1.0 - depth;
-}
+    aoCenter = s11;
+    aoMin = min(s00, min(s10, min(s20, min(s01, min(s11, min(s21, min(s02, min(s12, s22))))))));
+    aoMax = max(s00, max(s10, max(s20, max(s01, max(s11, max(s21, max(s02, max(s12, s22))))))));
 
-float2 TemporalReprojection(float2 uv, float depth, out float preViewDepth, out float preAO)
-{
-    float4 projPosCur = float4(2.0 * uv - 1, depth, 1);
-    float4 worldPos = mul(_ViewProjInverse, projPosCur);
-    float4 preProjPos = mul(_PreViewProj, worldPos);
-    preProjPos /= preProjPos.w;
-    
-    
-    float2 uvPre = 0.5 * preProjPos.xy + 0.5;
-    float4 aoHistory = _CurrentHistory.SampleLevel(s_linear_clamp_sampler, uvPre, 0); //_CurrentHistory[id.xy];
-    float prevDepth = UnpackFloatFromR8G8(aoHistory.zw);
-    float3 viewPosPreReal = ComputeViewSpacePosition(uvPre, prevDepth, _PreProjInverse);
-    preViewDepth = viewPosPreReal.z;
-    preAO = aoHistory.g;
-    return uvPre;
-}
-
-void GetLimitsAO(Texture2D<float> inTexture, SamplerState inSampler, float2 inUV, out float outMin, out float outMax, out float outCenter)
-{
-    float2 uv = inUV;
-
-    // Get 9 grid texture pixel
-    float s00 = inTexture.SampleLevel(inSampler, uv, 0, int2(-1, -1)).r;
-    float s10 = inTexture.SampleLevel(inSampler, uv, 0, int2(0, -1)).r;
-    float s20 = inTexture.SampleLevel(inSampler, uv, 0, int2(1, -1)).r;
-         
-    float s01 = inTexture.SampleLevel(inSampler, uv, 0, int2(-1, 0)).r;
-    float s11 = inTexture.SampleLevel(inSampler, uv, 0, int2(0, 0)).r;
-    float s21 = inTexture.SampleLevel(inSampler, uv, 0, int2(1, 0)).r;
-         
-    float s02 = inTexture.SampleLevel(inSampler, uv, 0, int2(-1, 1)).r;
-    float s12 = inTexture.SampleLevel(inSampler, uv, 0, int2(0, 1)).r;
-    float s22 = inTexture.SampleLevel(inSampler, uv, 0, int2(1, 1)).r;
-
-    // Output center
-    outCenter = s11;
-
-    outMin = min(s00, min(s10, min(s20, min(s01, min(s11, min(s21, min(s02, min(s12, s22))))))));
-    outMax = max(s00, max(s10, max(s20, max(s01, max(s11, max(s21, max(s02, max(s12, s22))))))));
+    // Slightly widen so noisy AO still accumulates; keep tight enough to kill ghosts.
+    float pad = 0.05;
+    aoMin = saturate(aoMin - pad);
+    aoMax = saturate(aoMax + pad);
 }
 
 [numthreads(8,8,1)]
 void TemporalFilter (uint3 id : SV_DispatchThreadID)
 {
-    // TODO: insert actual code here!
     half2 uv = ((half2)id.xy + 0.5) * _AOMaskSize.zw;
+    // Match HBAO: depth was rendered with jitter; sample at uv+jitter, unproject at stable uv.
+    float2 uvDepth = uv + _TAAJitterUV.xy;
 #ifdef NEED_PACK_AO
     float aoPack = _AOInput[id.xy];
     float ao = 0;
     float depth = 0;
     UnpackData(aoPack, ao, depth);
 
-    float depthFromDepth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uv, 0);
+    float depthFromDepth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvDepth, 0);
     if (abs(depth - depthFromDepth) > 0.5)
     {
         depth = depthFromDepth;
     }
-    //depth = GetPlatformDepth(depth);
 #else
     float ao = _AOInput.SampleLevel(s_point_clamp_sampler, uv, 0);
-    
-    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uv, 0);
+    float depth = _DepthTexture.SampleLevel(s_point_clamp_sampler, uvDepth, 0);
 #endif
-    
-    float3 viewPosCur = ComputeViewSpacePosition(uv, depth, _ProjInverse); //UVtoViewPosCurFrame(uv, depth);
-    float4 worldPosCur = mul(_ViewInverse, float4(viewPosCur, 1));
-    float4 projPosCur = float4(2.0 * uv - 1, depth, 1);
-    float4 weightViewPos = mul(_PreView, worldPosCur); //mul(_PreProjInverse, projPosCur);
-#if SHADEROPTIONS_CAMERA_RELATIVE_RENDERING == 1
-    weightViewPos.xyz += _CameraDisplacement;
-#endif
-    weightViewPos.z = -weightViewPos.z;   //convert the view pos to right coordinate
-    weightViewPos /= weightViewPos.w;
 
-    
-    float4 viewPosPre = weightViewPos;
-    float4 projPosPre = mul(_PreProj, viewPosPre);
+    // Reproject with non-camera-relative VP. Avoids the +Z/-Z mismatch from mixing
+    // ComputeViewSpacePosition (RH +Z) with Unity view/proj matrices (-Z).
+    float3 positionWS = ComputeWorldSpacePosition(uv, depth, _ViewProjInverse);
+    float4 prevPositionCS = mul(_PreViewProj, float4(positionWS, 1.0));
 #if UNITY_UV_STARTS_AT_TOP
-    // Our world space, view space, screen space and NDC space are Y-up.
-    // Our clip space is flipped upside-down due to poor legacy Unity design.
-    // The flip is baked into the projection matrix, so we only have to flip
-    // manually when going from CS to NDC and back.
-    projPosPre.y = -projPosPre.y;
+    prevPositionCS.y = -prevPositionCS.y;
 #endif
-    projPosPre /= projPosPre.w;
-    float2 uvPre = 0.5 * projPosPre.xy + 0.5;
-    
-    
-    
-    float4 aoHistory = _CurrentHistory.SampleLevel(s_linear_clamp_sampler, uvPre, 0);
-    float prevDepth = UnpackFloatFromR8G8(aoHistory.zw);
-    float3 viewPosPreReal = ComputeViewSpacePosition(uvPre, prevDepth, _PreProjInverse);
+    float invPrevW = rcp(max(abs(prevPositionCS.w), 1e-6));
+    float2 uvPre = prevPositionCS.xy * invPrevW * 0.5 + 0.5;
+    float expectedPrevDepth = prevPositionCS.z * invPrevW;
 
-    float weightCur = viewPosCur.z; //we have to convert the z to left coordinate
-    float weightPre = viewPosPreReal.z;
-
-    
-    //float ao = _AOInput.SampleLevel(s_linear_clamp_sampler, uv, 0); //_AOBlur[id.xy]; //aoHistory.r;
-    float aoPre = aoHistory.g;
+    float aoPre = ao;
     float finalAO = ao;
     int Ncur = 1;
-    int Npre = UnpackByte(aoHistory.r);
-    //disocclusion detecting
-    //if (abs(1.0 - weightCur / weightPre) < 0.1)
-    //{
-    //    //float aoPre = _PreviousHistory[id.xy];
-    //    float weight = (float) Npre / (Npre + 1);
-    //    finalAO = lerp(ao, aoPre, weight); //(ao + aoPre * Npre) / (Npre + 1);
-    //    Ncur = min(Npre + 1, MAX_FRAME_NUM);
-    //}
-    
-    float fWeight = distance(viewPosPreReal, viewPosCur) * 9.0;
+    int Npre = 1;
 
-    ////////////////////////////////
-    // And weight based on how different the amount of AO is (removes trailing artifact)
-    // Only works if both fAO and fPrevFrameAO is blurred
-    fWeight += abs(aoPre - ao) * 5.0;
-    fWeight = clamp(fWeight, _FrameTime, 1.0);
-    finalAO = lerp(aoPre, ao, fWeight);
-    
+    if (any(uvPre < 0.0) || any(uvPre > 1.0))
+    {
+        finalAO = ao;
+        Ncur = 1;
+    }
+    else
+    {
+        // Point sample: bilinear bleeds dark contact AO across flat surfaces.
+        float4 aoHistory = _CurrentHistory.SampleLevel(s_point_clamp_sampler, uvPre, 0);
+        float prevDepth = UnpackFloatFromR8G8(aoHistory.zw);
+        aoPre = aoHistory.g;
+        Npre = UnpackByte(aoHistory.r);
+
+        // Disocclusion from device-depth mismatch (same space as the depth buffer).
+        float depthRef = max(max(abs(expectedPrevDepth), abs(prevDepth)), 1e-3);
+        float relDepthDiff = abs(expectedPrevDepth - prevDepth) / depthRef;
+        float fWeight = saturate(relDepthDiff * 40.0);
+
+        // Neighborhood clamp: history cannot be darker/brighter than current local AO.
+        // This is the main fix for "dirty AO out of radius" ghost trails.
+        float aoMin, aoMax, aoCenter;
+        GetNeighborhoodAOLimits(uv, aoMin, aoMax, aoCenter);
+        aoPre = clamp(aoPre, aoMin, aoMax);
+
+        // Large AO disagreement after clamp still means invalid history (disocclusion / thin features).
+        fWeight = max(fWeight, smoothstep(0.25, 0.55, abs(aoPre - ao)));
+
+        if (fWeight < 0.9)
+            Ncur = min(Npre + 1, MAX_FRAME_NUM);
+        else
+        {
+            Ncur = 1;
+            aoPre = ao;
+        }
+
+        float minCurrentWeight = rcp((float)Ncur);
+        fWeight = clamp(max(fWeight, minCurrentWeight), _FrameTime, 1.0);
+        finalAO = lerp(aoPre, ao, fWeight);
+    }
+
     float4 aoCurHistory = float4(PackByte(Ncur), finalAO, PackFloatToR8G8(depth));
     _OutputHistory[id.xy] = aoCurHistory;
 
