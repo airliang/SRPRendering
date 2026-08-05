@@ -19,6 +19,8 @@ namespace Insanity
         public Matrix4x4 _PixelCoordToViewDirWS;
         public Matrix4x4 _PrevViewProjMatrix;
         public Matrix4x4 _PrevNonJitteredViewProjMatrix;
+        public Matrix4x4 _PrevNonJitteredInvViewProjMatrix;
+        public Matrix4x4 _PrevPixelCoordToViewDirWS;
         public Vector4 _WorldSpaceCameraPos_Internal;
         public Vector4 _PrevWorldSpaceCameraPos;
         public Vector4 _ScreenSize;

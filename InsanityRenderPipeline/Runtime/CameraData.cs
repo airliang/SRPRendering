@@ -33,6 +33,8 @@ namespace Insanity
             public Matrix4x4 nonJitteredViewProjMatrix;
             public Matrix4x4 nonJitteredInvViewProjMatrix;
             public Matrix4x4 prevNonJitteredViewProjMatrix;
+            /// <summary>Previous frame non-jittered inverse view-projection (sky / TAA far-depth).</summary>
+            public Matrix4x4 prevNonJitteredInvViewProjMatrix;
             /// <summary>Non-jittered projection (for SSAO / effects that must stay stable under TAA jitter).</summary>
             public Matrix4x4 nonJitteredProjMatrix;
             public Matrix4x4 nonJitteredInvProjMatrix;
@@ -43,6 +45,8 @@ namespace Insanity
             public Vector3 prevWorldSpaceCameraPos;
             /// <summary>Utility matrix (used by sky) to map screen position to WS view direction.</summary>
             public Matrix4x4 pixelCoordToViewDirWS;
+            /// <summary>Previous frame pixelCoordToViewDirWS (non-jittered) for sky motion vectors.</summary>
+            public Matrix4x4 prevPixelCoordToViewDirWS;
 
             /// <summary>World Space camera position.</summary>
             public Vector3 worldSpaceCameraPos;
@@ -150,8 +154,10 @@ namespace Insanity
             cb._NonJitteredInvViewProjMatrix = mainViewConstants.nonJitteredInvViewProjMatrix;
             cb._PrevViewProjMatrix = mainViewConstants.prevViewProjMatrix;
             cb._PrevNonJitteredViewProjMatrix = mainViewConstants.prevNonJitteredViewProjMatrix;
+            cb._PrevNonJitteredInvViewProjMatrix = mainViewConstants.prevNonJitteredInvViewProjMatrix;
             //cb._PrevInvViewProjMatrix = mainViewConstants.prevInvViewProjMatrix;
             cb._PixelCoordToViewDirWS = mainViewConstants.pixelCoordToViewDirWS;
+            cb._PrevPixelCoordToViewDirWS = mainViewConstants.prevPixelCoordToViewDirWS;
             cb._WorldSpaceCameraPos_Internal = mainViewConstants.worldSpaceCameraPos;
             cb._PrevWorldSpaceCameraPos = mainViewConstants.prevWorldSpaceCameraPos;
             cb._ScreenSize = screenSize;
@@ -208,11 +214,13 @@ namespace Insanity
                 viewConstants.prevViewMatrix = viewConstants.viewMatrix;
                 viewConstants.prevViewProjMatrix = viewConstants.viewProjMatrix;
                 viewConstants.prevNonJitteredViewProjMatrix = viewConstants.nonJitteredViewProjMatrix;
+                viewConstants.prevNonJitteredInvViewProjMatrix = viewConstants.nonJitteredInvViewProjMatrix;
                 viewConstants.prevProjMatrix = viewConstants.projMatrix;
                 viewConstants.prevInvProjMatrix = viewConstants.invProjMatrix;
                 viewConstants.prevNonJitteredProjMatrix = viewConstants.nonJitteredProjMatrix;
                 viewConstants.prevNonJitteredInvProjMatrix = viewConstants.nonJitteredInvProjMatrix;
                 viewConstants.prevViewProjMatrixOriginal = viewConstants.viewProjMatrixOriginal;
+                viewConstants.prevPixelCoordToViewDirWS = viewConstants.pixelCoordToViewDirWS;
             }
             else
             {
@@ -220,6 +228,7 @@ namespace Insanity
                 viewConstants.prevViewMatrix = gpuView;
                 viewConstants.prevViewProjMatrix = gpuJitteredProj * gpuView;
                 viewConstants.prevNonJitteredViewProjMatrix = gpuNonJitteredProj * gpuView;
+                viewConstants.prevNonJitteredInvViewProjMatrix = viewConstants.prevNonJitteredViewProjMatrix.inverse;
                 viewConstants.prevProjMatrix = gpuJitteredProj;
                 viewConstants.prevInvProjMatrix = gpuJitteredProj.inverse;
                 viewConstants.prevNonJitteredProjMatrix = gpuNonJitteredProj;
@@ -244,6 +253,8 @@ namespace Insanity
             var skyViewConstants = viewConstants;
             skyViewConstants.invViewProjMatrix = viewConstants.nonJitteredInvViewProjMatrix;
             viewConstants.pixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(skyViewConstants, screenSize);
+            if (isFirstFrame)
+                viewConstants.prevPixelCoordToViewDirWS = viewConstants.pixelCoordToViewDirWS;
             viewConstants.viewProjMatrixOriginal = gpuNonJitteredProj * viewMatrix;
             viewConstants.invViewProjMatrixOriginal = viewConstants.viewProjMatrixOriginal.inverse;
         }

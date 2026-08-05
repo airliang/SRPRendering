@@ -17,6 +17,8 @@ GLOBAL_CBUFFER_START(ShaderVariablesGlobal, b0)
 	float4x4 _PixelCoordToViewDirWS;
     float4x4 _PrevViewProjMatrix;
 	float4x4 _PrevNonJitteredViewProjMatrix;
+	float4x4 _PrevNonJitteredInvViewProjMatrix;
+	float4x4 _PrevPixelCoordToViewDirWS;
 	float4 _WorldSpaceCameraPos_Internal;
 	float4 _PrevWorldSpaceCameraPos;
 	float4 _ScreenSize;

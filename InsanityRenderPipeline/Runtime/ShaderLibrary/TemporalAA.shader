@@ -142,12 +142,34 @@ Shader "Insanity/TemporalAA"
                 }
             }
 
-            float2 GetMotionVector(float2 uv, int2 minDepthOffset, float2 historyUV)
+            float2 GetMotionVector(float2 uv, float2 positionCS, int2 minDepthOffset)
             {
             #ifdef _USE_MOTION_VECTORS
                 float2 sampleUV = uv + float2(minDepthOffset) * _MainTex_TexelSize.xy;
+                float deviceDepth = SampleDeviceDepth(sampleUV);
+                // Sky / background: GBuffer has no MV. Derive UV motion from curr/prev view directions.
+                if (deviceDepth == UNITY_RAW_FAR_CLIP_VALUE)
+                    return ComputeSkyMotionVectorUV(positionCS);
                 return SAMPLE_TEXTURE2D(_MotionVectorTex, s_point_clamp_sampler, sampleUV).rg;
             #else
+                float deviceDepth = SampleDeviceDepth(uv);
+                if (deviceDepth == UNITY_RAW_FAR_CLIP_VALUE)
+                    return ComputeSkyMotionVectorUV(positionCS);
+
+                float4 clipPos = float4(uv * 2.0 - 1.0, deviceDepth, 1.0);
+            #if UNITY_UV_STARTS_AT_TOP
+                clipPos.y = -clipPos.y;
+            #endif
+                float4 worldPos = mul(_NonJitteredInvViewProjMatrix, clipPos);
+                worldPos /= worldPos.w;
+                // Camera-relative: unprojected WS is relative to current camera; prev VP expects prev-camera space.
+                worldPos.xyz = GetPreviousFramePositionWS(worldPos.xyz);
+                float4 prevClip = mul(_PrevNonJitteredViewProjMatrix, worldPos);
+                prevClip /= prevClip.w;
+            #if UNITY_UV_STARTS_AT_TOP
+                prevClip.y *= _ProjectionParams.x;
+            #endif
+                float2 historyUV = prevClip.xy * 0.5 + 0.5;
                 return uv - historyUV;
             #endif
             }
@@ -162,6 +184,7 @@ Shader "Insanity/TemporalAA"
             half4 Fragment(Varyings input) : SV_Target
             {
                 float2 uv = input.uv;
+                float2 positionCS = input.positionCS.xy;
                 float weightMax = _TAAParams.x;
 
                 if (_FirstFrame > 0.5)
@@ -177,27 +200,8 @@ Shader "Insanity/TemporalAA"
 
                 float divergentDepth = saturate(10.0 * (zMax - zMin) / max(0.001, zMax));
 
-                float2 historyUV = uv;
-            #ifdef _USE_MOTION_VECTORS
-                float2 motionVector = GetMotionVector(uv, minDepthOffset, historyUV);
-                historyUV = uv - motionVector;
-            #else
-                float deviceDepth = SampleDeviceDepth(uv);
-                float4 clipPos = float4(uv * 2.0 - 1.0, deviceDepth, 1.0);
-            #if UNITY_UV_STARTS_AT_TOP
-                clipPos.y = -clipPos.y;
-            #endif
-                float4 worldPos = mul(_NonJitteredInvViewProjMatrix, clipPos);
-                worldPos /= worldPos.w;
-                // Camera-relative: unprojected WS is relative to current camera; prev VP expects prev-camera space.
-                worldPos.xyz = GetPreviousFramePositionWS(worldPos.xyz);
-                float4 prevClip = mul(_PrevNonJitteredViewProjMatrix, worldPos);
-                prevClip /= prevClip.w;
-            #if UNITY_UV_STARTS_AT_TOP
-                prevClip.y *= _ProjectionParams.x;
-            #endif
-                historyUV = prevClip.xy * 0.5 + 0.5;
-            #endif
+                float2 motionVector = GetMotionVector(uv, positionCS, minDepthOffset);
+                float2 historyUV = uv - motionVector;
 
                 if (any(historyUV < 0.0) || any(historyUV > 1.0))
                 {
@@ -205,10 +209,6 @@ Shader "Insanity/TemporalAA"
                     current.a = 1.0;
                     return current;
                 }
-
-            #ifndef _USE_MOTION_VECTORS
-                float2 motionVector = uv - historyUV;
-            #endif
 
                 float4 accumulatedColorRGBA = saturate(SampleHistoryBicubic(historyUV));
                 float accumulatedWeight = accumulatedColorRGBA.a;

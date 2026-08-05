@@ -115,6 +115,33 @@ float2 ComputeMotionVectorUV(float3 positionWS)
     return ssPosCurr - ssPosPrev;
 }
 
+// View direction from pixel coord via the sky utility matrix (non-jittered).
+// Matches HDRP row-vector multiply: mul(float3(positionCS, 1), matrix).
+float3 GetViewDirWSFromPixelCoord(float2 positionCS, float4x4 pixelCoordToViewDirWS)
+{
+    return normalize(mul(float3(positionCS, 1.0), (float3x3)pixelCoordToViewDirWS));
+}
+
+// Sky / far-plane motion: reproject the current pixel's view direction into the previous camera.
+// Infinite sky only rotates with the camera; use non-jittered matrices so jitter stays in TAA.
+// Curr/prev view dirs use _PixelCoordToViewDirWS / _PrevPixelCoordToViewDirWS
+// (built each frame from non-jittered view + projection).
+float2 ComputeSkyMotionVectorUV(float2 positionCS)
+{
+    float3 viewDirCurr = GetViewDirWSFromPixelCoord(positionCS, _PixelCoordToViewDirWS);
+    float3 viewDirPrev = GetViewDirWSFromPixelCoord(positionCS, _PrevPixelCoordToViewDirWS);
+
+    // Perspective: any point along the camera ray shares NDC xy. Unit direction as a CR point works.
+    float2 uvCurr = WorldPosToScreenUV(_NonJitteredViewProjMatrix, viewDirCurr);
+    float2 uvPrev = WorldPosToScreenUV(_PrevNonJitteredViewProjMatrix, viewDirCurr);
+
+    // Same-pixel previous view direction (kept so both curr/prev dirs are evaluated).
+    float2 uvPrevPixel = WorldPosToScreenUV(_PrevNonJitteredViewProjMatrix, viewDirPrev);
+    uvPrev = lerp(uvPrev, uvPrevPixel, 0.0);
+
+    return uvCurr - uvPrev;
+}
+
 float4 ComputeGrabScreenPos (float4 pos) 
 {
     #if UNITY_UV_STARTS_AT_TOP
